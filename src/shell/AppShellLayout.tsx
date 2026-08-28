@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Badge, Button } from "@ui/ui-lib";
+import { Badge, Button } from "@metap/ui";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
@@ -32,7 +32,7 @@ function NavLink({ item }: { item: ShellNavItem }) {
 
 /** The shared page chrome every `@metap/platform-ui` consumer app assembles its authenticated
  * routes into, instead of hand-rolling header/nav per app (ported from `packages/platform-react`'s
- * Mantine `AppShell`-based version onto the `@ui/ui-lib` design system). No i18n yet (deferred —
+ * Mantine `AppShell`-based version onto the `@metap/ui` design system). No i18n yet (deferred —
  * see repo README) — English strings hardcoded, unlike the version this was ported from. */
 export function AppShellLayout({
   brand,

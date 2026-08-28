@@ -1,10 +1,10 @@
-import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@ui/ui-lib";
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import type { EntityField } from "../metadata/types";
 import { formatFieldValue } from "./fieldKindConfig";
 import { ReferenceFieldValue } from "./ReferenceFieldValue";
 
 /** Renders inside a `TooltipProvider` — the consuming app mounts one once near its root (see
- * `@ui/ui-lib`'s `TooltipProvider`), same as every other `Tooltip` use in this package. */
+ * `@metap/ui`'s `TooltipProvider`), same as every other `Tooltip` use in this package. */
 export function FieldValue({ field, value }: { field: EntityField; value: unknown }) {
   if (value === null || value === undefined) {
     if (field.required) {

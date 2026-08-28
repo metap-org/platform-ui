@@ -6,7 +6,7 @@
  * `RecordDetail`/`GeneratedList` already do for CRUD.
  *
  * Renders as inline SVG (no chart library dependency, same choice `apps/jira-fe`'s burndown
- * chart already made) and reads color/ink from `@ui/ui-lib`'s design tokens (`hsl(var(--...)))`,
+ * chart already made) and reads color/ink from `@metap/ui`'s design tokens (`hsl(var(--...)))`,
  * same CSS-variable convention its Tailwind preset defines) so it inherits the host app's theme
  * (including dark mode) for free rather than shipping a second, disconnected palette. A single
  * un-colored series draws every bar in one hue (`--primary`) — per-bar `color` is for when

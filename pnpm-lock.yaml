@@ -8,12 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@metap/ui':
+        specifier: link:../design-system
+        version: link:../design-system
       '@tanstack/react-virtual':
         specifier: ^3.14.9
         version: 3.14.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@ui/ui-lib':
-        specifier: link:../design-system
-        version: link:../design-system
       dayjs:
         specifier: ^1.11.21
         version: 1.11.23

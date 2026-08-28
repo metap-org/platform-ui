@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.9",
-    "@ui/ui-lib": "link:../design-system",
+    "@metap/ui": "link:../design-system",
     "dayjs": "^1.11.21",
     "i18next": "^26.3.6",
     "react-i18next": "^17.0.11"

@@ -15,7 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@ui/ui-lib";
+} from "@metap/ui";
 import { useApiInfiniteQuery } from "../api/useApiInfiniteQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
@@ -43,7 +43,7 @@ type SortState = { field: string; descending: boolean } | null;
 
 const ROW_HEIGHT = 40;
 
-/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@ui/ui-lib` — see
+/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@metap/ui` — see
  * `field/ReferenceFieldInput`'s doc comment for the same tradeoff. */
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);

@@ -1,15 +1,15 @@
 # @metap/platform-ui
 
-Bản kế thừa `packages/platform-react` (repo `metap`), build lại UI bằng `@ui/ui-lib` (repo
+Bản kế thừa `packages/platform-react` (repo `metap`), build lại UI bằng `@metap/ui` (repo
 `../design-system`, Tailwind + Radix + shadcn-style) thay cho Mantine. Repo riêng, không nằm
-trong pnpm workspace của `metap` — `@ui/ui-lib` được link cục bộ qua `link:../design-system`
+trong pnpm workspace của `metap` — `@metap/ui` được link cục bộ qua `link:../design-system`
 trong lúc cả hai repo cùng phát triển song song (chưa publish package nào lên registry).
 
 ## Trạng thái (2026-08-28)
 
-**Đã port 100% sang `@ui/ui-lib`, gỡ hẳn `@mantine/*` khỏi `package.json`.** Toàn bộ
+**Đã port 100% sang `@metap/ui`, gỡ hẳn `@mantine/*` khỏi `package.json`.** Toàn bộ
 `admin/`, `api/`, `auth/`, `charts/`, `detail/`, `field/`, `form/`, `i18n/`, `list/`,
-`metadata/`, `navigation/`, `shell/`, `workflow/` giờ chỉ còn phụ thuộc `@ui/ui-lib` (không còn
+`metadata/`, `navigation/`, `shell/`, `workflow/` giờ chỉ còn phụ thuộc `@metap/ui` (không còn
 import `@mantine/*` nào trong `src/` — vài chỗ nhắc "@mantine" chỉ còn trong doc-comment giải
 thích gap lịch sử). `typecheck`/`lint`/`format:check` đều sạch.
 
@@ -17,7 +17,7 @@ thích gap lịch sử). `typecheck`/`lint`/`format:check` đều sạch.
 vì `react-i18next`. Phần `i18n/*` (LocaleSwitcher, LocaleProvider, ...) và các trang còn lại vẫn
 dùng `react-i18next` nguyên trạng như `platform-react`.
 
-**Gap đã biết giữa `@ui/ui-lib` và Mantine** (đã xử lý bằng workaround, không phải thiếu sót):
+**Gap đã biết giữa `@metap/ui` và Mantine** (đã xử lý bằng workaround, không phải thiếu sót):
 
 - Không có `MultiSelect`/`TagsInput` — tự viết `MultiFieldSelect`/`TagsField` (trong
   `admin/LowCodeEntitiesAdminPage.tsx`) dựng từ `Badge` + `Select`/input thuần.

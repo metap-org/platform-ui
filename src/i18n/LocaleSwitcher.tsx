@@ -1,4 +1,4 @@
-import { Select } from "@ui/ui-lib";
+import { Select } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useLocale } from "./LocaleProvider";
 import { SUPPORTED_LOCALES } from "./resources";

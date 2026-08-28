@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, buttonVariants, Input, Separator, Spinner } from "@ui/ui-lib";
+import { Alert, Button, buttonVariants, Input, Separator, Spinner } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { apiFetch, ApiError } from "../api/client";
 import { useNavigationAdapter } from "../navigation/NavigationContext";

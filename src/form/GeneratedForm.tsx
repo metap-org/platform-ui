@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Spinner } from "@ui/ui-lib";
+import { Alert, Button, Spinner } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { useApiMutation } from "../api/useApiMutation";

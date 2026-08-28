@@ -18,7 +18,7 @@ import {
   TableRow,
   Textarea,
   Toggle,
-} from "@ui/ui-lib";
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
@@ -59,7 +59,7 @@ function DismissButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** Free-text array editor (enum values, terminal states) — `@ui/ui-lib` has no `TagsInput`
+/** Free-text array editor (enum values, terminal states) — `@metap/ui` has no `TagsInput`
  * equivalent yet (a real gap, see README.md), so this is hand-built from `Chip`-style removable
  * pills + a plain text input, Enter/comma to commit a new tag. */
 function TagsField({
@@ -113,7 +113,7 @@ function TagsField({
   );
 }
 
-/** Fixed-option multi-select (list-view fields/filters) — `@ui/ui-lib` has no `MultiSelect`
+/** Fixed-option multi-select (list-view fields/filters) — `@metap/ui` has no `MultiSelect`
  * equivalent yet (a real gap, see README.md): selected options render as removable `Badge`s, a
  * plain `Select` underneath adds one more from whatever's not already picked. */
 function MultiFieldSelect({

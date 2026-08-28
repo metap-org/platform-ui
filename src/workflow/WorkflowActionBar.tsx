@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Spinner, Tooltip, TooltipContent, TooltipTrigger } from "@ui/ui-lib";
+import { Alert, Badge, Button, Spinner, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, ApiError } from "../api/client";

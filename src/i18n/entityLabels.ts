@@ -8,7 +8,7 @@
 //
 // Not self-service: adding a translation means editing this file and shipping a new frontend
 // build, not an admin API call. Fine for a demo app (`apps/crm-fe`); a real downstream
-// consumer of `platform-react` would maintain its own copy of this shape for its own entities.
+// consumer of `platform-ui` would maintain its own copy of this shape for its own entities.
 
 export type EntityLabelOverrides = {
   entity?: string;

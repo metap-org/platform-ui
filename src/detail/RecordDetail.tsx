@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, IconButton, Spinner } from "@ui/ui-lib";
+import { Alert, Button, IconButton, Spinner } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";

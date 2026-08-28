@@ -19,7 +19,7 @@ function isSupportedLocale(value: string): value is (typeof SUPPORTED_LOCALES)[n
 
 // Must be nested inside `AuthProvider` — reads `token` to load/persist the caller's
 // `GET/PUT /preferences` locale (`crates/metap-http/src/routes/preferences.rs`). Also wraps
-// `I18nextProvider` so any consumer of `platform-react` gets a working `useTranslation()`
+// `I18nextProvider` so any consumer of `platform-ui` gets a working `useTranslation()`
 // without wiring i18next itself.
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();

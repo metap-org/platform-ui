@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Autocomplete } from "@ui/ui-lib";
+import { Autocomplete } from "@metap/ui";
 import { useApiQuery } from "../api/useApiQuery";
 import type { EntityField } from "../metadata/types";
 
@@ -16,7 +16,7 @@ function labelFor(record: RecordDto, refDisplayField: string | undefined): strin
   return typeof raw === "string" ? raw : record.id;
 }
 
-/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@ui/ui-lib` (a component library, not
+/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@metap/ui` (a component library, not
  * a hooks utility one) — inlined the same 300ms debounce by hand. */
 function useDebouncedValue(value: string, delayMs: number): string {
   const [debounced, setDebounced] = useState(value);

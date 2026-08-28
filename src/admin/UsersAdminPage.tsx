@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@ui/ui-lib";
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";

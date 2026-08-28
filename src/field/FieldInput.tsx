@@ -1,8 +1,8 @@
-import { Checkbox, DatePicker, Input, NumberInput, Select, Textarea } from "@ui/ui-lib";
+import { Checkbox, DatePicker, Input, NumberInput, Select, Textarea } from "@metap/ui";
 import type { EntityField } from "../metadata/types";
 import { ReferenceFieldInput } from "./ReferenceFieldInput";
 
-/** `@ui/ui-lib`'s `DatePicker` is date-only (no time-of-day component yet, tracked as a real gap
+/** `@metap/ui`'s `DatePicker` is date-only (no time-of-day component yet, tracked as a real gap
  * — see README.md) — `"datetime"` fields use it too, losing the time portion `@mantine/dates`'s
  * `DateTimePicker` kept. Converts between this package's ISO-string field values and the
  * component's own `Date | null`. */
