@@ -2,7 +2,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, type ApiError } from "./client";
 
-export function useApiMutation<TResponse, TBody = unknown>(method: "POST" | "PATCH", path: string) {
+export function useApiMutation<TResponse, TBody = unknown>(
+  method: "POST" | "PATCH" | "PUT",
+  path: string,
+) {
   const { token } = useAuth();
 
   return useMutation<TResponse, ApiError, TBody>({

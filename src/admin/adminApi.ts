@@ -3,9 +3,15 @@ import { useApiMutation } from "../api/useApiMutation";
 import { useApiQuery } from "../api/useApiQuery";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, ApiError } from "../api/client";
+import type { PolicyCondition } from "./policyCondition";
 
 export type AdminUser = { userId: string; roles: string[] };
 
+/** `condition` is a real `PolicyCondition` (see `./policyCondition.ts`), not `unknown` — the
+ *  single hand-typed mirror of `crates/metap-permission/src/policy_condition/types.rs`'s wire
+ *  shape. `subject`/`effect` stay plain strings (`"context"|"record"`, `"allow"|"deny"`)
+ *  rather than a second enum type — narrow only where a caller actually branches on them
+ *  (`isBasicShapedRow`, the matrix/advanced-panel components). */
 export type AdminPolicy = {
   id: string;
   tenantId: string;
@@ -14,7 +20,8 @@ export type AdminPolicy = {
   field: string | null;
   subject: string;
   roles: string[] | null;
-  condition: unknown;
+  condition: PolicyCondition | null;
+  effect: string;
   createdBy: string | null;
 };
 
@@ -120,12 +127,13 @@ export function useAdminRoleActions() {
 
 // --- Policies ---
 
-export function useAdminPolicies(entity?: string) {
+export function useAdminPolicies(entity?: string, enabled = true) {
   const path = entity ? `/admin/policies?entity=${encodeURIComponent(entity)}` : "/admin/policies";
   return useApiQuery<{ data: AdminPolicy[] }, AdminPolicy[]>(
     ["admin", "policies", entity ?? null],
     path,
     (response) => response.data,
+    enabled,
   );
 }
 
@@ -136,9 +144,10 @@ export function useCreateAdminPolicy() {
       entity: string;
       action: string;
       roles?: string[];
-      condition?: unknown;
+      condition?: PolicyCondition | null;
       field?: string;
       subject?: string;
+      effect?: string;
     }
   >("POST", "/admin/policies");
 }
@@ -151,6 +160,31 @@ export function useDeleteAdminPolicy() {
     await apiFetch(`/admin/policies/${id}`, token, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
   };
+}
+
+/** The RBAC permission matrix's single save call (`PermissionMatrix.tsx`) — replaces the entire
+ *  basic-shaped policy set for `entity` with exactly `grants` in one atomic backend transaction
+ *  (`PUT /admin/policies/matrix`, `PolicyStore::sync_basic_policies`), instead of firing one
+ *  `POST`/`DELETE` per checkbox click. `role: null` means the matrix's pinned "Everyone" row (an
+ *  open, `roles IS NULL` policy). Never touches an Advanced-tab policy — see that trait method's
+ *  doc comment (`crates/metap-permission/src/policy_store.rs`) for the exact boundary. */
+export function useSyncMatrixPolicies() {
+  return useApiMutation<
+    { data: AdminPolicy[] },
+    { entity: string; grants: { role: string | null; action: string }[] }
+  >("PUT", "/admin/policies/matrix");
+}
+
+/** The fixed action set a policy can grant (`GET /metadata/actions`, backed by
+ *  `EntityAction::ALL` — `crates/metap-permission/src/context.rs`) — single source of truth for
+ *  the matrix's action columns and the Advanced form's action picker, instead of a second
+ *  hand-typed mirror of this list. */
+export function useKnownActions() {
+  return useApiQuery<{ data: string[] }, string[]>(
+    ["metadata", "actions"],
+    "/metadata/actions",
+    (response) => response.data,
+  );
 }
 
 // --- Cron jobs ---

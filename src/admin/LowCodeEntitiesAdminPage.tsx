@@ -22,6 +22,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
+import { TagsField } from "../shared/TagsField";
 import {
   useLowCodeActions,
   useLowCodeEntities,
@@ -56,60 +57,6 @@ function DismissButton({ onClick }: { onClick: () => void }) {
         </svg>
       }
     />
-  );
-}
-
-/** Free-text array editor (enum values, terminal states) — `@metap/ui` has no `TagsInput`
- * equivalent yet (a real gap, see README.md), so this is hand-built from `Chip`-style removable
- * pills + a plain text input, Enter/comma to commit a new tag. */
-function TagsField({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string[];
-  onChange: (next: string[]) => void;
-  placeholder?: string;
-}) {
-  const [draft, setDraft] = useState("");
-
-  function commit() {
-    const v = draft.trim();
-    if (v && !value.includes(v)) {
-      onChange([...value, v]);
-    }
-    setDraft("");
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1 rounded-md border border-input bg-background px-2 py-1">
-      {value.map((v) => (
-        <Badge key={v} variant="secondary" className="gap-1">
-          {v}
-          <button
-            type="button"
-            aria-label={`Remove ${v}`}
-            onClick={() => onChange(value.filter((x) => x !== v))}
-            className="text-xs leading-none"
-          >
-            ×
-          </button>
-        </Badge>
-      ))}
-      <input
-        className="min-w-[100px] flex-1 bg-transparent py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-        placeholder={placeholder}
-        value={draft}
-        onChange={(e) => setDraft(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            commit();
-          }
-        }}
-        onBlur={commit}
-      />
-    </div>
   );
 }
 

@@ -19,8 +19,19 @@ dùng `react-i18next` nguyên trạng như `platform-react`.
 
 **Gap đã biết giữa `@metap/ui` và Mantine** (đã xử lý bằng workaround, không phải thiếu sót):
 
-- Không có `MultiSelect`/`TagsInput` — tự viết `MultiFieldSelect`/`TagsField` (trong
-  `admin/LowCodeEntitiesAdminPage.tsx`) dựng từ `Badge` + `Select`/input thuần.
+- Không có `MultiSelect`/`TagsInput` — tự viết `MultiFieldSelect` (trong
+  `admin/LowCodeEntitiesAdminPage.tsx`) và `TagsField` (`shared/TagsField.tsx`, tách ra thành
+  file dùng chung 2026-08-29 khi có caller thứ hai — `admin/policies/ValueEditor.tsx`'s `in`/
+  `notIn` operator — ngoài `LowCodeEntitiesAdminPage.tsx`'s `enumValues`/`terminalStates`) dựng
+  từ `Badge`/`Chip` + `Select`/input thuần.
+- `Autocomplete` chỉ commit giá trị khi chọn 1 option có sẵn hoặc bấm clear — gõ text tự do
+  không khớp option nào sẽ bị bỏ qua âm thầm (không phải combobox thật dù giao diện giống). Vì
+  vậy `admin/policies/AttributePicker.tsx`'s context-attribute picker (giá trị tự do, không có
+  danh sách cố định — `AUTH_CONTEXT_ENTITY`'s dynamic attributes không enumerate được từ FE)
+  dùng `Input` + `Chip` gợi ý thay vì `Autocomplete`.
+- Không có `Tree`/`TreeView` hay drag-and-drop primitive nào — cây điều kiện ABAC
+  (`admin/policies/ConditionNodeEditor.tsx`) tự dựng đệ quy bằng indent + border trái, không
+  dùng `Accordion` (chỉ là list phẳng, không hỗ trợ nesting thật).
 - `DatePicker` chỉ chọn ngày, không có time component — dùng chung cho cả field kind `"date"`
   và `"datetime"`, mất phần giờ:phút:giây khi hiển thị/nhập (xem doc-comment trong
   `field/FieldInput.tsx`).
