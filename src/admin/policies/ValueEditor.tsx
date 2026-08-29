@@ -1,7 +1,14 @@
-import { Input, NumberInput, RadioGroup, RadioGroupItem, Select, DatePicker } from "@metap/ui";
+import {
+  Input,
+  NumberInput,
+  RadioGroup,
+  RadioGroupItem,
+  Select,
+  DatePicker,
+  TagsInput,
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import type { EntitySummary } from "../../metadata/types";
-import { TagsField } from "../../shared/TagsField";
 import { AttributePicker } from "./AttributePicker";
 import { isFromContext, isLiteral, type ConditionOp, type PolicyValue } from "../policyCondition";
 
@@ -70,7 +77,7 @@ export function ValueEditor({
           onChange={(next) => onChange({ fromContext: next })}
         />
       ) : isMultiValue ? (
-        <TagsField
+        <TagsInput
           value={Array.isArray(literal) ? literal.map(String) : []}
           onChange={(tags) => setLiteral(isNumericKind(field?.kind) ? tags.map(Number) : tags)}
           placeholder={t("admin.policies.builder.valuesPlaceholder")}

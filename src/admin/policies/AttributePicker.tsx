@@ -1,4 +1,4 @@
-import { Chip, Input, Select } from "@metap/ui";
+import { Select, SuggestInput } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import type { EntitySummary } from "../../metadata/types";
 
@@ -43,23 +43,11 @@ export function AttributePicker({
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <Input
-        placeholder={t("admin.policies.builder.contextAttributePlaceholder")}
-        value={value}
-        onChange={(e) => onChange(e.currentTarget.value)}
-      />
-      <div className="flex flex-wrap gap-1">
-        {CONTEXT_QUICK_FILLS.map((key) => (
-          <Chip
-            key={key}
-            label={key}
-            variant={value === key ? "default" : "outline"}
-            onClick={() => onChange(key)}
-            className="cursor-pointer"
-          />
-        ))}
-      </div>
-    </div>
+    <SuggestInput
+      placeholder={t("admin.policies.builder.contextAttributePlaceholder")}
+      value={value}
+      onChange={onChange}
+      suggestions={CONTEXT_QUICK_FILLS}
+    />
   );
 }

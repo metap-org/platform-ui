@@ -4,7 +4,6 @@ import {
   Badge,
   Button,
   IconButton,
-  Input,
   Select,
   Spinner,
   Table,
@@ -13,6 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TagsInput,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
@@ -20,12 +20,14 @@ import { ApiErrorMessage } from "../../api/ApiErrorMessage";
 import type { EntitySummary } from "../../metadata/types";
 import {
   useAdminPolicies,
+  useAdminUsers,
   useCreateAdminPolicy,
   useDeleteAdminPolicy,
   useKnownActions,
 } from "../adminApi";
 import { describeCondition, isBasicShapedRow, type PolicyCondition } from "../policyCondition";
 import { ConditionBuilder } from "./ConditionBuilder";
+import { collectKnownRoles } from "./policyMatrixHelpers";
 
 const NO_FIELD = "";
 
@@ -41,11 +43,12 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
   const { t } = useTranslation();
   const { data: policies, isLoading, error, refetch } = useAdminPolicies(entity.name);
   const { data: actions } = useKnownActions();
+  const { data: users } = useAdminUsers();
   const createPolicy = useCreateAdminPolicy();
   const deletePolicy = useDeleteAdminPolicy();
 
   const [action, setAction] = useState<string>("");
-  const [roles, setRoles] = useState("");
+  const [roles, setRoles] = useState<string[]>([]);
   const [field, setField] = useState(NO_FIELD);
   const [subject, setSubject] = useState<"context" | "record">("context");
   const [effect, setEffect] = useState<"allow" | "deny">("allow");
@@ -57,10 +60,11 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
     ...entity.fields.map((f) => ({ value: f.name, label: f.label })),
   ];
   const hasWorkflow = Boolean(entity.workflow);
+  const knownRoles = collectKnownRoles(users ?? [], policies ?? [], []);
 
   function resetForm() {
     setAction("");
-    setRoles("");
+    setRoles([]);
     setField(NO_FIELD);
     setSubject("context");
     setEffect("allow");
@@ -72,10 +76,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
       await createPolicy.mutateAsync({
         entity: entity.name,
         action,
-        roles: roles
-          .split(",")
-          .map((r) => r.trim())
-          .filter(Boolean),
+        roles,
         field: field.trim().length > 0 ? field.trim() : undefined,
         subject,
         effect,
@@ -122,11 +123,13 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
           onValueChange={setAction}
           placeholder={t("admin.policies.actionPlaceholder")}
         />
-        <Input
+        <TagsInput
           label={t("admin.users.rolesLabel")}
-          helperText={t("admin.users.rolesDescription")}
           value={roles}
-          onChange={(e) => setRoles(e.currentTarget.value)}
+          onChange={setRoles}
+          suggestions={knownRoles}
+          placeholder={t("admin.policies.rolesPlaceholder")}
+          helperText={t("admin.policies.rolesDescription")}
         />
         <Select
           label={t("admin.policies.field")}

@@ -7,6 +7,7 @@ import {
   Checkbox,
   IconButton,
   Input,
+  MultiSelect,
   NumberInput,
   Select,
   Spinner,
@@ -16,13 +17,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TagsInput,
   Textarea,
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
-import { TagsField } from "../shared/TagsField";
 import {
   useLowCodeActions,
   useLowCodeEntities,
@@ -60,53 +61,6 @@ function DismissButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** Fixed-option multi-select (list-view fields/filters) — `@metap/ui` has no `MultiSelect`
- * equivalent yet (a real gap, see README.md): selected options render as removable `Badge`s, a
- * plain `Select` underneath adds one more from whatever's not already picked. */
-function MultiFieldSelect({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const available = options.filter((o) => !value.includes(o));
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-foreground">{label}</label>
-      {value.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {value.map((v) => (
-            <Badge key={v} variant="secondary" className="gap-1">
-              {v}
-              <button
-                type="button"
-                aria-label={`Remove ${v}`}
-                onClick={() => onChange(value.filter((x) => x !== v))}
-                className="text-xs leading-none"
-              >
-                ×
-              </button>
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-      {available.length > 0 ? (
-        <Select
-          placeholder="Add…"
-          options={available.map((o) => ({ value: o, label: o }))}
-          value={undefined}
-          onValueChange={(v) => onChange([...value, v])}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 type FieldRow = {
   name: string;
   label: string;
@@ -123,7 +77,7 @@ type FieldRow = {
   // A real string[], not a comma-joined string — only meaningful when kind === "enum". A
   // comma-joined representation would silently corrupt any enum value that itself contains a
   // comma the next time it round-trips through save/load (split(",") can't tell "a value with
-  // a comma" apart from two separate values); `TagsField` above edits this array directly, no
+  // a comma" apart from two separate values); `TagsInput` above edits this array directly, no
   // join/split needed.
   enumValues: string[];
   refEntity: string; // only meaningful when kind === "reference"
@@ -282,7 +236,7 @@ const FieldRowEditor = memo(function FieldRowEditor({
       </TableCell>
       <TableCell>
         {row.kind === "enum" ? (
-          <TagsField
+          <TagsInput
             placeholder={t("admin.lowcode.enumValuesPlaceholder")}
             value={row.enumValues}
             onChange={(value) => onUpdate(index, { enumValues: value })}
@@ -459,7 +413,7 @@ function wireToListViewRow(view: unknown): ListViewRow {
 
 /** Memoized for the same reason as `FieldRowEditor` — `fieldNames`/`sortOptions` only get a
  * new reference when the underlying field list actually changes (`useMemo` in the parent), so
- * an edit in one list-view card doesn't re-render every other card's `MultiFieldSelect`. */
+ * an edit in one list-view card doesn't re-render every other card's `MultiSelect`. */
 const ListViewRowEditor = memo(function ListViewRowEditor({
   row,
   index,
@@ -476,6 +430,7 @@ const ListViewRowEditor = memo(function ListViewRowEditor({
   onRemove: (index: number) => void;
 }) {
   const { t } = useTranslation();
+  const fieldOptions = fieldNames.map((f) => ({ value: f, label: f }));
 
   return (
     <div className="flex flex-col gap-2 rounded border border-border p-3">
@@ -503,15 +458,15 @@ const ListViewRowEditor = memo(function ListViewRowEditor({
           icon={<span className="text-base leading-none">×</span>}
         />
       </div>
-      <MultiFieldSelect
+      <MultiSelect
         label={t("admin.lowcode.listViewFields")}
-        options={fieldNames}
+        options={fieldOptions}
         value={row.fields}
         onChange={(value) => onUpdate(index, { fields: value })}
       />
-      <MultiFieldSelect
+      <MultiSelect
         label={t("admin.lowcode.listViewFilters")}
-        options={fieldNames}
+        options={fieldOptions}
         value={row.filters}
         onChange={(value) => onUpdate(index, { filters: value })}
       />
@@ -861,16 +816,12 @@ function WorkflowBuilder({
           />
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-foreground">
-          {t("admin.lowcode.workflow.terminalStates")}
-        </label>
-        <TagsField
-          placeholder={t("admin.lowcode.workflow.terminalStatesPlaceholder")}
-          value={workflow.terminalStates}
-          onChange={(value) => onChange((prev) => ({ ...prev, terminalStates: value }))}
-        />
-      </div>
+      <TagsInput
+        label={t("admin.lowcode.workflow.terminalStates")}
+        placeholder={t("admin.lowcode.workflow.terminalStatesPlaceholder")}
+        value={workflow.terminalStates}
+        onChange={(value) => onChange((prev) => ({ ...prev, terminalStates: value }))}
+      />
       <p className="mt-2 text-sm font-medium text-foreground">
         {t("admin.lowcode.workflow.transitions")}
       </p>
@@ -1091,7 +1042,7 @@ export function LowCodeEntitiesAdminPage() {
 
   // `useMemo`'d so this array only gets a new reference when `fields` itself changes —
   // otherwise every keystroke/checkbox toggle anywhere on the page would hand `ListViewBuilder`
-  // a brand-new `fieldNames` array, cascading into every `MultiFieldSelect`'s `options` prop and
+  // a brand-new `fieldNames` array, cascading into every `MultiSelect`'s `options` prop and
   // defeating `ListViewRowEditor`'s memoization.
   const fieldNames = useMemo(
     () => [...fields.map((f) => f.name.trim()).filter(Boolean), ...IMPLICIT_SYSTEM_FIELDS],
