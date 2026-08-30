@@ -304,6 +304,12 @@ export function useLowCodeActions() {
       { method: "POST" },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode"] });
+    // This actually swaps the live `MetadataRegistry` — `useEntities`/`useEntity` cache it with
+    // `staleTime: Infinity` specifically because they rely on this invalidation (not a timed
+    // refetch) to notice a published schema change, so it can't be skipped here the way
+    // `previewPublish` skips it.
+    await queryClient.invalidateQueries({ queryKey: ["entities"] });
+    await queryClient.invalidateQueries({ queryKey: ["entity", name] });
     return result.data;
   }
 
@@ -326,6 +332,9 @@ export function useLowCodeActions() {
       { method: "POST", body: JSON.stringify({ toVersionNumber }) },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode"] });
+    // See `publish`'s comment — rollback swaps the live registry too.
+    await queryClient.invalidateQueries({ queryKey: ["entities"] });
+    await queryClient.invalidateQueries({ queryKey: ["entity", name] });
     return result.data;
   }
 
@@ -335,6 +344,10 @@ export function useLowCodeActions() {
       body: JSON.stringify({ enabled }),
     });
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode", "entities"] });
+    // See `publish`'s comment — disabling/enabling an entity changes what the live registry
+    // serves too (a disabled entity drops out of `GET /metadata/entities`).
+    await queryClient.invalidateQueries({ queryKey: ["entities"] });
+    await queryClient.invalidateQueries({ queryKey: ["entity", name] });
   }
 
   return { getDraft, saveDraft, publish, previewPublish, rollback, setEnabled };
