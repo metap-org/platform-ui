@@ -7,6 +7,19 @@ import { isBasicShapedRow } from "../policyCondition";
  *  collision risk is accepted as harmless — both cases already mean "no role restriction"). */
 export const EVERYONE_ROLE = "__everyone__";
 
+/** Per-role checked-action state, keyed by role name. Chosen over a single flat
+ *  `Set<"role::action">` (the earlier shape) specifically so toggling one role's cell only ever
+ *  replaces *that* role's `Set` — every other role's `Set` keeps its old reference, which lets
+ *  `PermissionMatrix`'s row component be `memo`-wrapped without re-rendering the whole matrix per
+ *  checkbox click (audit `platform-ui/docs/audits/01-frontend-performance-audit.md`, finding #2:
+ *  a few dozen roles × ~10 actions worth of checkboxes were all re-rendering on every click). */
+export type DesiredState = Map<string, Set<string>>;
+
+/** Stable shared reference for "this role has nothing checked" — never mutated, only ever read,
+ *  so a row whose role isn't in the map yet doesn't get a fresh empty `Set` (and therefore a
+ *  fresh prop reference) on every render. */
+export const EMPTY_ACTION_SET: ReadonlySet<string> = new Set();
+
 /** `{entity}_{action}` — a display/search label only (e.g. `jira.worklogs_read`), not a stored
  *  identifier: the wire model stays the existing `(entity, action)` pair
  *  (`crates/metap-permission/src/policy_store.rs`'s `PolicyRow`). Shared between the matrix's
@@ -16,105 +29,115 @@ export function permissionLabel(entity: string, action: string): string {
   return `${entity}_${action}`;
 }
 
-function cellKey(role: string, action: string): string {
-  return `${role}::${action}`;
-}
-
-export function isChecked(desired: Set<string>, role: string, action: string): boolean {
-  return desired.has(cellKey(role, action));
+export function isChecked(desired: DesiredState, role: string, action: string): boolean {
+  return (desired.get(role) ?? EMPTY_ACTION_SET).has(action);
 }
 
 export function toggleCell(
-  desired: Set<string>,
+  desired: DesiredState,
   role: string,
   action: string,
   checked: boolean,
-): Set<string> {
-  const next = new Set(desired);
-  const key = cellKey(role, action);
-  if (checked) next.add(key);
-  else next.delete(key);
+): DesiredState {
+  const next = new Map(desired);
+  const roleActions = new Set(next.get(role) ?? EMPTY_ACTION_SET);
+  if (checked) roleActions.add(action);
+  else roleActions.delete(action);
+  next.set(role, roleActions);
   return next;
 }
 
 export function toggleRow(
-  desired: Set<string>,
+  desired: DesiredState,
   role: string,
   actions: string[],
   checked: boolean,
-): Set<string> {
-  const next = new Set(desired);
+): DesiredState {
+  const next = new Map(desired);
+  const roleActions = new Set(next.get(role) ?? EMPTY_ACTION_SET);
   for (const action of actions) {
-    const key = cellKey(role, action);
-    if (checked) next.add(key);
-    else next.delete(key);
+    if (checked) roleActions.add(action);
+    else roleActions.delete(action);
   }
+  next.set(role, roleActions);
   return next;
 }
 
+/** The one toggle that legitimately touches every role's `Set` — a column header checkbox
+ *  affects every row in that column, so every row genuinely needs to re-render here. */
 export function toggleColumn(
-  desired: Set<string>,
+  desired: DesiredState,
   action: string,
   roles: string[],
   checked: boolean,
-): Set<string> {
-  const next = new Set(desired);
+): DesiredState {
+  const next = new Map(desired);
   for (const role of roles) {
-    const key = cellKey(role, action);
-    if (checked) next.add(key);
-    else next.delete(key);
+    const roleActions = new Set(next.get(role) ?? EMPTY_ACTION_SET);
+    if (checked) roleActions.add(action);
+    else roleActions.delete(action);
+    next.set(role, roleActions);
   }
   return next;
 }
 
-export function checkedCountForRole(desired: Set<string>, role: string, actions: string[]): number {
-  return actions.filter((action) => isChecked(desired, role, action)).length;
+export function checkedCountForRole(
+  desired: DesiredState,
+  role: string,
+  actions: string[],
+): number {
+  const roleActions = desired.get(role) ?? EMPTY_ACTION_SET;
+  return actions.filter((action) => roleActions.has(action)).length;
 }
 
 export function checkedCountForAction(
-  desired: Set<string>,
+  desired: DesiredState,
   action: string,
   roles: string[],
 ): number {
   return roles.filter((role) => isChecked(desired, role, action)).length;
 }
 
-/** The desired-state `Set` a freshly loaded `policies` list seeds the matrix's local editing
- *  state with — one `"role::action"` key per basic-shaped grant (`isBasicShapedRow`), with a
- *  `roles: null`/`[]` row expanding to `EVERYONE_ROLE`, and any other row expanding to one key
- *  per role in its `roles` array (a legacy hand-authored row can still have more than one). */
-export function initialDesiredCells(policies: AdminPolicy[]): Set<string> {
-  const set = new Set<string>();
+/** The desired-state map a freshly loaded `policies` list seeds the matrix's local editing state
+ *  with — one role -> action-set entry per basic-shaped grant (`isBasicShapedRow`), with a
+ *  `roles: null`/`[]` row expanding to `EVERYONE_ROLE`, and any other row expanding to every role
+ *  in its `roles` array (a legacy hand-authored row can still have more than one). */
+export function initialDesiredCells(policies: AdminPolicy[]): DesiredState {
+  const map: DesiredState = new Map();
   for (const p of policies) {
     if (!isBasicShapedRow(p)) continue;
     const roles = p.roles ?? [];
-    if (roles.length === 0) {
-      set.add(cellKey(EVERYONE_ROLE, p.action));
-    } else {
-      for (const role of roles) set.add(cellKey(role, p.action));
+    const roleKeys = roles.length === 0 ? [EVERYONE_ROLE] : roles;
+    for (const role of roleKeys) {
+      const roleActions = map.get(role) ?? new Set<string>();
+      roleActions.add(p.action);
+      map.set(role, roleActions);
     }
   }
-  return set;
+  return map;
 }
 
 /** The exact request body `PUT /admin/policies/matrix` (`useSyncMatrixPolicies`) expects —
  *  `EVERYONE_ROLE` becomes `role: null` on the wire (`crates/metap-permission/src/policy_store.rs`'s
  *  `sync_basic_policies` treats `None` as the open/Everyone grant). */
-export function toGrants(desired: Set<string>): { role: string | null; action: string }[] {
-  return [...desired].map((key) => {
-    // Split on the *first* "::" only (not `.split`, which returns an unbounded — to TypeScript,
-    // possibly-empty — array) — safe because `action` always comes from the fixed known-actions
-    // list and never contains "::", even if a free-text role name theoretically did.
-    const separatorIndex = key.indexOf("::");
-    const role = key.slice(0, separatorIndex);
-    const action = key.slice(separatorIndex + 2);
-    return { role: role === EVERYONE_ROLE ? null : role, action };
-  });
+export function toGrants(desired: DesiredState): { role: string | null; action: string }[] {
+  const grants: { role: string | null; action: string }[] = [];
+  for (const [role, actions] of desired) {
+    for (const action of actions) {
+      grants.push({ role: role === EVERYONE_ROLE ? null : role, action });
+    }
+  }
+  return grants;
 }
 
-export function setsEqual(a: Set<string>, b: Set<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const value of a) if (!b.has(value)) return false;
+export function desiredEqual(a: DesiredState, b: DesiredState): boolean {
+  const roles = new Set([...a.keys(), ...b.keys()]);
+  for (const role of roles) {
+    const setA = a.get(role) ?? EMPTY_ACTION_SET;
+    const setB = b.get(role) ?? EMPTY_ACTION_SET;
+    if (setA.size !== setB.size) return false;
+    for (const action of setA) if (!setB.has(action)) return false;
+  }
   return true;
 }
 

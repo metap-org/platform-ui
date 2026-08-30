@@ -32,6 +32,11 @@ type RecordDto = {
   status: string | null;
   version: number;
   data: Record<string, unknown>;
+  /** Batch-resolved reference display labels for this row (`crates/metap-crud/src/dto.rs`'s
+   *  `RecordDto.related_display`) — present only on a `list` response, keyed by reference field
+   *  name. Passed straight through to `FieldValue` so a reference column never fires its own
+   *  per-cell request; see `ReferenceFieldValue`'s doc comment for why. */
+  relatedDisplay?: Record<string, string>;
 };
 
 type ListPage = {
@@ -329,7 +334,11 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       return (
                         <TableCell key={fieldName}>
                           {field ? (
-                            <FieldValue field={field} value={record.data[fieldName]} />
+                            <FieldValue
+                              field={field}
+                              value={record.data[fieldName]}
+                              relatedDisplay={record.relatedDisplay}
+                            />
                           ) : null}
                         </TableCell>
                       );

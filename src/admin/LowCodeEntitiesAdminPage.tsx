@@ -62,6 +62,10 @@ function DismissButton({ onClick }: { onClick: () => void }) {
 }
 
 type FieldRow = {
+  // Stable identity for React's `key` — see this type's row-editor doc comment
+  // (`platform-ui/docs/audits/01-frontend-performance-audit.md` finding #4) for why `index`
+  // isn't safe once rows can be reordered, not just appended/removed.
+  id: string;
   name: string;
   label: string;
   kind: string;
@@ -86,6 +90,7 @@ type FieldRow = {
 
 function emptyFieldRow(): FieldRow {
   return {
+    id: crypto.randomUUID(),
     name: "",
     label: "",
     kind: "string",
@@ -136,6 +141,7 @@ function fieldRowToWire(row: FieldRow): Record<string, unknown> {
 function wireToFieldRow(field: unknown): FieldRow {
   const f = (field ?? {}) as Record<string, unknown>;
   return {
+    id: crypto.randomUUID(),
     name: typeof f.name === "string" ? f.name : "",
     label: typeof f.label === "string" ? f.label : "",
     kind: typeof f.kind === "string" ? f.kind : "string",
@@ -330,7 +336,7 @@ function FieldBuilder({
           ) : (
             fields.map((row, index) => (
               <FieldRowEditor
-                key={index}
+                key={row.id}
                 row={row}
                 index={index}
                 onUpdate={updateRow}
@@ -353,6 +359,8 @@ function FieldBuilder({
 const IMPLICIT_SYSTEM_FIELDS = ["createdAt", "updatedAt"];
 
 type ListViewRow = {
+  // Stable identity for React's `key` — see `FieldRow.id`'s doc comment.
+  id: string;
   name: string;
   label: string;
   fields: string[];
@@ -364,6 +372,7 @@ type ListViewRow = {
 
 function emptyListViewRow(): ListViewRow {
   return {
+    id: crypto.randomUUID(),
     name: "default",
     label: "",
     fields: [],
@@ -397,6 +406,7 @@ function wireToListViewRow(view: unknown): ListViewRow {
   const defaultSort = typeof v.defaultSort === "string" ? v.defaultSort : "";
   const sortDesc = defaultSort.startsWith("-");
   return {
+    id: crypto.randomUUID(),
     name: typeof v.name === "string" ? v.name : "",
     label: typeof v.label === "string" ? v.label : "",
     fields: Array.isArray(v.fields)
@@ -541,7 +551,7 @@ function ListViewBuilder({
       ) : null}
       {listViews.map((row, index) => (
         <ListViewRowEditor
-          key={index}
+          key={row.id}
           row={row}
           index={index}
           fieldNames={fieldNames}
@@ -558,6 +568,8 @@ function ListViewBuilder({
 }
 
 type TransitionRow = {
+  // Stable identity for React's `key` — see `FieldRow.id`'s doc comment.
+  id: string;
   action: string;
   from: string;
   to: string;
@@ -569,12 +581,13 @@ type TransitionRow = {
 };
 
 function emptyTransitionRow(): TransitionRow {
-  return { action: "", from: "", to: "", label: "", guardText: "" };
+  return { id: crypto.randomUUID(), action: "", from: "", to: "", label: "", guardText: "" };
 }
 
 function wireToTransitionRow(transition: unknown): TransitionRow {
   const t = (transition ?? {}) as Record<string, unknown>;
   return {
+    id: crypto.randomUUID(),
     action: typeof t.action === "string" ? t.action : "",
     from: typeof t.from === "string" ? t.from : "",
     to: typeof t.to === "string" ? t.to : "",
@@ -830,7 +843,7 @@ function WorkflowBuilder({
       ) : null}
       {workflow.transitions.map((row, index) => (
         <TransitionRowEditor
-          key={index}
+          key={row.id}
           row={row}
           index={index}
           stateOptions={stateOptions}

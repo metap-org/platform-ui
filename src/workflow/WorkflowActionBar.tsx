@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Badge, Button, Spinner, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext";
@@ -72,10 +72,20 @@ export function WorkflowActionBar({
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
-  const columns = groupByLevel(computeLevels(workflow));
-  const availableTransitions = workflow.transitions.filter((t) => t.from === currentState);
-  const terminalStates = new Set(workflow.terminalStates);
-  const transitionInfo = new Map(capabilities.transitions.map((t) => [t.action, t]));
+  // `computeLevels` is a BFS over `workflow.transitions` — cheap for today's small graphs, but
+  // was re-running on every render (including e.g. `pendingAction`/`showBar` changes that have
+  // nothing to do with the workflow) before this `useMemo`. See
+  // `platform-ui/docs/audits/01-frontend-performance-audit.md` finding #3.
+  const columns = useMemo(() => groupByLevel(computeLevels(workflow)), [workflow]);
+  const terminalStates = useMemo(() => new Set(workflow.terminalStates), [workflow]);
+  const availableTransitions = useMemo(
+    () => workflow.transitions.filter((t) => t.from === currentState),
+    [workflow, currentState],
+  );
+  const transitionInfo = useMemo(
+    () => new Map(capabilities.transitions.map((t) => [t.action, t])),
+    [capabilities],
+  );
 
   async function handleTransition(action: string) {
     setActionError(null);

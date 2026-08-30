@@ -21,29 +21,34 @@ function safeString(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function formatNumber(value: unknown): string {
+  return typeof value === "number" ? numberFormatter.format(value) : safeString(value);
+}
+
+/** A `FieldKind -> formatter` map rather than a `switch` — adding a new `FieldKind` means adding
+ *  one entry here instead of finding and editing every `switch (kind)` in the package. Also keeps
+ *  this file exhaustive over `FieldKind` the same way the old `switch` was: TypeScript errors if a
+ *  key is missing (`Record<FieldKind, ...>`), same guarantee a non-exhaustive `switch` doesn't
+ *  give. See `platform-ui/docs/audits/01-frontend-performance-audit.md` finding #7 — a low-code
+ *  UI builder will want to enumerate "available widgets" dynamically, which a `switch` can't do. */
+const FORMATTERS: Record<FieldKind, (value: unknown) => string> = {
+  number: formatNumber,
+  money: formatNumber,
+  boolean: (value) => (value ? "Yes" : "No"),
+  date: (value) =>
+    typeof value === "string" ? dateFormatter.format(new Date(value)) : safeString(value),
+  datetime: (value) =>
+    typeof value === "string" ? dateTimeFormatter.format(new Date(value)) : safeString(value),
+  json: (value) => JSON.stringify(value),
+  id: safeString,
+  string: safeString,
+  reference: safeString,
+  enum: safeString,
+};
+
 export function formatFieldValue(kind: FieldKind, value: unknown): string | null {
   if (value === null || value === undefined) {
     return null;
   }
-
-  switch (kind) {
-    case "number":
-    case "money":
-      return typeof value === "number" ? numberFormatter.format(value) : safeString(value);
-    case "boolean":
-      return value ? "Yes" : "No";
-    case "date":
-      return typeof value === "string" ? dateFormatter.format(new Date(value)) : safeString(value);
-    case "datetime":
-      return typeof value === "string"
-        ? dateTimeFormatter.format(new Date(value))
-        : safeString(value);
-    case "json":
-      return JSON.stringify(value);
-    case "id":
-    case "string":
-    case "reference":
-    case "enum":
-      return safeString(value);
-  }
+  return FORMATTERS[kind](value);
 }

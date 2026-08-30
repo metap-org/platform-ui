@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Autocomplete } from "@metap/ui";
 import { useApiQuery } from "../api/useApiQuery";
 import type { EntityField } from "../metadata/types";
@@ -72,22 +72,28 @@ export function ReferenceFieldInput({
     Boolean(refEntity && field.refDisplayField),
   );
 
-  const options = new Map<string, string>();
-  if (currentRecord) {
-    options.set(currentRecord.id, labelFor(currentRecord, field.refDisplayField));
-  }
-  for (const record of searchResults ?? []) {
-    options.set(record.id, labelFor(record, field.refDisplayField));
-  }
+  // Small (~11-element) set, so this was never a real cost — memoized only for consistency with
+  // the memoization style used elsewhere (`platform-ui/docs/audits/01-frontend-performance-audit.md`
+  // finding #5).
+  const options = useMemo(() => {
+    const map = new Map<string, string>();
+    if (currentRecord) {
+      map.set(currentRecord.id, labelFor(currentRecord, field.refDisplayField));
+    }
+    for (const record of searchResults ?? []) {
+      map.set(record.id, labelFor(record, field.refDisplayField));
+    }
+    return [...map.entries()].map(([optionValue, optionLabel]) => ({
+      value: optionValue,
+      label: optionLabel,
+    }));
+  }, [currentRecord, searchResults, field.refDisplayField]);
 
   return (
     <Autocomplete
       label={label}
       helperText={helperText}
-      options={[...options.entries()].map(([optionValue, optionLabel]) => ({
-        value: optionValue,
-        label: optionLabel,
-      }))}
+      options={options}
       value={currentValue}
       inputValue={searchInput}
       onInputChange={setSearchInput}
