@@ -169,9 +169,9 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
         </div>
         <Button
           onClick={() => void handleCreate()}
-          disabled={createPolicy.isPending || action.trim().length === 0}
+          disabled={action.trim().length === 0}
+          loading={createPolicy.isPending}
         >
-          {createPolicy.isPending ? <Spinner size="sm" className="mr-2" /> : null}
           {t("common.new")}
         </Button>
       </div>

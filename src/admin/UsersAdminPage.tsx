@@ -106,9 +106,9 @@ export function UsersAdminPage() {
         />
         <Button
           onClick={() => void handleCreate()}
-          disabled={createUser.isPending || email.trim().length === 0 || password.length === 0}
+          disabled={email.trim().length === 0 || password.length === 0}
+          loading={createUser.isPending}
         >
-          {createUser.isPending ? <Spinner size="sm" className="mr-2" /> : null}
           {t("common.new")}
         </Button>
       </div>

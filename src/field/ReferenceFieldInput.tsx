@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Autocomplete } from "@metap/ui";
 import { useApiQuery } from "../api/useApiQuery";
 import type { EntityField } from "../metadata/types";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 type RecordDto = {
   id: string;
@@ -14,17 +15,6 @@ type RecordDto = {
 function labelFor(record: RecordDto, refDisplayField: string | undefined): string {
   const raw = refDisplayField ? record.data[refDisplayField] : undefined;
   return typeof raw === "string" ? raw : record.id;
-}
-
-/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@metap/ui` (a component library, not
- * a hooks utility one) — inlined the same 300ms debounce by hand. */
-function useDebouncedValue(value: string, delayMs: number): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
 }
 
 export function ReferenceFieldInput({

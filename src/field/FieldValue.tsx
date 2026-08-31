@@ -1,5 +1,6 @@
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import type { EntityField } from "../metadata/types";
+import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { formatFieldValue } from "./fieldKindConfig";
 import { ReferenceFieldValue } from "./ReferenceFieldValue";
 
@@ -12,15 +13,21 @@ import { ReferenceFieldValue } from "./ReferenceFieldValue";
  * masked/dangling/unresolvable relation just falls back to showing the raw id) — see
  * `ReferenceFieldValue`'s doc comment for why refetching per cell is never the right fallback
  * here. Omit it (as `RecordDetail`'s single-record view does) to keep the previous one-request-
- * per-field behavior, which is fine at that scale (one record, not a page of rows). */
+ * per-field behavior, which is fine at that scale (one record, not a page of rows).
+ *
+ * `entityName` (the entity *containing* this field, not `field.refEntity`) looks up this field's
+ * `entityLayout.ts` hint — omit it to always get the default hint (e.g. a caller that doesn't
+ * have an entity context to declare against yet). */
 export function FieldValue({
   field,
   value,
   relatedDisplay,
+  entityName,
 }: {
   field: EntityField;
   value: unknown;
   relatedDisplay?: Record<string, string>;
+  entityName?: string;
 }) {
   if (value === null || value === undefined) {
     if (field.required) {
@@ -37,12 +44,14 @@ export function FieldValue({
   }
 
   if (field.kind === "reference") {
+    const hint = getFieldLayoutHint(entityName ?? "", field.name);
     return (
       <ReferenceFieldValue
         field={field}
         value={value}
         displayValue={relatedDisplay?.[field.name]}
         batchMode={relatedDisplay !== undefined}
+        interactive={hint.interactive ?? true}
       />
     );
   }

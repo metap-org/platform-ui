@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Badge, Button, Spinner, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
+import { Alert, Badge, Button, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, ApiError } from "../api/client";
@@ -150,8 +150,8 @@ export function WorkflowActionBar({
               <Button
                 onClick={() => void handleTransition(transition.action)}
                 disabled={blocked || (pendingAction !== null && !pending)}
+                loading={pending}
               >
-                {pending ? <Spinner size="sm" className="mr-2" /> : null}
                 {transitionLabel(transition.action, transition.label)} ({transition.from} →{" "}
                 {transition.to})
               </Button>

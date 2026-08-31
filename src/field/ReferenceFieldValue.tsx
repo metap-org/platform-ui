@@ -1,5 +1,6 @@
 import { useApiQuery } from "../api/useApiQuery";
 import type { EntityField } from "../metadata/types";
+import { useNavigationAdapter } from "../navigation/NavigationContext";
 
 type RecordDto = {
   id: string;
@@ -20,20 +21,28 @@ type RecordDto = {
  * firing a request — the same "additive, never required" contract the backend doc comment
  * describes. Outside batch mode (`RecordDetail`'s single-record view, which has no page of rows
  * to batch across) this still fetches directly, exactly as before.
+ *
+ * `interactive` (from `FieldValue`'s `entityLayout.ts` lookup, default `true`) wraps the display
+ * text in `navAdapter.Link` to the referenced record's own detail page — this field already knows
+ * `refEntity`+`id`, so not linking it was a gap, not a deliberate choice. A dangling/masked
+ * reference (no `id`, handled above) is never a link regardless of `interactive`.
  */
 export function ReferenceFieldValue({
   field,
   value,
   displayValue,
   batchMode = false,
+  interactive = true,
 }: {
   field: EntityField;
   value: unknown;
   displayValue?: string;
   batchMode?: boolean;
+  interactive?: boolean;
 }) {
   const refEntity = field.refEntity;
   const id = typeof value === "string" ? value : undefined;
+  const navAdapter = useNavigationAdapter();
 
   const { data: record } = useApiQuery<{ data: RecordDto }, RecordDto>(
     ["record", refEntity, id],
@@ -46,10 +55,20 @@ export function ReferenceFieldValue({
     return <>—</>;
   }
 
-  if (batchMode) {
-    return <>{displayValue ?? id}</>;
+  const raw =
+    !batchMode && record && field.refDisplayField ? record.data[field.refDisplayField] : undefined;
+  const label = batchMode ? (displayValue ?? id) : typeof raw === "string" ? raw : id;
+
+  if (interactive && refEntity) {
+    return (
+      <navAdapter.Link
+        to={navAdapter.toRecordDetail(refEntity, id)}
+        className="text-primary underline-offset-4 hover:underline"
+      >
+        {label}
+      </navAdapter.Link>
+    );
   }
 
-  const raw = record && field.refDisplayField ? record.data[field.refDisplayField] : undefined;
-  return <>{typeof raw === "string" ? raw : id}</>;
+  return <>{label}</>;
 }

@@ -26,9 +26,10 @@ className="flex ...">` bọc ngoài để bố cục — xem gạch đầu dòng
 import `@mantine/*` nào trong `src/` — vài chỗ nhắc "@mantine" chỉ còn trong doc-comment giải
 thích gap lịch sử). `typecheck`/`lint`/`format:check` đều sạch.
 
-**Cố ý bỏ qua i18n ở một số file** — `ApiErrorMessage`/`AppShellLayout` hardcode tiếng Anh thay
-vì `react-i18next`. Phần `i18n/*` (LocaleSwitcher, LocaleProvider, ...) và các trang còn lại vẫn
-dùng `react-i18next` nguyên trạng như `platform-react`.
+**i18n đã đủ (2026-08-31)** — `ApiErrorMessage`/`AppShellLayout` trước đó hardcode tiếng Anh, giờ
+đã chuyển sang `react-i18next` (key `error.*`/`shell.logout` đã có sẵn trong `i18n/resources.ts`
+từ trước, chỉ chưa được 2 file này dùng tới). Toàn bộ `src/` giờ đi qua `react-i18next` như phần
+còn lại của package.
 
 **Gap đã biết giữa `@metap/ui` và Mantine** (đã xử lý bằng workaround, không phải thiếu sót):
 
@@ -45,21 +46,46 @@ dùng `react-i18next` nguyên trạng như `platform-react`.
   danh sách cố định — `AUTH_CONTEXT_ENTITY`'s dynamic attributes không enumerate được từ FE)
   dùng `SuggestInput` (`@metap/ui`, thêm 2026-08-29 cùng đợt dọn ở trên — trước đó là `Input`+
   `Chip` viết tay ngay tại `platform-ui`) thay vì `Autocomplete`.
-- Không có `Tree`/`TreeView` hay drag-and-drop primitive nào — cây điều kiện ABAC
-  (`admin/policies/ConditionNodeEditor.tsx`) tự dựng đệ quy bằng indent + border trái, không
-  dùng `Accordion` (chỉ là list phẳng, không hỗ trợ nesting thật).
-- `DatePicker` chỉ chọn ngày, không có time component — dùng chung cho cả field kind `"date"`
-  và `"datetime"`, mất phần giờ:phút:giây khi hiển thị/nhập (xem doc-comment trong
-  `field/FieldInput.tsx`).
-- Không có `useDebouncedValue` — viết tay, lặp lại cục bộ ở `field/ReferenceFieldInput.tsx` và
-  `list/GeneratedList.tsx` (chấp nhận duplicate nhỏ, không tách file chung).
-- Không có polymorphism kiểu `component={Link}`/`Anchor component={Link}` — mọi nav-link tự
-  render `navAdapter.Link` (hoặc `<a>` thuần) với `className` từ `buttonVariants(...)` hoặc
-  Tailwind text classes.
-- `Button` không có prop `loading`/color `"red"` — dùng `Spinner` + `disabled`, hoặc
-  `className="text-destructive hover:text-destructive"`.
+- ~~Không có `Tree`/`TreeView` hay drag-and-drop primitive nào~~ **Đã xử lý 2026-08-31** —
+  `@metap/ui` thêm `TreeItem` (khung indent + border trái theo depth, không phải widget
+  expand-collapse đầy đủ); `admin/policies/ConditionNodeEditor.tsx` chuyển sang dùng nó, vẫn tự sở
+  hữu phần đệ quy `PolicyCondition` (domain data riêng, không có counterpart trong `@metap/ui`).
+- ~~`DatePicker` chỉ chọn ngày, không có time component~~ **Đã xử lý 2026-08-31** — `@metap/ui`
+  thêm `DateTimePicker` riêng (component tách biệt, không phải prop trên `DatePicker`, để
+  `DatePicker` giữ nguyên là date-only cho caller chỉ cần ngày); field kind `"datetime"` giờ dùng
+  `DateTimePicker` trong `field/FieldInput.tsx`, không còn mất phần giờ:phút:giây khi round-trip.
+- ~~Không có `useDebouncedValue`, 2 bản viết tay lặp lại~~ **Đã xử lý 2026-08-31** — nhưng
+  **không** chuyển vào `@metap/ui` (thử rồi revert cùng ngày: `@metap/ui` tự định phạm vi là
+  component library, không phải hooks-utility library — xem `design-system/docs/component-status.md`
+  infra-debt table). Hợp lý hơn: `platform-ui` tự nó là nơi chứa business/UI **logic** dùng chung
+  cho application (`design-system` chỉ lo UI thuần, customize style), nên hook logic thuần thuộc về
+  đây — gộp thành 1 bản chung tại `hooks/useDebouncedValue.ts` (không phải `shared/` — cả package
+  này đã là tầng "shared" rồi, thư mục `shared/` con bên trong là thừa; `hooks/` nói đúng nó là gì),
+  cả 2 call site cũ trong `platform-ui` lẫn 1 bản duplicate thứ 3 phát hiện ở `apps/jira-fe`'s
+  `DashboardPage.tsx` (repo `metap`) đều đã chuyển sang import từ `@metap/platform-ui`.
+- Polymorphism kiểu `component={Link}`: **`Button` đã có prop `asChild`** (2026-08-31, qua
+  `@radix-ui/react-slot`) — nhưng **chưa retrofit** vào các nav-link hiện có
+  (`shell/AppShellLayout.tsx`'s `NavLink`, `list/GeneratedList.tsx`/`detail/RecordDetail.tsx`'s
+  view-link...) vẫn tự render `navAdapter.Link` với className từ `buttonVariants(...)` — chỉ mới
+  là component sẵn sàng dùng, chưa phải đã dùng ở mọi chỗ.
+- ~~`Button` không có prop `loading`/color `"red"`~~ **Đã xử lý 2026-08-31** — `@metap/ui`'s
+  `Button` giờ có `variant="destructive"` và prop `loading` (built-in `Spinner` + tự `disabled`);
+  mọi call site trong `platform-ui` đang ghép tay `<Spinner/>` + `disabled` đã chuyển sang dùng
+  `loading` (xem `git log`/diff cho danh sách file).
 - Không có `Container`/`Stack`/`Title`/`Group`/`Text`/`Divider`/`Center` — thay bằng div/flex
-  Tailwind thuần.
+  Tailwind thuần. Đây là lựa chọn kiến trúc chủ đích (Tailwind-first), không phải gap cần xử lý.
+
+## State management cho UI builder tương lai (2026-08-31)
+
+`src/builder/builderStore.ts` — scaffold rỗng (chưa có field state thật, chưa có UI builder nào
+tiêu thụ) cho canvas/selection/drag/undo-redo state của low-code UI builder sau này. Dùng
+**Zustand** (`zustand` + `zundo` cho undo/redo qua middleware `temporal`, `devtools` để inspect
+qua Redux DevTools extension) — **không phải Redux**: đã cân nhắc lại 2026-08-31 và giữ nguyên
+quyết định cũ (audit 2026-08-29), lý do chính là Zustand không cần `<Provider>` nên bundle vào
+package này không ép mọi app tiêu thụ (`crm-fe`/`jira-fe`) phải tự wire provider chỉ để dùng
+builder — xem doc-comment trong file đó. `docs/architectures/04-strategy.md`'s ADR (không global
+store áp đặt lên app) vẫn đúng cho phần admin CRUD hiện có — store này tách biệt, chỉ phục vụ
+builder chưa tồn tại.
 
 ## Lệnh
 

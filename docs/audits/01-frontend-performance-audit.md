@@ -1,5 +1,10 @@
 # Audit 01 — Kiến trúc & performance frontend (2026-08-29)
 
+**Trạng thái (2026-08-31): tất cả 7 finding bên dưới đã được fix trong code, verify lại bằng cách
+đọc trực tiếp source (không phải chỉ tin theo doc-comment) — xem dòng "**Đã xử lý**" ở đầu mỗi mục
+để biết fix nằm ở đâu. Không còn việc gì mở ở audit này; giữ lại file làm lịch sử, session sau
+không cần đọc lại để tìm việc.**
+
 Review toàn bộ `src/` ở trạng thái hiện tại (không phải diff — git status có 2 file đang sửa dở
 `AdvancedPoliciesPanel.tsx`/`i18n/resources.ts`, không liên quan tới audit này). Không sửa code —
 chỉ report.
@@ -17,21 +22,27 @@ tới, dù chưa gây hại ở scope hiện tại.
 
 ## Tóm tắt ưu tiên xử lý
 
-| #   | Mức độ                                   | Vị trí                                                                                            | Vấn đề                                                                                                                                                                                                               |
-| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **HIGH**                                 | `field/ReferenceFieldValue.tsx:16-21`                                                             | Mỗi cell reference field tự bắn 1 request `GET /api/{refEntity}/{id}` riêng — N+1 query, virtualized list scroll nhanh có thể tạo hàng chục request song song                                                        |
-| 2   | **MEDIUM-HIGH**                          | `admin/policies/PermissionMatrix.tsx` + `policyMatrixHelpers.ts`                                  | State `desired` là 1 `Set<string>` toàn cục cho cả ma trận role×action — mỗi lần toggle 1 checkbox re-render toàn bảng, không có row-level `memo` như pattern đã áp dụng ở `LowCodeEntitiesAdminPage`                |
-| 3   | **MEDIUM**                               | `workflow/WorkflowActionBar.tsx:75-78`                                                            | `computeLevels` (BFS) + `groupByLevel` + `transitionInfo` Map chạy lại mỗi render, kể cả khi chỉ `pendingAction`/`showBar` đổi — không `useMemo`                                                                     |
-| 4   | **LOW** (forward-looking)                | `admin/LowCodeEntitiesAdminPage.tsx` — `FieldRowEditor`/`ListViewRowEditor`/`TransitionRowEditor` | Row key = index mảng (`key={index}`), không phải id ổn định — an toàn với add/remove-cuối-mảng hiện tại, nhưng sẽ vỡ (mất focus, lẫn state giữa row) ngay khi có drag-reorder — thứ UI builder gần như chắc chắn cần |
-| 5   | **LOW**                                  | `field/ReferenceFieldInput.tsx:75-81`                                                             | `options` dựng bằng `new Map()` mới mỗi render, không `useMemo` — rẻ (≤11 phần tử) nhưng không nhất quán với phần còn lại của code                                                                                   |
-| 6   | **LOW**                                  | `i18n/useEntityLabels.ts`                                                                         | Trả về closure mới (`entityLabel`/`fieldLabel`/`transitionLabel`) mỗi render, không `useCallback` — chưa gây hại vì chưa truyền vào component đã `memo`, nhưng là nợ kỹ thuật                                        |
-| 7   | **LOW** (extensibility, forward-looking) | `field/FieldInput.tsx` + `field/fieldKindConfig.ts`                                               | Field-kind rendering là `switch` cứng, không phải registry/map — hợp lý với kind cố định hiện tại, nhưng UI builder sẽ cần liệt kê "widget khả dụng" động                                                            |
+| #   | Mức độ                                   | Vị trí                                                                                            | Vấn đề                                                                                                                                                                                                               | Trạng thái  |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | **HIGH**                                 | `field/ReferenceFieldValue.tsx:16-21`                                                             | Mỗi cell reference field tự bắn 1 request `GET /api/{refEntity}/{id}` riêng — N+1 query, virtualized list scroll nhanh có thể tạo hàng chục request song song                                                        | ✅ Đã xử lý |
+| 2   | **MEDIUM-HIGH**                          | `admin/policies/PermissionMatrix.tsx` + `policyMatrixHelpers.ts`                                  | State `desired` là 1 `Set<string>` toàn cục cho cả ma trận role×action — mỗi lần toggle 1 checkbox re-render toàn bảng, không có row-level `memo` như pattern đã áp dụng ở `LowCodeEntitiesAdminPage`                | ✅ Đã xử lý |
+| 3   | **MEDIUM**                               | `workflow/WorkflowActionBar.tsx:75-78`                                                            | `computeLevels` (BFS) + `groupByLevel` + `transitionInfo` Map chạy lại mỗi render, kể cả khi chỉ `pendingAction`/`showBar` đổi — không `useMemo`                                                                     | ✅ Đã xử lý |
+| 4   | **LOW** (forward-looking)                | `admin/LowCodeEntitiesAdminPage.tsx` — `FieldRowEditor`/`ListViewRowEditor`/`TransitionRowEditor` | Row key = index mảng (`key={index}`), không phải id ổn định — an toàn với add/remove-cuối-mảng hiện tại, nhưng sẽ vỡ (mất focus, lẫn state giữa row) ngay khi có drag-reorder — thứ UI builder gần như chắc chắn cần | ✅ Đã xử lý |
+| 5   | **LOW**                                  | `field/ReferenceFieldInput.tsx:75-81`                                                             | `options` dựng bằng `new Map()` mới mỗi render, không `useMemo` — rẻ (≤11 phần tử) nhưng không nhất quán với phần còn lại của code                                                                                   | ✅ Đã xử lý |
+| 6   | **LOW**                                  | `i18n/useEntityLabels.ts`                                                                         | Trả về closure mới (`entityLabel`/`fieldLabel`/`transitionLabel`) mỗi render, không `useCallback` — chưa gây hại vì chưa truyền vào component đã `memo`, nhưng là nợ kỹ thuật                                        | ✅ Đã xử lý |
+| 7   | **LOW** (extensibility, forward-looking) | `field/FieldInput.tsx` + `field/fieldKindConfig.ts`                                               | Field-kind rendering là `switch` cứng, không phải registry/map — hợp lý với kind cố định hiện tại, nhưng UI builder sẽ cần liệt kê "widget khả dụng" động                                                            | ✅ Đã xử lý |
 
-Chi tiết từng mục ở các phần dưới.
+**Tất cả 7 mục đã fix (verify 2026-08-31 bằng cách đọc source, không chỉ tin doc-comment) — chi
+tiết + vị trí fix thật ở mỗi mục dưới đây.**
 
 ---
 
 ## 1. [HIGH] N+1 query ở reference field — `field/ReferenceFieldValue.tsx:16-21`
+
+**Đã xử lý** — `ReferenceFieldValue` giờ nhận `batchMode`/`displayValue` prop; khi
+`GeneratedList` truyền `relatedDisplay` map, component trust thẳng `displayValue` đã batch-resolve
+sẵn từ backend (`hydrate_related_display`), không fetch per-cell nữa. Chỉ `RecordDetail` (view 1
+record, không có trang list để batch qua) vẫn fetch trực tiếp như cũ — đúng scope, không phải N+1.
 
 ```tsx
 const { data: record } = useApiQuery<{ data: RecordDto }, RecordDto>(
@@ -55,6 +66,12 @@ batch `POST /api/{refEntity}/batch?ids=...` và gom toàn bộ id cần resolve 
 request duy nhất ở `GeneratedList`, truyền xuống qua context/prop thay vì để mỗi cell tự fetch.
 
 ## 2. [MEDIUM-HIGH] `PermissionMatrix` re-render toàn bảng mỗi checkbox
+
+**Đã xử lý** — `DesiredState` đổi thành `Map<string, Set<string>>` (1 `Set` riêng mỗi role, không
+còn 1 `Set` toàn cục); `toggleCell`/`toggleRow`/`toggleColumn` chỉ thay reference của role bị đổi.
+`PermissionMatrix.tsx` tách `RoleRow` thành component `memo`hoá riêng, nhận
+`checkedActions={desired.get(role)}` + callback ổn định qua `useCallback` — đúng pattern
+`FieldRowEditor` đã áp dụng.
 
 `policyMatrixHelpers.ts`'s `toggleCell`/`toggleRow`/`toggleColumn` đều nhận và trả `Set<string>`
 mới cho **toàn bộ ma trận**:
@@ -84,6 +101,9 @@ action = vài trăm checkbox), đây là đúng loại lag mà `LowCodeEntitiesA
 
 ## 3. [MEDIUM] BFS + Map không memo — `workflow/WorkflowActionBar.tsx:75-78`
 
+**Đã xử lý** — `columns`/`terminalStates`/`availableTransitions`/`transitionInfo` đều bọc
+`useMemo` với dep đúng như đề xuất (`[workflow]`, `[workflow, currentState]`, `[capabilities]`).
+
 ```tsx
 const columns = groupByLevel(computeLevels(workflow));
 const availableTransitions = workflow.transitions.filter((t) => t.from === currentState);
@@ -104,6 +124,9 @@ nhưng không nhất quán với discipline `useMemo` mà phần còn lại củ
 
 ## 4. [LOW, forward-looking] Row key = index — `admin/LowCodeEntitiesAdminPage.tsx`
 
+**Đã xử lý** — `FieldRowEditor`/`ListViewRowEditor`/`TransitionRowEditor` đều dùng `key={row.id}`
+(id ổn định gán lúc tạo row), không còn `key={index}` ở file này.
+
 `FieldBuilder`/`ListViewBuilder`/`WorkflowBuilder` đều render list bằng `key={index}`:
 
 ```tsx
@@ -121,6 +144,9 @@ key **trước khi** implement drag-reorder, để không phải refactor lại 
 
 ## 5. [LOW] `options` Map rebuilt mỗi render — `field/ReferenceFieldInput.tsx:75-81`
 
+**Đã xử lý** — `options` bọc `useMemo` với dep `[currentRecord, searchResults,
+field.refDisplayField]`, kèm doc-comment trỏ ngược lại đúng finding #5 này.
+
 ```tsx
 const options = new Map<string, string>();
 if (currentRecord) {
@@ -135,6 +161,8 @@ Rebuilt mỗi render, không `useMemo`. Rẻ vì giới hạn ~11 phần tử (`
 phải vấn đề thật, chỉ nêu vì thiếu nhất quán với style memoization ở nơi khác.
 
 ## 6. [LOW] Closure mới mỗi render — `i18n/useEntityLabels.ts`
+
+**Đã xử lý** — cả 3 hàm (`entityLabel`/`fieldLabel`/`transitionLabel`) đều bọc `useCallback`.
 
 ```ts
 export function useEntityLabels(entityName: string) {
@@ -155,6 +183,9 @@ thuật: nếu sau này 1 component con được `memo`hoá nhận `fieldLabel` 
 vô hiệu vì reference đổi mỗi lần cha render.
 
 ## 7. [LOW, extensibility] Field-kind dispatch bằng `switch` — `field/FieldInput.tsx`, `field/fieldKindConfig.ts`
+
+**Đã xử lý** — cả hai đổi thành `Record<FieldKind, ...>` registry (`fieldKindConfig.ts`'s
+`FORMATTERS`, `FieldInput.tsx`'s renderer map), không còn `switch (field.kind)`.
 
 Cả input renderer (`FieldInput.tsx`) và value formatter (`fieldKindConfig.ts`'s
 `formatFieldValue`) dispatch bằng `switch (field.kind)` cứng. Hợp lý với tập `FieldKind` cố định

@@ -5,6 +5,7 @@ import {
   Alert,
   buttonVariants,
   Button,
+  Card,
   IconButton,
   Input,
   Select,
@@ -25,6 +26,7 @@ import { useEntity } from "../metadata/useEntity";
 import type { EntityField } from "../metadata/types";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 type RecordDto = {
   id: string;
@@ -47,17 +49,6 @@ type ListPage = {
 type SortState = { field: string; descending: boolean } | null;
 
 const ROW_HEIGHT = 40;
-
-/** No `@mantine/hooks` `useDebouncedValue` equivalent in `@metap/ui` — see
- * `field/ReferenceFieldInput`'s doc comment for the same tradeoff. */
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 export function GeneratedList({ entityName }: { entityName: string }) {
   const { t } = useTranslation();
@@ -208,9 +199,11 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   const columnCount = listView.fields.length + 1;
 
   return (
-    <div className="py-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-foreground">{entityLabel(entity.label)}</h2>
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 py-8">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          {entityLabel(entity.label)}
+        </h2>
         <navAdapter.Link
           to={navAdapter.toNewRecord(entityName)}
           className={buttonVariants({ variant: "default" })}
@@ -219,7 +212,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         </navAdapter.Link>
       </div>
       {deleteError ? (
-        <Alert variant="destructive" className="mb-4 flex items-center justify-between gap-2">
+        <Alert variant="destructive" className="flex items-center justify-between gap-2">
           <span>{deleteError}</span>
           <IconButton
             variant="ghost"
@@ -234,149 +227,160 @@ export function GeneratedList({ entityName }: { entityName: string }) {
           />
         </Alert>
       ) : null}
-      <div ref={scrollContainerRef} className="h-[600px] overflow-auto">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background">
-            <TableRow>
-              {listView.fields.map((fieldName) => {
-                const field = fieldsByName.get(fieldName);
+      <Card className="overflow-hidden">
+        <div ref={scrollContainerRef} className="h-[600px] overflow-auto">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableRow>
+                {listView.fields.map((fieldName) => {
+                  const field = fieldsByName.get(fieldName);
 
-                if (!field) {
-                  return <TableHead key={fieldName} />;
-                }
+                  if (!field) {
+                    return <TableHead key={fieldName} />;
+                  }
 
-                return (
-                  <TableHead
-                    key={fieldName}
-                    onClick={() => toggleSort(field)}
-                    className={field.sortable ? "cursor-pointer select-none" : undefined}
-                  >
-                    {fieldLabel(field.name, field.label)}
-                    {sort?.field === fieldName ? (sort.descending ? " ▼" : " ▲") : ""}
-                  </TableHead>
-                );
-              })}
-              <TableHead>{t("common.actions")}</TableHead>
-            </TableRow>
-            <TableRow>
-              {listView.fields.map((fieldName) => {
-                if (!listView.filters.includes(fieldName)) {
-                  return <TableHead key={fieldName} />;
-                }
+                  return (
+                    <TableHead
+                      key={fieldName}
+                      onClick={() => toggleSort(field)}
+                      className={`text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
+                    >
+                      {fieldLabel(field.name, field.label)}
+                      {sort?.field === fieldName ? (sort.descending ? " ▼" : " ▲") : ""}
+                    </TableHead>
+                  );
+                })}
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("common.actions")}
+                </TableHead>
+              </TableRow>
+              <TableRow className="bg-muted/40">
+                {listView.fields.map((fieldName) => {
+                  if (!listView.filters.includes(fieldName)) {
+                    return <TableHead key={fieldName} />;
+                  }
 
-                const field = fieldsByName.get(fieldName);
+                  const field = fieldsByName.get(fieldName);
 
-                if (field?.kind === "enum") {
+                  if (field?.kind === "enum") {
+                    return (
+                      <TableHead key={fieldName}>
+                        <Select
+                          placeholder={t("common.any")}
+                          options={(field.enumValues ?? []).map((value) => ({
+                            value,
+                            label: value,
+                          }))}
+                          value={enumFilters[fieldName] || undefined}
+                          onValueChange={(value) =>
+                            setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }))
+                          }
+                        />
+                      </TableHead>
+                    );
+                  }
+
                   return (
                     <TableHead key={fieldName}>
-                      <Select
-                        placeholder={t("common.any")}
-                        options={(field.enumValues ?? []).map((value) => ({ value, label: value }))}
-                        value={enumFilters[fieldName] || undefined}
-                        onValueChange={(value) =>
-                          setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }))
-                        }
+                      <Input
+                        placeholder={t("common.filterPlaceholder")}
+                        value={filterInputs[fieldName] ?? ""}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          setFilterInputs((prev) => ({ ...prev, [fieldName]: value }));
+                        }}
                       />
                     </TableHead>
                   );
-                }
-
-                return (
-                  <TableHead key={fieldName}>
-                    <Input
-                      placeholder={t("common.filterPlaceholder")}
-                      value={filterInputs[fieldName] ?? ""}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFilterInputs((prev) => ({ ...prev, [fieldName]: value }));
-                      }}
-                    />
-                  </TableHead>
-                );
-              })}
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody className="relative" style={{ height: rowVirtualizer.getTotalSize() }}>
-            {recordsLoading ? (
-              <TableRow>
-                <TableCell colSpan={columnCount}>
-                  <Spinner size="sm" />
-                </TableCell>
+                })}
+                <TableHead />
               </TableRow>
-            ) : recordsError ? (
-              <TableRow>
-                <TableCell colSpan={columnCount}>
-                  <ApiErrorMessage error={recordsError} />
-                </TableCell>
-              </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columnCount}>{t("common.noRecords")}</TableCell>
-              </TableRow>
-            ) : (
-              virtualRows.map((virtualRow) => {
-                const record = records[virtualRow.index];
-
-                if (!record) {
-                  return null;
-                }
-
-                return (
-                  <TableRow
-                    key={record.id}
-                    className="absolute w-full"
-                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+            </TableHeader>
+            <TableBody className="relative" style={{ height: rowVirtualizer.getTotalSize() }}>
+              {recordsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={columnCount} className="py-10 text-center">
+                    <Spinner size="sm" />
+                  </TableCell>
+                </TableRow>
+              ) : recordsError ? (
+                <TableRow>
+                  <TableCell colSpan={columnCount} className="py-10">
+                    <ApiErrorMessage error={recordsError} />
+                  </TableCell>
+                </TableRow>
+              ) : records.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columnCount}
+                    className="py-10 text-center text-sm text-muted-foreground"
                   >
-                    {listView.fields.map((fieldName) => {
-                      const field = fieldsByName.get(fieldName);
+                    {t("common.noRecords")}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                virtualRows.map((virtualRow) => {
+                  const record = records[virtualRow.index];
 
-                      return (
-                        <TableCell key={fieldName}>
-                          {field ? (
-                            <FieldValue
-                              field={field}
-                              value={record.data[fieldName]}
-                              relatedDisplay={record.relatedDisplay}
-                            />
-                          ) : null}
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <navAdapter.Link
-                          to={navAdapter.toRecordDetail(entityName, record.id)}
-                          className="text-sm underline hover:no-underline"
-                        >
-                          {t("common.view")}
-                        </navAdapter.Link>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          disabled={pendingDeleteId !== null && pendingDeleteId !== record.id}
-                          onClick={() => void handleDelete(record)}
-                        >
-                          {pendingDeleteId === record.id ? (
-                            <Spinner size="sm" className="mr-2" />
-                          ) : null}
-                          {t("common.delete")}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                  if (!record) {
+                    return null;
+                  }
+
+                  return (
+                    <TableRow
+                      key={record.id}
+                      className="absolute w-full hover:bg-muted/30"
+                      style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      {listView.fields.map((fieldName) => {
+                        const field = fieldsByName.get(fieldName);
+
+                        return (
+                          <TableCell key={fieldName} className="text-sm">
+                            {field ? (
+                              <FieldValue
+                                field={field}
+                                value={record.data[fieldName]}
+                                relatedDisplay={record.relatedDisplay}
+                                entityName={entityName}
+                              />
+                            ) : null}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell>
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <navAdapter.Link
+                            to={navAdapter.toRecordDetail(entityName, record.id)}
+                            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            {t("common.view")}
+                          </navAdapter.Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            disabled={pendingDeleteId !== null && pendingDeleteId !== record.id}
+                            loading={pendingDeleteId === record.id}
+                            onClick={() => void handleDelete(record)}
+                          >
+                            {t("common.delete")}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
         {isFetchingNextPage ? (
-          <div className="p-2 text-center text-sm text-muted-foreground">
+          <div className="border-t border-border p-2 text-center text-sm text-muted-foreground">
             {t("common.loadingMore")}
           </div>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }

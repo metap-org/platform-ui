@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert, Button, IconButton, Spinner } from "@metap/ui";
+import { Alert, Badge, Button, buttonVariants, Card, IconButton, Spinner } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useEntity } from "../metadata/useEntity";
+import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { FieldValue } from "../field/FieldValue";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
@@ -74,36 +75,39 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
     return <div>{t("common.notFound")}</div>;
   }
 
+  const currentState = entity.workflow ? stateValue(record.data[entity.workflow.stateField]) : null;
+  const visibleFields = entity.fields.filter((field) => field.kind !== "id");
+
   return (
-    <div className="py-8">
-      <h2 className="mb-4 text-xl font-semibold text-foreground">{entityLabel(entity.label)}</h2>
-      <div className="mb-4 flex flex-col gap-4">
-        {entity.fields
-          .filter((field) => field.kind !== "id")
-          .map((field) => (
-            <div key={field.name}>
-              <p className="text-sm font-medium text-foreground">
-                {fieldLabel(field.name, field.label)}
-              </p>
-              <FieldValue field={field} value={record.data[field.name]} />
-            </div>
-          ))}
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 py-8">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+            {entityLabel(entity.label)}
+          </h2>
+          {currentState ? <Badge variant="secondary">{currentState}</Badge> : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <navAdapter.Link
+            to={navAdapter.toEditRecord(entityName, id)}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {t("common.edit")}
+          </navAdapter.Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            loading={deleting}
+            onClick={() => void handleDelete()}
+          >
+            {t("common.delete")}
+          </Button>
+        </div>
       </div>
-      {entity.workflow ? (
-        <WorkflowActionBar
-          entityName={entityName}
-          recordId={id}
-          version={record.version}
-          workflow={entity.workflow}
-          currentState={stateValue(record.data[entity.workflow.stateField])}
-          capabilities={record.capabilities}
-          onTransitioned={() => {
-            void refetch();
-          }}
-        />
-      ) : null}
+
       {deleteError ? (
-        <Alert variant="destructive" className="mt-4 flex items-center justify-between gap-2">
+        <Alert variant="destructive" className="flex items-center justify-between gap-2">
           <span>{deleteError}</span>
           <IconButton
             variant="ghost"
@@ -118,24 +122,42 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           />
         </Alert>
       ) : null}
-      <div className="mt-4 flex items-center gap-4">
-        <navAdapter.Link
-          to={navAdapter.toEditRecord(entityName, id)}
-          className="text-sm underline hover:no-underline"
-        >
-          {t("common.edit")}
-        </navAdapter.Link>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:text-destructive"
-          disabled={deleting}
-          onClick={() => void handleDelete()}
-        >
-          {deleting ? <Spinner size="sm" className="mr-2" /> : null}
-          {t("common.delete")}
-        </Button>
-      </div>
+
+      <Card>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 p-md sm:grid-cols-2">
+          {visibleFields.map((field) => {
+            const hint = getFieldLayoutHint(entityName, field.name, field.kind);
+            return (
+              <div key={field.name} className={hint.span === 2 ? "sm:col-span-2" : undefined}>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {fieldLabel(field.name, field.label)}
+                </dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  <FieldValue
+                    field={field}
+                    value={record.data[field.name]}
+                    entityName={entityName}
+                  />
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </Card>
+
+      {entity.workflow ? (
+        <WorkflowActionBar
+          entityName={entityName}
+          recordId={id}
+          version={record.version}
+          workflow={entity.workflow}
+          currentState={currentState ?? ""}
+          capabilities={record.capabilities}
+          onTransitioned={() => {
+            void refetch();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

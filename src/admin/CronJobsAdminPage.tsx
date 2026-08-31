@@ -177,9 +177,9 @@ export function CronJobsAdminPage() {
         />
         <Button
           onClick={() => void handleCreate()}
-          disabled={createJob.isPending || name.trim().length === 0 || cronExpr.trim().length === 0}
+          disabled={name.trim().length === 0 || cronExpr.trim().length === 0}
+          loading={createJob.isPending}
         >
-          {createJob.isPending ? <Spinner size="sm" className="mr-2" /> : null}
           {t("common.new")}
         </Button>
       </div>

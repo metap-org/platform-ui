@@ -346,8 +346,7 @@ export function PermissionMatrix({ entity }: { entity: EntitySummary }) {
         ) : (
           <span />
         )}
-        <Button onClick={() => void handleSave()} disabled={!dirty || syncMatrix.isPending}>
-          {syncMatrix.isPending ? <Spinner size="sm" className="mr-2" /> : null}
+        <Button onClick={() => void handleSave()} disabled={!dirty} loading={syncMatrix.isPending}>
           {t("common.save")}
         </Button>
       </div>

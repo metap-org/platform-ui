@@ -1162,9 +1162,9 @@ export function LowCodeEntitiesAdminPage() {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => void handleSaveDraft()}
-            disabled={saving || name.trim().length === 0 || label.trim().length === 0}
+            disabled={name.trim().length === 0 || label.trim().length === 0}
+            loading={saving}
           >
-            {saving ? <Spinner size="sm" className="mr-2" /> : null}
             {t("admin.lowcode.saveDraft")}
           </Button>
           <Button variant="ghost" onClick={resetForm}>

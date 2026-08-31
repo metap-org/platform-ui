@@ -143,8 +143,7 @@ export function GeneratedForm({
               disabled={writableFields ? !writableFields.has(field.name) : false}
             />
           ))}
-        <Button onClick={() => void handleSubmit()} disabled={submitting}>
-          {submitting ? <Spinner size="sm" className="mr-2" /> : null}
+        <Button onClick={() => void handleSubmit()} loading={submitting}>
           {t("common.save")}
         </Button>
       </div>

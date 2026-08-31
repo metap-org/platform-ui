@@ -1,4 +1,4 @@
-import { Button, IconButton, RadioGroup, RadioGroupItem, Select } from "@metap/ui";
+import { Button, IconButton, RadioGroup, RadioGroupItem, Select, TreeItem } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import type { EntitySummary } from "../../metadata/types";
 import { AttributePicker } from "./AttributePicker";
@@ -30,9 +30,11 @@ function RemoveButton({ onClick, label }: { onClick: () => void; label: string }
 }
 
 /**
- * Recursive renderer for one `PolicyCondition` node — `@metap/ui` has no Tree/nesting component
- * (confirmed gap, see README.md), so grouping is hand-built as an indented, left-bordered block
- * rather than a real tree widget. `onReplace`/`onRemove` are supplied by the parent that owns
+ * Recursive renderer for one `PolicyCondition` node — grouping nests via `@metap/ui`'s `TreeItem`
+ * (the indent + left-border shell, added 2026-08-31 once this was the confirmed gap prompting it
+ * — see design-system/docs/component-status.md's TreeItem row). This component still owns the
+ * recursion itself (`PolicyCondition` domain data has no counterpart in `@metap/ui`), `TreeItem`
+ * only renders the per-level visual shell. `onReplace`/`onRemove` are supplied by the parent that owns
  * this node's slot (either `ConditionBuilder` for the root, or this same component for a group's
  * child), so edits always flow top-down through immutable array splicing
  * (`replaceChildAt`/`removeChildAt`) — nodes have no stable id, index-based splicing within a
@@ -103,10 +105,7 @@ export function ConditionNodeEditor({
   }
 
   return (
-    <div
-      className="ml-2 flex flex-col gap-2 border-l-2 border-border pl-4"
-      style={{ marginLeft: depth > 0 ? undefined : 0 }}
-    >
+    <TreeItem depth={depth}>
       <div className="flex items-center justify-between gap-2">
         <RadioGroup
           value={kind}
@@ -158,6 +157,6 @@ export function ConditionNodeEditor({
           {t("admin.policies.builder.addGroup")}
         </Button>
       </div>
-    </div>
+    </TreeItem>
   );
 }

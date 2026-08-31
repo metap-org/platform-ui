@@ -1,12 +1,20 @@
 import type { ReactElement } from "react";
-import { Checkbox, DatePicker, Input, NumberInput, Select, Textarea } from "@metap/ui";
+import {
+  Checkbox,
+  DatePicker,
+  DateTimePicker,
+  Input,
+  NumberInput,
+  Select,
+  Textarea,
+} from "@metap/ui";
 import type { EntityField, FieldKind } from "../metadata/types";
 import { ReferenceFieldInput } from "./ReferenceFieldInput";
 
-/** `@metap/ui`'s `DatePicker` is date-only (no time-of-day component yet, tracked as a real gap
- * — see README.md) — `"datetime"` fields use it too, losing the time portion `@mantine/dates`'s
- * `DateTimePicker` kept. Converts between this package's ISO-string field values and the
- * component's own `Date | null`. */
+/** Converts between this package's ISO-string field values and `DatePicker`/`DateTimePicker`'s
+ * own `Date | null`. `"datetime"` fields use `DateTimePicker` (added to `@metap/ui` 2026-08-31)
+ * instead of `DatePicker` — previously both kinds shared `DatePicker`, silently losing the
+ * time-of-day portion on every round trip for `"datetime"` fields. */
 function isoDateToDate(value: unknown): Date | null {
   if (typeof value !== "string" || !value) return null;
   const parsed = new Date(value);
@@ -80,6 +88,26 @@ function renderDateInput({
 }: FieldInputRendererProps) {
   return (
     <DatePicker
+      label={label}
+      helperText={helperText}
+      value={isoDateToDate(value)}
+      onValueChange={(d) => onChange(d ? d.toISOString() : undefined)}
+      error={error}
+      disabled={disabled}
+    />
+  );
+}
+
+function renderDateTimeInput({
+  label,
+  helperText,
+  value,
+  onChange,
+  error,
+  disabled,
+}: FieldInputRendererProps) {
+  return (
+    <DateTimePicker
       label={label}
       helperText={helperText}
       value={isoDateToDate(value)}
@@ -184,7 +212,7 @@ const FIELD_INPUT_RENDERERS: Record<
   number: renderNumberInput,
   money: renderNumberInput,
   date: renderDateInput,
-  datetime: renderDateInput,
+  datetime: renderDateTimeInput,
   enum: renderEnumInput,
   json: renderJsonInput,
   string: renderStringInput,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, buttonVariants, Input, Separator, Spinner } from "@metap/ui";
+import { Alert, Button, buttonVariants, Input, Separator } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { apiFetch, ApiError } from "../api/client";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
@@ -82,9 +82,9 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
         />
         <Button
           onClick={() => void handleSubmit()}
-          disabled={submitting || email.trim().length === 0 || password.length === 0}
+          disabled={email.trim().length === 0 || password.length === 0}
+          loading={submitting}
         >
-          {submitting ? <Spinner size="sm" className="mr-2" /> : null}
           {t("login.submit")}
         </Button>
         {oidcEnabled && tenantId ? (
