@@ -203,896 +203,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/admin/lowcode/audit": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Cross-entity audit feed for the caller's tenant, newest first */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** @enum {string} */
-                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
-                actorTenantId?: string | null;
-                actorUserId?: string | null;
-                entityName?: string;
-                /** Format: date-time */
-                occurredAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number | null;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List every DB-authored entity (draft/published status, enabled flag) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                entities?: {
-                  enabled?: boolean;
-                  name?: string;
-                  published?: boolean;
-                }[];
-              };
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Enable/disable a published entity — takes effect immediately, no restart */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            enabled: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/audit": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Audit log for one entity (draft-saved/published/rolled-back/enabled/disabled) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** @enum {string} */
-                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
-                actorTenantId?: string | null;
-                actorUserId?: string | null;
-                entityName?: string;
-                /** Format: date-time */
-                occurredAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number | null;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/draft": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get the current draft for an entity */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                fields?: {
-                  enumValues?: string[];
-                  indexed?: boolean;
-                  /** @enum {string} */
-                  kind:
-                    | "id"
-                    | "string"
-                    | "number"
-                    | "boolean"
-                    | "date"
-                    | "datetime"
-                    | "money"
-                    | "enum"
-                    | "reference"
-                    | "json";
-                  label: string;
-                  max?: number;
-                  maxLength?: number;
-                  min?: number;
-                  minLength?: number;
-                  name: string;
-                  refDisplayField?: string;
-                  refEntity?: string;
-                  required?: boolean;
-                  /** @enum {string} */
-                  searchMode?: "substring" | "fts";
-                  searchable?: boolean;
-                  sortable?: boolean;
-                  /** @enum {string} */
-                  storage?: "native" | "column";
-                  unique?: boolean;
-                }[];
-                label: string;
-                listViews?: {
-                  defaultSort?: string;
-                  fields: string[];
-                  filters: string[];
-                  label: string;
-                  maxLimit: number;
-                  name: string;
-                }[];
-                name?: string;
-                workflow?: {
-                  initialState: string;
-                  stateField: string;
-                  terminalStates: string[];
-                  transitions: {
-                    action: string;
-                    from: string;
-                    guard?: unknown;
-                    label: string;
-                    to: string;
-                  }[];
-                };
-              };
-            };
-          };
-        };
-        /** @description No draft exists for this entity */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    /** Save (create or overwrite) the draft for an entity */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            fields?: {
-              enumValues?: string[];
-              indexed?: boolean;
-              /** @enum {string} */
-              kind:
-                | "id"
-                | "string"
-                | "number"
-                | "boolean"
-                | "date"
-                | "datetime"
-                | "money"
-                | "enum"
-                | "reference"
-                | "json";
-              label: string;
-              max?: number;
-              maxLength?: number;
-              min?: number;
-              minLength?: number;
-              name: string;
-              refDisplayField?: string;
-              refEntity?: string;
-              required?: boolean;
-              /** @enum {string} */
-              searchMode?: "substring" | "fts";
-              searchable?: boolean;
-              sortable?: boolean;
-              /** @enum {string} */
-              storage?: "native" | "column";
-              unique?: boolean;
-            }[];
-            label: string;
-            listViews?: {
-              defaultSort?: string;
-              fields: string[];
-              filters: string[];
-              label: string;
-              maxLimit: number;
-              name: string;
-            }[];
-            workflow?: {
-              initialState: string;
-              stateField: string;
-              terminalStates: string[];
-              transitions: {
-                action: string;
-                from: string;
-                guard?: unknown;
-                label: string;
-                to: string;
-              }[];
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/publish": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Publish the current draft as a new version — validates shape, name-reservation, cross-reference */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description No draft exists for this entity */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Entity name reserved by a code-authored entity */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Draft failed shape validation */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/publish/preview": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Dry-run `publish` — same checks, no side effect */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                impact?: unknown;
-                valid?: boolean;
-                wouldBeVersion?: number;
-              };
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/published": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get the currently published version's definition */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                definition?: {
-                  fields?: {
-                    enumValues?: string[];
-                    indexed?: boolean;
-                    /** @enum {string} */
-                    kind:
-                      | "id"
-                      | "string"
-                      | "number"
-                      | "boolean"
-                      | "date"
-                      | "datetime"
-                      | "money"
-                      | "enum"
-                      | "reference"
-                      | "json";
-                    label: string;
-                    max?: number;
-                    maxLength?: number;
-                    min?: number;
-                    minLength?: number;
-                    name: string;
-                    refDisplayField?: string;
-                    refEntity?: string;
-                    required?: boolean;
-                    /** @enum {string} */
-                    searchMode?: "substring" | "fts";
-                    searchable?: boolean;
-                    sortable?: boolean;
-                    /** @enum {string} */
-                    storage?: "native" | "column";
-                    unique?: boolean;
-                  }[];
-                  label: string;
-                  listViews?: {
-                    defaultSort?: string;
-                    fields: string[];
-                    filters: string[];
-                    label: string;
-                    maxLimit: number;
-                    name: string;
-                  }[];
-                  name?: string;
-                  workflow?: {
-                    initialState: string;
-                    stateField: string;
-                    terminalStates: string[];
-                    transitions: {
-                      action: string;
-                      from: string;
-                      guard?: unknown;
-                      label: string;
-                      to: string;
-                    }[];
-                  };
-                };
-                /** Format: date-time */
-                publishedAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description Never published */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/rollback": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Restore a previously published version as the new current version */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            toVersionNumber: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description Version not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/entities/{name}/versions": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List every published version's metadata (newest first) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** Format: date-time */
-                publishedAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/export": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Export published entity definitions as a portable snapshot */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Comma-separated entity names; omitted exports every published entity */
-          entities?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                entities?: {
-                  definition?: {
-                    fields?: {
-                      enumValues?: string[];
-                      indexed?: boolean;
-                      /** @enum {string} */
-                      kind:
-                        | "id"
-                        | "string"
-                        | "number"
-                        | "boolean"
-                        | "date"
-                        | "datetime"
-                        | "money"
-                        | "enum"
-                        | "reference"
-                        | "json";
-                      label: string;
-                      max?: number;
-                      maxLength?: number;
-                      min?: number;
-                      minLength?: number;
-                      name: string;
-                      refDisplayField?: string;
-                      refEntity?: string;
-                      required?: boolean;
-                      /** @enum {string} */
-                      searchMode?: "substring" | "fts";
-                      searchable?: boolean;
-                      sortable?: boolean;
-                      /** @enum {string} */
-                      storage?: "native" | "column";
-                      unique?: boolean;
-                    }[];
-                    label: string;
-                    listViews?: {
-                      defaultSort?: string;
-                      fields: string[];
-                      filters: string[];
-                      label: string;
-                      maxLimit: number;
-                      name: string;
-                    }[];
-                    name?: string;
-                    workflow?: {
-                      initialState: string;
-                      stateField: string;
-                      terminalStates: string[];
-                      transitions: {
-                        action: string;
-                        from: string;
-                        guard?: unknown;
-                        label: string;
-                        to: string;
-                      }[];
-                    };
-                  };
-                  name?: string;
-                }[];
-                notFound?: string[];
-              };
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/lowcode/import": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Import a snapshot as drafts (never auto-publishes) — best-effort, per-entity outcome */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            entities: {
-              definition: {
-                fields?: {
-                  enumValues?: string[];
-                  indexed?: boolean;
-                  /** @enum {string} */
-                  kind:
-                    | "id"
-                    | "string"
-                    | "number"
-                    | "boolean"
-                    | "date"
-                    | "datetime"
-                    | "money"
-                    | "enum"
-                    | "reference"
-                    | "json";
-                  label: string;
-                  max?: number;
-                  maxLength?: number;
-                  min?: number;
-                  minLength?: number;
-                  name: string;
-                  refDisplayField?: string;
-                  refEntity?: string;
-                  required?: boolean;
-                  /** @enum {string} */
-                  searchMode?: "substring" | "fts";
-                  searchable?: boolean;
-                  sortable?: boolean;
-                  /** @enum {string} */
-                  storage?: "native" | "column";
-                  unique?: boolean;
-                }[];
-                label: string;
-                listViews?: {
-                  defaultSort?: string;
-                  fields: string[];
-                  filters: string[];
-                  label: string;
-                  maxLimit: number;
-                  name: string;
-                }[];
-                workflow?: {
-                  initialState: string;
-                  stateField: string;
-                  terminalStates: string[];
-                  transitions: {
-                    action: string;
-                    from: string;
-                    guard?: unknown;
-                    label: string;
-                    to: string;
-                  }[];
-                };
-              };
-              name: string;
-            }[];
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                failed?: {
-                  error?: string;
-                  name?: string;
-                }[];
-                imported?: string[];
-              };
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/admin/policies": {
     parameters: {
       query?: never;
@@ -1198,6 +308,50 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/policies/matrix": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the entire RBAC permission-matrix state for one entity in a single atomic call */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            entity: string;
+            grants: {
+              action: string;
+              role?: string | null;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1464,14 +618,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/accounting.journal": {
+  "/api/waf.ddos_policies": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** List Journal Entry */
+    /** List DDoS Policy */
     get: {
       parameters: {
         query?: never;
@@ -1491,7 +645,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Create Journal Entry */
+    /** Create DDoS Policy */
     post: {
       parameters: {
         query?: never;
@@ -1503,16 +657,14 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              account: string;
-              code: string;
-              creditAmount: number;
-              debitAmount: number;
-              description?: string;
-              /** Format: date */
-              entryDate: string;
-              referenceMovement?: string;
               /** @enum {string} */
-              status?: "draft" | "posted" | "voided";
+              action: "log" | "challenge" | "block";
+              burstWindow: number;
+              enabled?: boolean;
+              requestRateThreshold: number;
+              /** @enum {string} */
+              sensitivity: "low" | "medium" | "high" | "aggressive";
+              zoneId: string;
             };
           };
         };
@@ -1533,14 +685,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/accounting.journal/{id}": {
+  "/api/waf.ddos_policies/{id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get one Journal Entry */
+    /** Get one DDoS Policy */
     get: {
       parameters: {
         query?: never;
@@ -1558,16 +710,14 @@ export interface paths {
           content: {
             "application/json": {
               data?: {
-                account: string;
-                code: string;
-                creditAmount: number;
-                debitAmount: number;
-                description?: string;
-                /** Format: date */
-                entryDate: string;
-                referenceMovement?: string;
                 /** @enum {string} */
-                status?: "draft" | "posted" | "voided";
+                action: "log" | "challenge" | "block";
+                burstWindow: number;
+                enabled?: boolean;
+                requestRateThreshold: number;
+                /** @enum {string} */
+                sensitivity: "low" | "medium" | "high" | "aggressive";
+                zoneId: string;
               };
             };
           };
@@ -1583,7 +733,7 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    /** Delete Journal Entry */
+    /** Delete DDoS Policy */
     delete: {
       parameters: {
         query?: never;
@@ -1610,7 +760,7 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    /** Update Journal Entry */
+    /** Update DDoS Policy */
     patch: {
       parameters: {
         query?: never;
@@ -1622,16 +772,14 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              account: string;
-              code: string;
-              creditAmount: number;
-              debitAmount: number;
-              description?: string;
-              /** Format: date */
-              entryDate: string;
-              referenceMovement?: string;
               /** @enum {string} */
-              status?: "draft" | "posted" | "voided";
+              action: "log" | "challenge" | "block";
+              burstWindow: number;
+              enabled?: boolean;
+              requestRateThreshold: number;
+              /** @enum {string} */
+              sensitivity: "low" | "medium" | "high" | "aggressive";
+              zoneId: string;
             };
             version?: number;
           };
@@ -1649,54 +797,14 @@ export interface paths {
     };
     trace?: never;
   };
-  "/api/accounting.journal/{id}/transitions/{action}": {
+  "/api/waf.firewall_rules": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    /** Transition Journal Entry */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/crm.customers": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Customer */
+    /** List Firewall Rule */
     get: {
       parameters: {
         query?: never;
@@ -1716,7 +824,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Create Customer */
+    /** Create Firewall Rule */
     post: {
       parameters: {
         query?: never;
@@ -1728,13 +836,17 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              code: string;
-              email?: string;
-              name: string;
-              phone?: string;
-              referredBy?: string;
               /** @enum {string} */
-              status?: "draft" | "active" | "blocked";
+              action: "allow" | "block" | "challenge" | "log";
+              enabled?: boolean;
+              matchCondition: unknown;
+              name: string;
+              priority: number;
+              rateLimitThreshold?: number;
+              rateLimitWindow?: number;
+              /** @enum {string} */
+              ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
+              zoneId: string;
             };
           };
         };
@@ -1755,14 +867,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/crm.customers/{id}": {
+  "/api/waf.firewall_rules/{id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get one Customer */
+    /** Get one Firewall Rule */
     get: {
       parameters: {
         query?: never;
@@ -1780,13 +892,17 @@ export interface paths {
           content: {
             "application/json": {
               data?: {
-                code: string;
-                email?: string;
+                /** @enum {string} */
+                action: "allow" | "block" | "challenge" | "log";
+                enabled?: boolean;
+                matchCondition: unknown;
                 name: string;
-                phone?: string;
-                referredBy?: string;
+                priority: number;
+                rateLimitThreshold?: number;
+                rateLimitWindow?: number;
                 /** @enum {string} */
-                status?: "draft" | "active" | "blocked";
+                ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
+                zoneId: string;
               };
             };
           };
@@ -1802,7 +918,7 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    /** Delete Customer */
+    /** Delete Firewall Rule */
     delete: {
       parameters: {
         query?: never;
@@ -1829,7 +945,7 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    /** Update Customer */
+    /** Update Firewall Rule */
     patch: {
       parameters: {
         query?: never;
@@ -1841,13 +957,17 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              code: string;
-              email?: string;
+              /** @enum {string} */
+              action: "allow" | "block" | "challenge" | "log";
+              enabled?: boolean;
+              matchCondition: unknown;
               name: string;
-              phone?: string;
-              referredBy?: string;
+              priority: number;
+              rateLimitThreshold?: number;
+              rateLimitWindow?: number;
               /** @enum {string} */
-              status?: "draft" | "active" | "blocked";
+              ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
+              zoneId: string;
             };
             version?: number;
           };
@@ -1865,54 +985,14 @@ export interface paths {
     };
     trace?: never;
   };
-  "/api/crm.customers/{id}/transitions/{action}": {
+  "/api/waf.zones": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    /** Transition Customer */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/inventory.movements": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Inventory Movement */
+    /** List Zone */
     get: {
       parameters: {
         query?: never;
@@ -1932,7 +1012,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Create Inventory Movement */
+    /** Create Zone */
     post: {
       parameters: {
         query?: never;
@@ -1944,16 +1024,23 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              code: string;
+              configVersion?: number;
               /** @enum {string} */
-              movementType: "in" | "out" | "transfer";
-              notes?: string;
-              quantity: number;
-              referenceOrder?: string;
+              dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
+              hasConfig?: boolean;
+              hostname: string;
+              /** Format: date-time */
+              lastDnsCheckAt?: string;
+              originAddress: string;
               /** @enum {string} */
-              status?:
-                "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
-              warehouse: string;
+              protectionMode: "monitor" | "enforce";
+              /** @enum {string} */
+              status?: "pending" | "active" | "paused" | "suspended";
+              /** @enum {string} */
+              verificationMethod?: "dnsTxt" | "httpFile";
+              /** @enum {string} */
+              verificationStatus?: "unverified" | "verified";
+              verificationToken?: string;
             };
           };
         };
@@ -1974,14 +1061,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/inventory.movements/{id}": {
+  "/api/waf.zones/{id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get one Inventory Movement */
+    /** Get one Zone */
     get: {
       parameters: {
         query?: never;
@@ -1999,16 +1086,23 @@ export interface paths {
           content: {
             "application/json": {
               data?: {
-                code: string;
+                configVersion?: number;
                 /** @enum {string} */
-                movementType: "in" | "out" | "transfer";
-                notes?: string;
-                quantity: number;
-                referenceOrder?: string;
+                dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
+                hasConfig?: boolean;
+                hostname: string;
+                /** Format: date-time */
+                lastDnsCheckAt?: string;
+                originAddress: string;
                 /** @enum {string} */
-                status?:
-                  "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
-                warehouse: string;
+                protectionMode: "monitor" | "enforce";
+                /** @enum {string} */
+                status?: "pending" | "active" | "paused" | "suspended";
+                /** @enum {string} */
+                verificationMethod?: "dnsTxt" | "httpFile";
+                /** @enum {string} */
+                verificationStatus?: "unverified" | "verified";
+                verificationToken?: string;
               };
             };
           };
@@ -2024,7 +1118,7 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    /** Delete Inventory Movement */
+    /** Delete Zone */
     delete: {
       parameters: {
         query?: never;
@@ -2051,7 +1145,7 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    /** Update Inventory Movement */
+    /** Update Zone */
     patch: {
       parameters: {
         query?: never;
@@ -2063,16 +1157,23 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
-              code: string;
+              configVersion?: number;
               /** @enum {string} */
-              movementType: "in" | "out" | "transfer";
-              notes?: string;
-              quantity: number;
-              referenceOrder?: string;
+              dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
+              hasConfig?: boolean;
+              hostname: string;
+              /** Format: date-time */
+              lastDnsCheckAt?: string;
+              originAddress: string;
               /** @enum {string} */
-              status?:
-                "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
-              warehouse: string;
+              protectionMode: "monitor" | "enforce";
+              /** @enum {string} */
+              status?: "pending" | "active" | "paused" | "suspended";
+              /** @enum {string} */
+              verificationMethod?: "dnsTxt" | "httpFile";
+              /** @enum {string} */
+              verificationStatus?: "unverified" | "verified";
+              verificationToken?: string;
             };
             version?: number;
           };
@@ -2090,7 +1191,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/api/inventory.movements/{id}/transitions/{action}": {
+  "/api/waf.zones/{id}/transitions/{action}": {
     parameters: {
       query?: never;
       header?: never;
@@ -2099,226 +1200,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Transition Inventory Movement */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/sales.orders": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Sales Order */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create Sales Order */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              code: string;
-              customer: string;
-              notes?: string;
-              /** Format: date */
-              orderDate: string;
-              /** @enum {string} */
-              status?: "draft" | "confirmed" | "shipped" | "cancelled";
-              totalAmount: number;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/sales.orders/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get one Sales Order */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                code: string;
-                customer: string;
-                notes?: string;
-                /** Format: date */
-                orderDate: string;
-                /** @enum {string} */
-                status?: "draft" | "confirmed" | "shipped" | "cancelled";
-                totalAmount: number;
-              };
-            };
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete Sales Order */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update Sales Order */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              code: string;
-              customer: string;
-              notes?: string;
-              /** Format: date */
-              orderDate: string;
-              /** @enum {string} */
-              status?: "draft" | "confirmed" | "shipped" | "cancelled";
-              totalAmount: number;
-            };
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  "/api/sales.orders/{id}/transitions/{action}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Transition Sales Order */
+    /** Transition Zone */
     post: {
       parameters: {
         query?: never;
@@ -2995,6 +1877,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/metadata/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List the fixed set of actions a policy can grant */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: string[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/metadata/entities": {
     parameters: {
       query?: never;
@@ -3076,253 +1996,6 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
-    trace?: never;
-  };
-  "/platform/tenants": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List every tenant (platform-admin only) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** Format: date-time */
-                createdAt?: string;
-                id?: string;
-                /** @enum {string} */
-                status?: "active" | "suspended" | "deleted";
-                strategy?: {
-                  dsnSecretRef?: string;
-                  schemaName?: string;
-                  /** @enum {string} */
-                  type?: "schema" | "dedicated_db";
-                };
-                tier?: string;
-                /** Format: date-time */
-                trialExpiresAt?: string | null;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Provision a new tenant (schema or dedicated_db strategy) and its first admin user */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            adminEmail: string;
-            adminPassword: string;
-            /** @description Required when strategy is "dedicated_db" */
-            dedicatedDatabaseUrl?: string;
-            /** @description Required when strategy is "dedicated_db" */
-            dsnSecretRef?: string;
-            /** @enum {string} */
-            strategy: "schema" | "dedicated_db";
-            tenantId: string;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                adminUserId?: string;
-                tenantId?: string;
-              };
-            };
-          };
-        };
-        /** @description Validation failed (unknown strategy, or missing dedicated_db fields) */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description A tenant with this id already exists */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/platform/tenants/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get one tenant's routing info */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                id?: string;
-                /** @enum {string} */
-                status?: "active" | "suspended" | "deleted";
-                strategy?: {
-                  dsnSecretRef?: string;
-                  schemaName?: string;
-                  /** @enum {string} */
-                  type?: "schema" | "dedicated_db";
-                };
-              };
-            };
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Deprovision a tenant permanently — refuses future routing, does not touch or drop its data */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/platform/tenants/{id}/status": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Suspend or resume a tenant */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            /** @enum {string} */
-            status: "active" | "suspended";
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid status */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
     trace?: never;
   };
   "/preferences": {
@@ -3436,6 +2109,10 @@ export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
     EntitySummary: {
+      fieldDisplayHints?: {
+        field: string;
+        resolveVia: string;
+      }[];
       fields: {
         enumValues?: string[];
         indexed?: boolean;
@@ -3478,6 +2155,14 @@ export interface components {
         name: string;
       }[];
       name: string;
+      relatedViews?: {
+        entity: string;
+        fields: string[];
+        filterField: string;
+        label: string;
+        limit?: number;
+        name: string;
+      }[];
       version: string;
       workflow?: {
         initialState: string;

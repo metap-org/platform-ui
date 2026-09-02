@@ -32,6 +32,7 @@ const en = {
     missingEntityOrId: "Missing entity name or id.",
     entityNotFound: "Entity not found.",
     noListView: "{{label}} has no list view configured.",
+    backToList: "Back to {{label}}",
   },
   form: {
     editTitle: "Edit {{label}}",
@@ -267,6 +268,7 @@ const vi = {
     missingEntityOrId: "Thiếu tên entity hoặc id.",
     entityNotFound: "Không tìm thấy entity.",
     noListView: "{{label}} chưa cấu hình list view.",
+    backToList: "Quay lại {{label}}",
   },
   form: {
     editTitle: "Sửa {{label}}",

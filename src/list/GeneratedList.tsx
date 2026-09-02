@@ -49,6 +49,26 @@ type ListPage = {
 type SortState = { field: string; descending: boolean } | null;
 
 const ROW_HEIGHT = 40;
+/** Fixed width for the trailing "actions" column — everything else divides the remaining space
+ *  evenly. `table-fixed` layout (below) only reads *this* row's cell widths to size every
+ *  column; body cells don't need matching widths. */
+const ACTIONS_COLUMN_WIDTH = 140;
+
+function SortIndicator({ direction }: { direction: "asc" | "desc" }) {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`ml-1 inline h-3 w-3 align-middle${direction === "asc" ? " rotate-180" : ""}`}
+    >
+      <path d="M3 5l3 3 3-3" />
+    </svg>
+  );
+}
 
 export function GeneratedList({ entityName }: { entityName: string }) {
   const { t } = useTranslation();
@@ -199,7 +219,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   const columnCount = listView.fields.length + 1;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 py-8">
+    <div className="mx-auto flex max-w-7xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {entityLabel(entity.label)}
@@ -228,8 +248,16 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         </Alert>
       ) : null}
       <Card className="overflow-hidden">
-        <div ref={scrollContainerRef} className="h-[600px] overflow-auto">
-          <Table>
+        <div ref={scrollContainerRef} className="h-[calc(100vh-280px)] min-h-[420px] overflow-auto">
+          {/* `table-fixed` — a virtualized body row is `position: absolute` (below), which takes
+              it out of normal flow entirely; the browser's default `table-layout: auto` sizes
+              columns only from rows still in flow, so with every body row absolute it would size
+              columns from the header alone and body cells wouldn't line up under them at all.
+              `table-fixed` sizes columns once, from this component's first row (the label row
+              right below), and every other row — filter row, every virtualized data row — just
+              inherits those widths, keeping header and body aligned regardless of how rows are
+              positioned. */}
+          <Table className="table-fixed">
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 {listView.fields.map((fieldName) => {
@@ -239,6 +267,8 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                     return <TableHead key={fieldName} />;
                   }
 
+                  const active = sort?.field === fieldName;
+
                   return (
                     <TableHead
                       key={fieldName}
@@ -246,11 +276,16 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       className={`text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
                     >
                       {fieldLabel(field.name, field.label)}
-                      {sort?.field === fieldName ? (sort.descending ? " ▼" : " ▲") : ""}
+                      {active ? (
+                        <SortIndicator direction={sort.descending ? "desc" : "asc"} />
+                      ) : null}
                     </TableHead>
                   );
                 })}
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <TableHead
+                  style={{ width: ACTIONS_COLUMN_WIDTH }}
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
                   {t("common.actions")}
                 </TableHead>
               </TableRow>
@@ -266,6 +301,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                     return (
                       <TableHead key={fieldName}>
                         <Select
+                          className="h-8 px-2 text-xs"
                           placeholder={t("common.any")}
                           options={(field.enumValues ?? []).map((value) => ({
                             value,
@@ -283,6 +319,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                   return (
                     <TableHead key={fieldName}>
                       <Input
+                        className="h-8 px-2 text-xs"
                         placeholder={t("common.filterPlaceholder")}
                         value={filterInputs[fieldName] ?? ""}
                         onChange={(event) => {
@@ -336,19 +373,20 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                         const field = fieldsByName.get(fieldName);
 
                         return (
-                          <TableCell key={fieldName} className="text-sm">
+                          <TableCell key={fieldName} className="truncate text-sm">
                             {field ? (
                               <FieldValue
                                 field={field}
                                 value={record.data[fieldName]}
                                 relatedDisplay={record.relatedDisplay}
                                 entityName={entityName}
+                                fieldDisplayHints={entity.fieldDisplayHints}
                               />
                             ) : null}
                           </TableCell>
                         );
                       })}
-                      <TableCell>
+                      <TableCell style={{ width: ACTIONS_COLUMN_WIDTH }}>
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <navAdapter.Link
                             to={navAdapter.toRecordDetail(entityName, record.id)}

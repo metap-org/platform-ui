@@ -4,6 +4,7 @@ import { Badge, Button } from "@metap/ui";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
+import { useCurrentUserEmail } from "../auth/useTenantUsers";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 
 export type ShellNavItem = {
@@ -46,6 +47,10 @@ export function AppShellLayout({
   const { t } = useTranslation();
   const { setToken } = useAuth();
   const { data: user } = useCurrentUser();
+  // The JWT only carries a user id (`sub`), never email — see `useCurrentUserEmail`'s own doc
+  // comment. `useTenantUsers()` underneath fetches the whole tenant user list once (not
+  // per-render), so this costs nothing extra beyond what `useCurrentUser` already fetches.
+  const email = useCurrentUserEmail();
   const navAdapter = useNavigationAdapter();
 
   function handleLogout() {
@@ -71,6 +76,7 @@ export function AppShellLayout({
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
             {user ? (
               <div className="flex items-center gap-1">
                 {user.roles.map((role) => (

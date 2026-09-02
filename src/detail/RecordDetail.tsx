@@ -11,6 +11,7 @@ import { FieldValue } from "../field/FieldValue";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { WorkflowActionBar } from "../workflow/WorkflowActionBar";
+import { RelatedRecordsPanel } from "./RelatedRecordsPanel";
 import type { RecordCapabilities } from "./recordCapabilities";
 
 type RecordDto = {
@@ -79,7 +80,24 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
   const visibleFields = entity.fields.filter((field) => field.kind !== "id");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 py-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 py-4">
+      <navAdapter.Link
+        to={navAdapter.toRecordList(entityName)}
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <svg
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3 w-3"
+        >
+          <path d="M7.5 3L4.5 6l3 3" />
+        </svg>
+        {t("common.backToList", { label: entityLabel(entity.label) })}
+      </navAdapter.Link>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -137,6 +155,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
                     field={field}
                     value={record.data[field.name]}
                     entityName={entityName}
+                    fieldDisplayHints={entity.fieldDisplayHints}
                   />
                 </dd>
               </div>
@@ -144,6 +163,10 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           })}
         </dl>
       </Card>
+
+      {entity.relatedViews && entity.relatedViews.length > 0 ? (
+        <RelatedRecordsPanel id={id} relatedViews={entity.relatedViews} />
+      ) : null}
 
       {entity.workflow ? (
         <WorkflowActionBar

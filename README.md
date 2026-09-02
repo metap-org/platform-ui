@@ -75,6 +75,19 @@ còn lại của package.
 - Không có `Container`/`Stack`/`Title`/`Group`/`Text`/`Divider`/`Center` — thay bằng div/flex
   Tailwind thuần. Đây là lựa chọn kiến trúc chủ đích (Tailwind-first), không phải gap cần xử lý.
 
+## Component đã chuyển sang `design-system` (không còn ở đây)
+
+Không phải "gap giữa `@metap/ui` và Mantine" (mục trên) — đây là các UI atom từng bị build nhầm ở
+repo này, vi phạm "Nguyên tắc kiến trúc" đầu file, đã dọn theo đúng nguyên tắc đó ngay khi phát
+hiện:
+
+- `TagsField`/`MultiFieldSelect`/`Input`+`Chip` viết tay (xem mục "Gap đã biết" ở trên) → chuyển
+  thành `TagsInput`/`SuggestInput`/`MultiSelect` (2026-08-29).
+- `charts/BarChart.tsx` → chuyển thành `@metap/ui`'s `BarChart` (2026-09-01) — component thuần
+  SVG, không biết `jira.issues` hay entity nào, chỉ nhận `{label, value, color?}`, không có lý do
+  gì phải nằm ở tầng business-screen này. `apps/jira-fe`'s `DashboardPage.tsx`/
+  `CustomizableDashboardPage.tsx` (2 consumer duy nhất) đổi import sang `@metap/ui`.
+
 ## State management cho UI builder tương lai (2026-08-31)
 
 `src/builder/builderStore.ts` — scaffold rỗng (chưa có field state thật, chưa có UI builder nào
