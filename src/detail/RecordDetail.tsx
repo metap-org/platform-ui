@@ -176,6 +176,23 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
         <WorkflowStepper workflow={entity.workflow} currentState={currentState} />
       ) : null}
 
+      {/* The "Visualize workflow" trigger + transition buttons — moved up here from below the
+          record fields/related-records panel (2026-09-03, project owner request) so the actions
+          that change this record's own state aren't buried under a scroll of unrelated content. */}
+      {entity.workflow ? (
+        <WorkflowActionBar
+          entityName={entityName}
+          recordId={id}
+          version={record.version}
+          workflow={entity.workflow}
+          currentState={currentState ?? ""}
+          capabilities={record.capabilities}
+          onTransitioned={() => {
+            void refetch();
+          }}
+        />
+      ) : null}
+
       {deleteError ? (
         <Alert variant="destructive" className="flex items-center justify-between gap-2">
           <span>{deleteError}</span>
@@ -218,20 +235,6 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
 
       {entity.relatedViews && entity.relatedViews.length > 0 ? (
         <RelatedRecordsPanel id={id} relatedViews={entity.relatedViews} />
-      ) : null}
-
-      {entity.workflow ? (
-        <WorkflowActionBar
-          entityName={entityName}
-          recordId={id}
-          version={record.version}
-          workflow={entity.workflow}
-          currentState={currentState ?? ""}
-          capabilities={record.capabilities}
-          onTransitioned={() => {
-            void refetch();
-          }}
-        />
       ) : null}
     </div>
   );

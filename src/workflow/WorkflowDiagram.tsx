@@ -259,20 +259,18 @@ export function WorkflowDiagram({
   );
 }
 
-/** Point at `t=0.5` on a cubic Bézier — where a label sits so it tracks the curve it belongs to
- * instead of the straight line between the endpoints (which, for a routed edge, is nowhere near
- * the drawn path). */
-function cubicMidpoint(p0: Point, c1: Point, c2: Point, p3: Point): Point {
+/** 4-point orthogonal (Manhattan) route: straight from `p0` to `c1`, straight to `c2`, straight
+ * to `p3` — no diagonals, only right angles, requested in place of the earlier cubic-Bézier
+ * version (`docs/roadmap/xx-workflow-diagram-orthogonal-routing.md`). Each `edgeGeometry` case
+ * below already places `c1`/`c2` so that every one of the 3 segments is purely horizontal or
+ * purely vertical (same waypoints a curve would have used as control points, just connected with
+ * straight lines instead of a spline) — this function itself has no opinion on that, it only
+ * turns 4 points into an SVG path. Label sits at the midpoint of the `c1`-`c2` run (the one
+ * segment that's usually clear of both node boxes), `labelDy` nudges it off the line itself. */
+function orthogonal(p0: Point, c1: Point, c2: Point, p3: Point, labelDy: number): EdgeGeometry {
+  const mid = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
   return {
-    x: 0.125 * p0.x + 0.375 * c1.x + 0.375 * c2.x + 0.125 * p3.x,
-    y: 0.125 * p0.y + 0.375 * c1.y + 0.375 * c2.y + 0.125 * p3.y,
-  };
-}
-
-function curve(p0: Point, c1: Point, c2: Point, p3: Point, labelDy: number): EdgeGeometry {
-  const mid = cubicMidpoint(p0, c1, c2, p3);
-  return {
-    path: `M${p0.x},${p0.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${p3.x},${p3.y}`,
+    path: `M${p0.x},${p0.y} L${c1.x},${c1.y} L${c2.x},${c2.y} L${p3.x},${p3.y}`,
     labelX: mid.x,
     labelY: mid.y + labelDy,
   };
@@ -299,12 +297,14 @@ function edgeGeometry(
   const selfLoop = from.x === to.x && from.y === to.y;
 
   if (selfLoop) {
-    // Arc over the top of the node. The old code sent this through the backward-edge branch, where
-    // it collapsed into the node's own bounding box and vanished completely (finding A3).
+    // Rectangular loop over the top of the node: up from the top edge, across, back down —
+    // already 3 axis-aligned segments, nothing to change for orthogonal routing. The old code
+    // sent this through the backward-edge branch, where it collapsed into the node's own
+    // bounding box and vanished completely (finding A3).
     const lift = 26 + ordinal * 10;
     const left = from.x + NODE_WIDTH * 0.32;
     const right = from.x + NODE_WIDTH * 0.68;
-    return curve(
+    return orthogonal(
       { x: left, y: from.y },
       { x: left, y: from.y - lift },
       { x: right, y: from.y - lift },
@@ -314,50 +314,47 @@ function edgeGeometry(
   }
 
   if (to.col === from.col) {
-    // Same column: bow out to the right, staying inside the inter-column gutter so the bulge can't
-    // reach the next column's nodes.
-    const bow = Math.min(COLUMN_GAP - 6, 30 + ordinal * 10);
+    // Same column: out to the right, straight down/up through the inter-column gutter, back in —
+    // the gutter offset keeps this clear of the next column's nodes, same as before.
+    const gutterOffset = Math.min(COLUMN_GAP - 6, 30 + ordinal * 10);
     const x1 = from.x + NODE_WIDTH;
     const x2 = to.x + NODE_WIDTH;
     const y1 = from.y + NODE_HEIGHT / 2;
     const y2 = to.y + NODE_HEIGHT / 2;
-    return curve(
+    return orthogonal(
       { x: x1, y: y1 },
-      { x: x1 + bow, y: y1 },
-      { x: x2 + bow, y: y2 },
+      { x: x1 + gutterOffset, y: y1 },
+      { x: x2 + gutterOffset, y: y2 },
       { x: x2, y: y2 },
-      // Successive bows differ by only 10px horizontally, which is not enough to keep their
+      // Successive routes differ by only 10px horizontally, which is not enough to keep their
       // labels apart — separate those vertically instead.
       ordinal * 13,
     );
   }
 
   if (to.col === from.col + 1) {
-    // Adjacent columns: straight across the gutter. Both control points sit strictly between the
-    // two node boxes, so this case was already safe — only the parallel-edge offset is new.
+    // Adjacent columns: across, straight down/up through the gutter, across again. Parallel
+    // edges used to fan out by nudging the middle run's Y off `y1`/`y2` (a gentle S-curve) — for
+    // straight lines that would tilt the first/last segment off-axis, so they fan out along X
+    // (where the vertical run sits inside the gutter) instead; each still lands on a distinct,
+    // fully axis-aligned 3-segment path.
     const x1 = from.x + NODE_WIDTH;
     const x2 = to.x;
     const y1 = from.y + NODE_HEIGHT / 2;
     const y2 = to.y + NODE_HEIGHT / 2;
-    const midX = (x1 + x2) / 2;
-    const offset = spread * 12;
-    return curve(
-      { x: x1, y: y1 },
-      { x: midX, y: y1 + offset },
-      { x: midX, y: y2 + offset },
-      { x: x2, y: y2 },
-      -7,
-    );
+    const midX = (x1 + x2) / 2 + spread * Math.min(10, (COLUMN_GAP - 8) / 2);
+    return orthogonal({ x: x1, y: y1 }, { x: midX, y: y1 }, { x: midX, y: y2 }, { x: x2, y: y2 }, -7);
   }
 
   // Everything else — a backward edge, or a forward one that skips a column (which used to run
   // dead straight through whatever node sat in between, finding A4). Drop into the row gutter
   // below both nodes, run across, come back up into the target's bottom edge. Leaving and entering
-  // through the bottom keeps the whole curve clear of both boxes.
+  // through the bottom keeps the whole route clear of both boxes — already 3 axis-aligned
+  // segments (down, across, up), nothing to change here either.
   const dip = Math.max(from.y, to.y) + NODE_HEIGHT + ROW_GAP / 2 + ordinal * 8;
   const x1 = from.x + NODE_WIDTH / 2;
   const x2 = to.x + NODE_WIDTH / 2;
-  return curve(
+  return orthogonal(
     { x: x1, y: from.y + NODE_HEIGHT },
     { x: x1, y: dip },
     { x: x2, y: dip },
