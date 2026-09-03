@@ -17,20 +17,20 @@ function isSupportedLocale(value: string): value is (typeof SUPPORTED_LOCALES)[n
   return (SUPPORTED_LOCALES as readonly string[]).includes(value);
 }
 
-// Must be nested inside `AuthProvider` — reads `token` to load/persist the caller's
-// `GET/PUT /preferences` locale (`crates/metap-http/src/routes/preferences.rs`). Also wraps
-// `I18nextProvider` so any consumer of `platform-ui` gets a working `useTranslation()`
-// without wiring i18next itself.
+// Must be nested inside `AuthProvider` — reads `status` to gate loading/persisting the caller's
+// `GET/PUT /preferences` locale (`crates/metap-http/src/routes/preferences.rs`) until a session
+// (cookie-based since 2026-09-03) actually exists. Also wraps `I18nextProvider` so any consumer of
+// `platform-ui` gets a working `useTranslation()` without wiring i18next itself.
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { status } = useAuth();
   const [locale, setLocaleState] = useState<string>(DEFAULT_LOCALE);
 
   useEffect(() => {
-    if (!token) {
+    if (status !== "authenticated") {
       return;
     }
     let cancelled = false;
-    apiFetch<{ data: { locale: string } }>("/preferences", token)
+    apiFetch<{ data: { locale: string } }>("/preferences")
       .then((response) => {
         if (!cancelled && isSupportedLocale(response.data.locale)) {
           setLocaleState(response.data.locale);
@@ -44,20 +44,20 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [status]);
 
   const setLocale = useCallback(
     async (next: string) => {
       setLocaleState(next);
       await i18n.changeLanguage(next);
-      if (token) {
-        await apiFetch("/preferences", token, {
+      if (status === "authenticated") {
+        await apiFetch("/preferences", {
           method: "PUT",
           body: JSON.stringify({ locale: next }),
         });
       }
     },
-    [token],
+    [status],
   );
 
   const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);

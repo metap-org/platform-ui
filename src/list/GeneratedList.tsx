@@ -20,7 +20,6 @@ import {
 import { useApiInfiniteQuery } from "../api/useApiInfiniteQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
 import { FieldValue } from "../field/FieldValue";
 import { useEntity } from "../metadata/useEntity";
 import type { EntityField } from "../metadata/types";
@@ -73,7 +72,6 @@ function SortIndicator({ direction }: { direction: "asc" | "desc" }) {
 export function GeneratedList({ entityName }: { entityName: string }) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
-  const { token } = useAuth();
   const navAdapter = useNavigationAdapter();
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
   // Text filters are debounced (wait for the user to stop typing before refetching).
@@ -204,7 +202,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     setDeleteError(null);
     setPendingDeleteId(record.id);
     try {
-      await apiFetch(`/api/${entityName}/${record.id}`, token, {
+      await apiFetch(`/api/${entityName}/${record.id}`, {
         method: "DELETE",
         body: JSON.stringify({ version: record.version }),
       });

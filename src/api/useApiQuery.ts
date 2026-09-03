@@ -29,13 +29,13 @@ export function useApiQuery<TFetched, TSelected = TFetched>(
   enabled: boolean = true,
   options?: ApiQueryOptions<TFetched>,
 ) {
-  const { token } = useAuth();
+  const { status } = useAuth();
 
   return useQuery({
     queryKey,
-    queryFn: () => apiFetch<TFetched>(path, token),
+    queryFn: () => apiFetch<TFetched>(path),
     select,
-    enabled: token !== null && enabled,
+    enabled: status === "authenticated" && enabled,
     staleTime: options?.staleTime,
     initialData: options?.initialData,
   });

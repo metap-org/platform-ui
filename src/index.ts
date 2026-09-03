@@ -10,6 +10,7 @@ export * from "./api/useApiInfiniteQuery";
 export * from "./api/useApiMutation";
 export * from "./api/useApiQuery";
 export * from "./api/useGraphQLQuery";
+export * from "./auth/AdminOnly";
 export * from "./auth/AuthContext";
 export * from "./builder/builderStore";
 export * from "./auth/Can";
@@ -37,3 +38,10 @@ export * from "./navigation/NavigationContext";
 export * from "./navigation/ReactRouterNavigationProvider";
 export * from "./shell/AppShellLayout";
 export * from "./workflow/WorkflowActionBar";
+export * from "./workflow/WorkflowStepper";
+// Exported so a consumer can embed the canvas outside a record's action bar — e.g. an admin screen
+// showing an entity's workflow with no particular record in hand
+// (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding A11).
+export * from "./workflow/WorkflowDiagram";
+export * from "./workflow/TransitionButtons";
+export * from "./workflow/layout";

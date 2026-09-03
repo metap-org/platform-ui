@@ -7,6 +7,7 @@ import { isBasicShapedRow } from "./policyCondition";
 import { PermissionMatrix } from "./policies/PermissionMatrix";
 import { AdvancedPoliciesPanel } from "./policies/AdvancedPoliciesPanel";
 import { PermissionSearch } from "./policies/PermissionSearch";
+import { AdminOnly } from "../auth/AdminOnly";
 
 /**
  * Thin orchestrator: an entity picker shared by both tabs, plus the RBAC "basic" matrix
@@ -16,7 +17,7 @@ import { PermissionSearch } from "./policies/PermissionSearch";
  * (`crates/metap-permission/src/policy_store.rs`). Passes the whole `EntitySummary`, not just its
  * name, down to both children — they each need `entity.workflow`/`entity.fields` too.
  */
-export function PoliciesAdminPage() {
+function PoliciesAdminPageContent() {
   const { t } = useTranslation();
   const { data: entities } = useEntities();
   const [entityName, setEntityName] = useState("");
@@ -62,5 +63,18 @@ export function PoliciesAdminPage() {
         <p className="text-sm text-muted-foreground">{t("admin.policies.selectEntityFirst")}</p>
       )}
     </div>
+  );
+}
+
+/** Self-gated on the `admin` role rather than trusting every consumer to gate the route: the
+ * `PoliciesAdminPageContent` body below fires `/admin/*` requests from its very first render, so an
+ * ungated non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
+ * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
+export function PoliciesAdminPage() {
+  return (
+    <AdminOnly>
+      <PoliciesAdminPageContent />
+    </AdminOnly>
   );
 }

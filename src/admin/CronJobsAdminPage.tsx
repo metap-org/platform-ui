@@ -24,6 +24,7 @@ import {
   useCreateAdminCronJob,
   useCronJobRuns,
 } from "./adminApi";
+import { AdminOnly } from "../auth/AdminOnly";
 
 const TARGET_TYPES = ["workflow_transition", "bulk_query_action", "webhook"];
 const DISPATCH_MODES = ["outbox", "direct"];
@@ -69,7 +70,7 @@ function CronJobRuns({ jobId }: { jobId: string }) {
   );
 }
 
-export function CronJobsAdminPage() {
+function CronJobsAdminPageContent() {
   const { t } = useTranslation();
   const { data: jobs, isLoading, error, refetch } = useAdminCronJobs();
   const createJob = useCreateAdminCronJob();
@@ -269,5 +270,18 @@ export function CronJobsAdminPage() {
         </Table>
       )}
     </div>
+  );
+}
+
+/** Self-gated on the `admin` role rather than trusting every consumer to gate the route: the
+ * `CronJobsAdminPageContent` body below fires `/admin/*` requests from its very first render, so an
+ * ungated non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
+ * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
+export function CronJobsAdminPage() {
+  return (
+    <AdminOnly>
+      <CronJobsAdminPageContent />
+    </AdminOnly>
   );
 }

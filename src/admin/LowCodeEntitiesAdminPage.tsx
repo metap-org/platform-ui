@@ -30,6 +30,7 @@ import {
   useLowCodeVersions,
   type LowCodeVersionSummary,
 } from "./adminApi";
+import { AdminOnly } from "../auth/AdminOnly";
 
 // Every FieldKind `metap_metadata::FieldKind` declares except "id" — the id column is
 // implicit/system-managed (`records.id`), never something an author picks for a new field.
@@ -909,7 +910,7 @@ function LowCodeVersionHistory({
   );
 }
 
-export function LowCodeEntitiesAdminPage() {
+function LowCodeEntitiesAdminPageContent() {
   const { t } = useTranslation();
   const { data: entities, isLoading, error, refetch } = useLowCodeEntities();
   const { getDraft, saveDraft, publish, previewPublish, rollback, setEnabled } =
@@ -1290,5 +1291,18 @@ export function LowCodeEntitiesAdminPage() {
         </Table>
       )}
     </div>
+  );
+}
+
+/** Self-gated on the `admin` role rather than trusting every consumer to gate the route: the
+ * `LowCodeEntitiesAdminPageContent` body below fires `/admin/*` requests from its very first render, so an
+ * ungated non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
+ * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
+export function LowCodeEntitiesAdminPage() {
+  return (
+    <AdminOnly>
+      <LowCodeEntitiesAdminPageContent />
+    </AdminOnly>
   );
 }
