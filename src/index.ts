@@ -38,6 +38,7 @@ export * from "./navigation/NavigationContext";
 export * from "./navigation/ReactRouterNavigationProvider";
 export * from "./shell/AppShellLayout";
 export * from "./workflow/WorkflowActionBar";
+export * from "./workflow/WorkflowStepper";
 // Exported so a consumer can embed the canvas outside a record's action bar — e.g. an admin screen
 // showing an entity's workflow with no particular record in hand
 // (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding A11).

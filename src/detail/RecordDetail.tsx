@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Alert,
-  Badge,
   Button,
   buttonVariants,
   Card,
@@ -21,6 +20,7 @@ import { FieldValue } from "../field/FieldValue";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { WorkflowActionBar } from "../workflow/WorkflowActionBar";
+import { WorkflowStepper } from "../workflow/WorkflowStepper";
 import { RelatedRecordsPanel } from "./RelatedRecordsPanel";
 import type { RecordCapabilities } from "./recordCapabilities";
 
@@ -112,7 +112,6 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">
             {entityLabel(entity.label)}
           </h2>
-          {currentState ? <Badge variant="secondary">{currentState}</Badge> : null}
         </div>
         {/* Both actions are gated on the capabilities the server already sent with this very
             record, rather than offered unconditionally and left to fail with a 403 — see
@@ -169,6 +168,13 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           )}
         </div>
       </div>
+
+      {/* Always visible, right under the header — not something a caller can toggle away like
+          the old badge-grid in `WorkflowActionBar` used to be. See `WorkflowStepper`'s own doc
+          comment for why this moved out of that component. */}
+      {entity.workflow && currentState ? (
+        <WorkflowStepper workflow={entity.workflow} currentState={currentState} />
+      ) : null}
 
       {deleteError ? (
         <Alert variant="destructive" className="flex items-center justify-between gap-2">
