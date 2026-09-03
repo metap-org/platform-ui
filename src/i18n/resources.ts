@@ -33,6 +33,11 @@ const en = {
     entityNotFound: "Entity not found.",
     noListView: "{{label}} has no list view configured.",
     backToList: "Back to {{label}}",
+    noPermissionEdit: "You don't have permission to edit this record.",
+    noPermissionDelete: "You don't have permission to delete this record.",
+    signingIn: "Signing you in…",
+    signInFailed: "Sign-in failed. Please try logging in again.",
+    backToLogin: "Back to login",
   },
   form: {
     editTitle: "Edit {{label}}",
@@ -78,6 +83,7 @@ const en = {
     navLowCode: "Entities (Low-code)",
   },
   admin: {
+    notAuthorized: "You don't have access to this page. It requires the admin role.",
     users: {
       title: "Users",
       createTitle: "Create user",
@@ -275,6 +281,11 @@ const vi = {
     entityNotFound: "Không tìm thấy entity.",
     noListView: "{{label}} chưa cấu hình list view.",
     backToList: "Quay lại {{label}}",
+    noPermissionEdit: "Bạn không có quyền sửa bản ghi này.",
+    noPermissionDelete: "Bạn không có quyền xoá bản ghi này.",
+    signingIn: "Đang đăng nhập…",
+    signInFailed: "Đăng nhập thất bại. Vui lòng thử đăng nhập lại.",
+    backToLogin: "Quay lại trang đăng nhập",
   },
   form: {
     editTitle: "Sửa {{label}}",
@@ -320,6 +331,7 @@ const vi = {
     navLowCode: "Entities (Low-code)",
   },
   admin: {
+    notAuthorized: "Bạn không có quyền truy cập trang này. Trang này yêu cầu vai trò admin.",
     users: {
       title: "Người dùng",
       createTitle: "Tạo người dùng",

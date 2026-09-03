@@ -10,7 +10,10 @@ import { useNavigationAdapter } from "../navigation/NavigationContext";
 export type ShellNavItem = {
   to: string;
   label: string;
-  /** Hidden unless the current user holds one of these roles; visible to everyone if omitted. */
+  /** Hidden unless the current user holds one of these roles; visible to everyone if omitted **or
+   * empty**. An empty array reads as "no role requirement", not "no one may see this" — the latter
+   * was the old behavior purely because `[]` is truthy in JS, which nothing intended
+   * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B7). */
   roles?: string[];
 };
 
@@ -18,7 +21,7 @@ function NavLink({ item }: { item: ShellNavItem }) {
   const navAdapter = useNavigationAdapter();
   const allowedByRole = useHasRole(item.roles ?? []);
 
-  if (item.roles && !allowedByRole) {
+  if (item.roles?.length && !allowedByRole) {
     return null;
   }
 

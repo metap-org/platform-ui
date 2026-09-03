@@ -17,8 +17,9 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useAdminRoleActions, useAdminUsers, useCreateAdminUser } from "./adminApi";
+import { AdminOnly } from "../auth/AdminOnly";
 
-export function UsersAdminPage() {
+function UsersAdminPageContent() {
   const { t } = useTranslation();
   const { data: users, isLoading, error, refetch } = useAdminUsers();
   const createUser = useCreateAdminUser();
@@ -189,5 +190,18 @@ export function UsersAdminPage() {
         </Table>
       )}
     </div>
+  );
+}
+
+/** Self-gated on the `admin` role rather than trusting every consumer to gate the route: the
+ * `UsersAdminPageContent` body below fires `/admin/*` requests from its very first render, so an
+ * ungated non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
+ * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
+export function UsersAdminPage() {
+  return (
+    <AdminOnly>
+      <UsersAdminPageContent />
+    </AdminOnly>
   );
 }

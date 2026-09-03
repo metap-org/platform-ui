@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Alert, Badge, Button, buttonVariants, Card, IconButton, Spinner } from "@metap/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  buttonVariants,
+  Card,
+  IconButton,
+  Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
@@ -105,22 +116,59 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           </h2>
           {currentState ? <Badge variant="secondary">{currentState}</Badge> : null}
         </div>
+        {/* Both actions are gated on the capabilities the server already sent with this very
+            record, rather than offered unconditionally and left to fail with a 403 — see
+            `docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B1. Disabled with a
+            reason, not hidden, matching how `TransitionButtons` presents a blocked transition. */}
         <div className="flex items-center gap-2">
-          <navAdapter.Link
-            to={navAdapter.toEditRecord(entityName, id)}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {t("common.edit")}
-          </navAdapter.Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            loading={deleting}
-            onClick={() => void handleDelete()}
-          >
-            {t("common.delete")}
-          </Button>
+          {record.capabilities.canUpdate ? (
+            <navAdapter.Link
+              to={navAdapter.toEditRecord(entityName, id)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              {t("common.edit")}
+            </navAdapter.Link>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button variant="outline" size="sm" disabled>
+                    {t("common.edit")}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{t("common.noPermissionEdit")}</TooltipContent>
+            </Tooltip>
+          )}
+          {/* `canDelete === false` only — `undefined` means an older backend that doesn't report
+              it, where gating would hide the action from people entitled to it. */}
+          {record.capabilities.canDelete === false ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    disabled
+                  >
+                    {t("common.delete")}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{t("common.noPermissionDelete")}</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              loading={deleting}
+              onClick={() => void handleDelete()}
+            >
+              {t("common.delete")}
+            </Button>
+          )}
         </div>
       </div>
 
