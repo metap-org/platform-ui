@@ -96,7 +96,7 @@ tiêu thụ) cho canvas/selection/drag/undo-redo state của low-code UI builder
 qua Redux DevTools extension) — **không phải Redux**: đã cân nhắc lại 2026-08-31 và giữ nguyên
 quyết định cũ (audit 2026-08-29), lý do chính là Zustand không cần `<Provider>` nên bundle vào
 package này không ép mọi app tiêu thụ (`crm-fe`/`jira-fe`) phải tự wire provider chỉ để dùng
-builder — xem doc-comment trong file đó. `docs/architectures/04-strategy.md`'s ADR (không global
+builder — xem doc-comment trong file đó. `docs/architectures/04-strategy/00-index.md`'s ADR (không global
 store áp đặt lên app) vẫn đúng cho phần admin CRUD hiện có — store này tách biệt, chỉ phục vụ
 builder chưa tồn tại.
 
