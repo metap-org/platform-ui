@@ -42,26 +42,23 @@ function readCsrfCookie(): string | null {
 }
 
 const CSRF_HEADER_NAME = "X-CSRF-Token";
-/** Methods a browser can trigger cross-site without the request ever touching CORS (a plain HTML
- * form, an `<img>`/`<script>` src) — exactly the shape CSRF depends on, and exactly what the
- * server (`crates/metap-http/src/auth.rs`'s cookie branch) requires the CSRF header for. GET/HEAD
- * are also excluded on the general REST principle that they never mutate, matching the backend's
- * own `Method::GET | Method::HEAD | Method::OPTIONS` exemption. */
-function needsCsrfHeader(method: string | undefined): boolean {
-  const safe = new Set(["GET", "HEAD", "OPTIONS"]);
-  return !safe.has((method ?? "GET").toUpperCase());
-}
 
 /** No `token` parameter (removed 2026-09-03, alongside the backend's move to cookie-based
  * sessions — `docs/audits/02-auth-permission-workflow-diagram-audit.md`'s follow-up). The session
  * is a `HttpOnly` cookie the browser attaches on its own; `credentials: "include"` is what makes
  * `fetch` actually send (and store, on `/auth/login`'s response) it — the default of
  * `"same-origin"` would still work for a same-origin dev proxy, but not once the frontend and API
- * are on genuinely different origins, which `credentials: "include"` handles either way. The CSRF
- * header is attached automatically for any mutating request, so no call site needs to remember
- * it — see `needsCsrfHeader`/`readCsrfCookie` above. */
+ * are on genuinely different origins, which `credentials: "include"` handles either way.
+ *
+ * The CSRF header is attached to **every** request whenever the cookie exists, not only to
+ * mutating ones (changed 2026-09-03 for the backend's audit 04 A#4 fix). Sending it on a safe
+ * request costs nothing — the server exempts those methods and never looks at it — while the
+ * previous method-based filter meant a *credential-issuing* `GET` like `/auth/token` could not be
+ * CSRF-gated server-side without the frontend silently breaking. Keeping the rule "attach it if we
+ * have it" here means the backend can gate any endpoint it needs to without a matching change in
+ * this file, and there is no second list of "which GETs are special" to keep in sync. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const csrfToken = needsCsrfHeader(init?.method) ? readCsrfCookie() : null;
+  const csrfToken = readCsrfCookie();
   const response = await fetch(path, {
     ...init,
     credentials: "include",
