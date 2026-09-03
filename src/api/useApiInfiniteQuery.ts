@@ -9,13 +9,13 @@ export function useApiInfiniteQuery<TFetched>(
   getNextCursor: (lastPage: TFetched) => string | null,
   enabled: boolean = true,
 ) {
-  const { token } = useAuth();
+  const { status } = useAuth();
 
   return useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam }) => apiFetch<TFetched>(buildPath(pageParam), token),
+    queryFn: ({ pageParam }) => apiFetch<TFetched>(buildPath(pageParam)),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => getNextCursor(lastPage),
-    enabled: token !== null && enabled,
+    enabled: status === "authenticated" && enabled,
   });
 }

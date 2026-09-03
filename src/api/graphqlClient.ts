@@ -1,6 +1,7 @@
-/** GraphQL counterpart to `client.ts`'s `apiFetch` — same shape (relative `path`, bearer token,
- *  same-origin dev-proxy convention) but POSTs a query/variables body and unwraps
- *  `{data, errors}` instead of a plain JSON body. For a BFF gateway that aggregates several
+/** GraphQL counterpart to `client.ts`'s `apiFetch`, but not the same auth shape — see
+ *  `graphqlFetch`'s own doc comment for why this one still takes an explicit Bearer token while
+ *  `apiFetch` moved to a cookie session. POSTs a query/variables body and unwraps `{data, errors}`
+ *  instead of a plain JSON body. For a BFF gateway that aggregates several
  *  backend services into 1 GraphQL schema (e.g. `metap`'s `graphql-gateway`) — not a general
  *  replacement for `apiFetch`: flat per-entity CRUD screens (`GeneratedList`/`RecordDetail`)
  *  stay on REST, this is for a page that genuinely needs 1 round-trip across several services'
@@ -22,16 +23,23 @@ type GraphQLResponseBody<T> = {
   errors?: { message: string }[];
 };
 
+/** Still takes a `token` (unlike `client.ts`'s `apiFetch`, which dropped it 2026-09-03) — this one
+ *  talks to `crates/graphql-gateway`, a separate deployment with its own keypair that only ever
+ *  speaks `Authorization: Bearer` (decode-only, see that crate's `authenticate` function), not the
+ *  cookie session the rest of this package now relies on. `useGraphQLQuery` fetches a fresh
+ *  short-lived token from `GET /auth/token` immediately before each call rather than this module
+ *  holding one — see that new route's doc comment for why a client-held long-lived token is
+ *  exactly what the cookie migration was meant to stop doing. */
 export async function graphqlFetch<T>(
   path: string,
-  token: string | null,
+  token: string,
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ query, variables }),

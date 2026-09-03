@@ -5,7 +5,6 @@ import { apiFetch, ApiError } from "../api/client";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { useAuth } from "./AuthContext";
 
-type LoginResponse = { data: { token: string } };
 type ProvidersResponse = { data: { providers: string[] } };
 
 type LoginFormProps = {
@@ -21,7 +20,7 @@ type LoginFormProps = {
 
 export function LoginForm({ tenantId }: LoginFormProps = {}) {
   const { t } = useTranslation();
-  const { setToken } = useAuth();
+  const { markAuthenticated } = useAuth();
   const navAdapter = useNavigationAdapter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +30,7 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
 
   useEffect(() => {
     if (!tenantId) return;
-    apiFetch<ProvidersResponse>(`/auth/providers?tenantId=${encodeURIComponent(tenantId)}`, null)
+    apiFetch<ProvidersResponse>(`/auth/providers?tenantId=${encodeURIComponent(tenantId)}`)
       .then((response) => setOidcEnabled(response.data.providers.includes("oidc")))
       .catch(() => setOidcEnabled(false));
   }, [tenantId]);
@@ -40,11 +39,15 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
     setError(null);
     setSubmitting(true);
     try {
-      const response = await apiFetch<LoginResponse>("/auth/login", null, {
+      // `POST /auth/login` sets the session cookie itself (`Set-Cookie`, `HttpOnly`) — this
+      // response's own JSON body still carries a bearer token for non-browser callers, but this
+      // form has nothing to do with it now that the cookie is what makes every later request
+      // authenticated (`docs/audits/02-auth-permission-workflow-diagram-audit.md`'s follow-up).
+      await apiFetch("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password, ...(tenantId ? { tenantId } : {}) }),
       });
-      setToken(response.data.token);
+      markAuthenticated();
       navAdapter.navigate(navAdapter.toHome());
     } catch (err) {
       if (err instanceof ApiError && err.code === "invalid_credentials") {

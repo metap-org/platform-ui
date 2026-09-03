@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Alert, buttonVariants } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthContext";
@@ -6,49 +6,37 @@ import { useNavigationAdapter } from "../navigation/NavigationContext";
 
 /**
  * Route target for `crates/metap-auth::OidcConfig`'s `post_login_redirect` — the backend's
- * `GET /auth/oidc/{tenantId}/callback` appends the minted session JWT as a URL fragment
- * (`#token=...`, never a query param: fragments never reach server access logs or `Referer`
- * headers), so this page's only job is to read it out of `window.location.hash` and hand it to
- * `setToken`, exactly like `LoginForm` does after a local login — from here on an OIDC session is
- * indistinguishable from a local one to the rest of the app.
+ * `GET /auth/oidc/{tenantId}/callback` mints the session the exact same way a local login does and
+ * sets it as a cookie directly on its own redirect response, so by the time the browser lands
+ * here the session already exists; this page has nothing to extract from the URL.
  *
- * Two things this page owes that fragment-based handoff, both added 2026-09-03
- * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` findings B3/B4). First, the token is
- * scrubbed from the URL the moment it's read (`history.replaceState`) and the redirect home
- * *replaces* rather than pushes — otherwise the whole point of keeping the JWT out of logs is
- * given back by leaving `#token=<JWT>` one Back-button press away in session history. Second, a
- * callback that arrives without a usable token (the IdP denied the request and sent `#error=...`,
- * or someone opened this URL directly) now says so and offers a way out, instead of sitting on
- * "Signing you in…" forever with no token ever coming.
+ * That's a change from the original design (2026-09-03): the callback used to hand the minted JWT
+ * to the browser as a `#token=...` URL fragment, which this page read, stored, and scrubbed from
+ * history. Once the backend moved to cookie-based sessions
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md`'s follow-up), embedding the token in
+ * the URL at all — even a fragment immediately wiped — stopped being the best available option:
+ * a `Set-Cookie` header on the redirect achieves the same "keep it out of server logs/`Referer`"
+ * goal without the token ever touching the address bar or session history in the first place.
+ *
+ * So this page now does the same thing every other route does to find out whether the caller is
+ * signed in: reads `useAuth().status`, which resolves via the ordinary `GET /auth/me` bootstrap
+ * check. `"authenticated"` means the redirect's cookie took — go home. `"anonymous"` means either
+ * the OIDC flow genuinely failed before ever reaching this cookie-setting step, or someone opened
+ * this URL directly without going through login at all; either way there's nothing to recover
+ * client-side, so this shows a plain failure state with a way back to login.
  */
 export function OidcCallbackPage() {
   const { t } = useTranslation();
-  const { setToken } = useAuth();
+  const { status } = useAuth();
   const navAdapter = useNavigationAdapter();
-  // Read once, during the first render rather than inside the effect below. The effect then only
-  // performs side effects and never calls `setState`, which is both what the lint rule
-  // (`react/set-state-in-effect`) asks for and simpler: whether a token was present is a fact
-  // about the URL this page was opened with, not state that evolves.
-  const [token] = useState(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-    const hash = window.location.hash;
-    return hash.startsWith("#token=") ? decodeURIComponent(hash.slice("#token=".length)) : null;
-  });
 
   useEffect(() => {
-    if (!token) {
-      return;
+    if (status === "authenticated") {
+      navAdapter.navigate(navAdapter.toHome(), { replace: true });
     }
-    // Before `setToken`, so the credential stops being part of the address as early as possible —
-    // `replaceState` rewrites the current entry in place rather than adding another one.
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    setToken(token);
-    navAdapter.navigate(navAdapter.toHome(), { replace: true });
-  }, [token, setToken, navAdapter]);
+  }, [status, navAdapter]);
 
-  if (!token) {
+  if (status === "anonymous") {
     return (
       <div className="mx-auto flex max-w-sm flex-col gap-4 py-8">
         <Alert variant="destructive">{t("common.signInFailed")}</Alert>

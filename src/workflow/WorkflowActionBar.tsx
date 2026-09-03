@@ -10,7 +10,6 @@ import {
   DialogTrigger,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../auth/AuthContext";
 import { apiFetch, ApiError } from "../api/client";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import type { EntityWorkflow } from "../metadata/types";
@@ -41,7 +40,6 @@ export function WorkflowActionBar({
 }) {
   const { t } = useTranslation();
   const { transitionLabel } = useEntityLabels(entityName);
-  const { token } = useAuth();
   const [showBar, setShowBar] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -67,7 +65,6 @@ export function WorkflowActionBar({
     try {
       const response = await apiFetch<{ data: RecordDto }>(
         `/api/${entityName}/${recordId}/transitions/${action}`,
-        token,
         {
           method: "POST",
           body: JSON.stringify({ version }),

@@ -48,7 +48,7 @@ export function AppShellLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const { setToken } = useAuth();
+  const { logout } = useAuth();
   const { data: user } = useCurrentUser();
   // The JWT only carries a user id (`sub`), never email — see `useCurrentUserEmail`'s own doc
   // comment. `useTenantUsers()` underneath fetches the whole tenant user list once (not
@@ -56,8 +56,8 @@ export function AppShellLayout({
   const email = useCurrentUserEmail();
   const navAdapter = useNavigationAdapter();
 
-  function handleLogout() {
-    setToken(null);
+  async function handleLogout() {
+    await logout();
     navAdapter.navigate(navAdapter.toLogin());
   }
 
@@ -89,7 +89,7 @@ export function AppShellLayout({
                 ))}
               </div>
             ) : null}
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
               {t("shell.logout")}
             </Button>
           </div>

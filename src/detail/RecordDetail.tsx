@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
 import { useEntity } from "../metadata/useEntity";
 import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { FieldValue } from "../field/FieldValue";
@@ -39,7 +38,6 @@ function stateValue(value: unknown): string {
 export function RecordDetail({ entityName, id }: { entityName: string; id: string }) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
-  const { token } = useAuth();
   const navAdapter = useNavigationAdapter();
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -63,7 +61,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
     setDeleteError(null);
     setDeleting(true);
     try {
-      await apiFetch(`/api/${entityName}/${id}`, token, {
+      await apiFetch(`/api/${entityName}/${id}`, {
         method: "DELETE",
         body: JSON.stringify({ version: record.version }),
       });

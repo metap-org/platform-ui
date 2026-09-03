@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiMutation } from "../api/useApiMutation";
 import { useApiQuery } from "../api/useApiQuery";
-import { useAuth } from "../auth/AuthContext";
 import { apiFetch, ApiError } from "../api/client";
 import type { PolicyCondition } from "./policyCondition";
 
@@ -106,11 +105,10 @@ export function useCreateAdminUser() {
  * fixed-path shape can't express — same convention as `GeneratedList`'s per-row delete: a
  * plain `apiFetch` call plus manual invalidation instead of a bound mutation hook. */
 export function useAdminRoleActions() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   async function assignRole(userId: string, role: string) {
-    await apiFetch(`/admin/users/${userId}/roles`, token, {
+    await apiFetch(`/admin/users/${userId}/roles`, {
       method: "POST",
       body: JSON.stringify({ role }),
     });
@@ -118,7 +116,7 @@ export function useAdminRoleActions() {
   }
 
   async function revokeRole(userId: string, role: string) {
-    await apiFetch(`/admin/users/${userId}/roles/${role}`, token, { method: "DELETE" });
+    await apiFetch(`/admin/users/${userId}/roles/${role}`, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   }
 
@@ -153,11 +151,10 @@ export function useCreateAdminPolicy() {
 }
 
 export function useDeleteAdminPolicy() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return async function deletePolicy(id: string) {
-    await apiFetch(`/admin/policies/${id}`, token, { method: "DELETE" });
+    await apiFetch(`/admin/policies/${id}`, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
   };
 }
@@ -224,11 +221,10 @@ export function useCreateAdminCronJob() {
 /** Row-level actions (update/delete) need a per-job path — see `useAdminRoleActions`'s doc
  * comment for why this bypasses `useApiMutation`. */
 export function useAdminCronJobActions() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   async function toggleEnabled(job: CronJob) {
-    await apiFetch(`/admin/cron-jobs/${job.id}`, token, {
+    await apiFetch(`/admin/cron-jobs/${job.id}`, {
       method: "PATCH",
       body: JSON.stringify({ enabled: !job.enabled }),
     });
@@ -236,7 +232,7 @@ export function useAdminCronJobActions() {
   }
 
   async function deleteJob(id: string) {
-    await apiFetch(`/admin/cron-jobs/${id}`, token, { method: "DELETE" });
+    await apiFetch(`/admin/cron-jobs/${id}`, { method: "DELETE" });
     await queryClient.invalidateQueries({ queryKey: ["admin", "cronJobs"] });
   }
 
@@ -266,14 +262,12 @@ export function useLowCodeVersions(name: string | null) {
  * `useApiMutation`'s fixed-path shape, same reasoning as `useAdminRoleActions`/
  * `useAdminCronJobActions`. */
 export function useLowCodeActions() {
-  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   async function getDraft(name: string): Promise<LowCodeEntityDefinition | null> {
     try {
       const result = await apiFetch<{ data: LowCodeEntityDefinition }>(
         `/admin/lowcode/entities/${name}/draft`,
-        token,
       );
       return result.data;
     } catch (err) {
@@ -290,7 +284,6 @@ export function useLowCodeActions() {
   ) {
     const result = await apiFetch<{ data: LowCodeEntityDefinition }>(
       `/admin/lowcode/entities/${name}/draft`,
-      token,
       { method: "PUT", body: JSON.stringify(body) },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode", "entities"] });
@@ -300,7 +293,6 @@ export function useLowCodeActions() {
   async function publish(name: string) {
     const result = await apiFetch<{ data: { versionNumber: number } }>(
       `/admin/lowcode/entities/${name}/publish`,
-      token,
       { method: "POST" },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode"] });
@@ -319,7 +311,6 @@ export function useLowCodeActions() {
   async function previewPublish(name: string) {
     const result = await apiFetch<{ data: { valid: boolean; wouldBeVersion: number } }>(
       `/admin/lowcode/entities/${name}/publish/preview`,
-      token,
       { method: "POST" },
     );
     return result.data;
@@ -328,7 +319,6 @@ export function useLowCodeActions() {
   async function rollback(name: string, toVersionNumber: number) {
     const result = await apiFetch<{ data: { versionNumber: number } }>(
       `/admin/lowcode/entities/${name}/rollback`,
-      token,
       { method: "POST", body: JSON.stringify({ toVersionNumber }) },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "lowcode"] });
@@ -339,7 +329,7 @@ export function useLowCodeActions() {
   }
 
   async function setEnabled(name: string, enabled: boolean) {
-    await apiFetch(`/admin/lowcode/entities/${name}`, token, {
+    await apiFetch(`/admin/lowcode/entities/${name}`, {
       method: "PATCH",
       body: JSON.stringify({ enabled }),
     });
