@@ -16,6 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  toast,
 } from "@metap/ui";
 import { useApiInfiniteQuery } from "../api/useApiInfiniteQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
@@ -206,6 +207,9 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         method: "DELETE",
         body: JSON.stringify({ version: record.version }),
       });
+      // Was silent on success (only `deleteError` below surfaced anything) — the row disappearing
+      // from the list was the only feedback a delete had actually gone through.
+      toast(t("common.deleteSuccess"));
       await refetch();
     } catch (error) {
       setDeleteError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));

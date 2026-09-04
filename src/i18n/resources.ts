@@ -38,10 +38,13 @@ const en = {
     signingIn: "Signing you in…",
     signInFailed: "Sign-in failed. Please try logging in again.",
     backToLogin: "Back to login",
+    deleteSuccess: "Deleted.",
   },
   form: {
     editTitle: "Edit {{label}}",
     newTitle: "New {{label}}",
+    createSuccess: "{{label}} created.",
+    updateSuccess: "{{label}} updated.",
   },
   error: {
     sessionExpired: "Session expired.",
@@ -286,10 +289,13 @@ const vi = {
     signingIn: "Đang đăng nhập…",
     signInFailed: "Đăng nhập thất bại. Vui lòng thử đăng nhập lại.",
     backToLogin: "Quay lại trang đăng nhập",
+    deleteSuccess: "Đã xoá.",
   },
   form: {
     editTitle: "Sửa {{label}}",
     newTitle: "Thêm {{label}}",
+    createSuccess: "Đã tạo {{label}}.",
+    updateSuccess: "Đã cập nhật {{label}}.",
   },
   error: {
     sessionExpired: "Phiên đăng nhập đã hết hạn.",

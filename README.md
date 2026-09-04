@@ -75,6 +75,16 @@ còn lại của package.
 - Không có `Container`/`Stack`/`Title`/`Group`/`Text`/`Divider`/`Center` — thay bằng div/flex
   Tailwind thuần. Đây là lựa chọn kiến trúc chủ đích (Tailwind-first), không phải gap cần xử lý.
 
+## Toast notifications (2026-09-04)
+
+`@metap/ui`'s `Toast`/`ToastProvider` tồn tại từ trước nhưng chưa có consumer nào trong repo này
+dùng — `GeneratedForm`/`GeneratedList` chỉ báo lỗi (`Alert` inline), im lặng khi thành công.
+`AppShellLayout` giờ mount `<ToastProvider>` bọc `children` (cùng shape "library tự cung cấp" với
+`AuthContext`/`LocaleProvider`, không ép mọi consumer app tự wire provider) — `GeneratedForm` toast
+`form.createSuccess`/`updateSuccess` sau khi tạo/sửa thành công, `GeneratedList` toast
+`common.deleteSuccess` sau khi xoá. Không toast lỗi — lỗi đã có `Alert`/`deleteError` inline sẵn,
+thêm toast sẽ trùng lặp thông tin.
+
 ## Component đã chuyển sang `design-system` (không còn ở đây)
 
 Không phải "gap giữa `@metap/ui` và Mantine" (mục trên) — đây là các UI atom từng bị build nhầm ở
