@@ -3,10 +3,13 @@
  *  `apiFetch` moved to a cookie session. POSTs a query/variables body and unwraps `{data, errors}`
  *  instead of a plain JSON body. For a BFF gateway that aggregates several
  *  backend services into 1 GraphQL schema (e.g. `metap`'s `graphql-gateway`) — not a general
- *  replacement for `apiFetch`: flat per-entity CRUD screens (`GeneratedList`/`RecordDetail`)
- *  stay on REST, this is for a page that genuinely needs 1 round-trip across several services'
- *  data instead of a client-side entity-by-entity fetch. See that gateway's own README for why
- *  it's query-only in practice (no per-caller identity propagation to mutate through safely).
+ *  replacement for `apiFetch`: `GeneratedList`/`RecordDetail`'s flat per-entity CRUD screens stay
+ *  on REST since they need no cross-service aggregation, this is for a page that genuinely needs 1
+ *  round-trip across several services' data instead of a client-side entity-by-entity fetch.
+ *  Mutations work fine too (not query-only) — `metap`'s `graphql-gateway` forwards the caller's own
+ *  bearer token to each upstream (see that crate's README's Auth section), so a mutation through
+ *  here enforces the real caller's permissions same as a query does; `metap-demo-waf`'s
+ *  `data-plane/web/src/api/waf.ts` is a full CRUD example (2026-09-04).
  */
 export class GraphQLError extends Error {
   readonly errors: { message: string }[];
