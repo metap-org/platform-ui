@@ -124,6 +124,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     refetch,
   } = useApiInfiniteQuery<ListPage>(
     ["records", entityName, sort, activeFilters],
@@ -226,12 +227,34 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {entityLabel(entity.label)}
         </h2>
-        <navAdapter.Link
-          to={navAdapter.toNewRecord(entityName)}
-          className={buttonVariants({ variant: "default" })}
-        >
-          {t("common.new")}
-        </navAdapter.Link>
+        <div className="flex items-center gap-2">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={t("common.refresh")}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            icon={
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-4 w-4${isFetching ? " animate-spin" : ""}`}
+              >
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            }
+          />
+          <navAdapter.Link
+            to={navAdapter.toNewRecord(entityName)}
+            className={buttonVariants({ variant: "default" })}
+          >
+            {t("common.new")}
+          </navAdapter.Link>
+        </div>
       </div>
       {deleteError ? (
         <Alert variant="destructive" className="flex items-center justify-between gap-2">
