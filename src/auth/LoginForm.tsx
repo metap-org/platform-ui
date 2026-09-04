@@ -47,7 +47,10 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
         method: "POST",
         body: JSON.stringify({ email, password, ...(tenantId ? { tenantId } : {}) }),
       });
-      markAuthenticated();
+      // Awaited (2026-09-04, `markAuthenticated`'s own doc comment on the `AuthContext` interface)
+      // — by the time this resolves, `status` has already settled to "authenticated", so the
+      // destination route's `RequireAuth` can't read a stale "anonymous" and bounce back here.
+      await markAuthenticated();
       navAdapter.navigate(navAdapter.toHome());
     } catch (err) {
       if (err instanceof ApiError && err.code === "invalid_credentials") {

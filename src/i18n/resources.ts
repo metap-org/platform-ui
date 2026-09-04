@@ -70,6 +70,9 @@ const en = {
     legendEnd: "End",
     legendBlocked: "Blocked for you",
     currentStateActions: 'Actions from "{{state}}"',
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    resetView: "Reset view",
   },
   login: {
     title: "Log In",
@@ -330,6 +333,9 @@ const vi = {
     legendEnd: "Kết thúc",
     legendBlocked: "Bị chặn với bạn",
     currentStateActions: 'Hành động từ "{{state}}"',
+    zoomIn: "Phóng to",
+    zoomOut: "Thu nhỏ",
+    resetView: "Đặt lại góc nhìn",
   },
   login: {
     title: "Đăng nhập",

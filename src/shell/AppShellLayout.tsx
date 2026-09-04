@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { useCurrentUserEmail } from "../auth/useTenantUsers";
+import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 
 export type ShellNavItem = {
@@ -40,7 +41,11 @@ function NavLink({ item }: { item: ShellNavItem }) {
  * Mantine `AppShell`-based version onto the `@metap/ui` design system). Also mounts `@metap/ui`'s
  * `ToastProvider` once here, so `GeneratedForm`/`GeneratedList`'s success toasts (and any future
  * `toast(...)` call anywhere under this shell) render without every consumer app wiring its own
- * provider — the same "the library provides it" shape as `AuthContext`/`LocaleProvider`. */
+ * provider — the same "the library provides it" shape as `AuthContext`/`LocaleProvider`. Also
+ * renders `LocaleSwitcher` in the header (2026-09-05) — every `LocaleProvider`-wrapped app already
+ * gets working `en`/`vi` translation via `useTranslation()`, but until now nothing actually
+ * rendered a way to change it, in any consumer app (`../metap-demo-crm`/`../metap-demo-jira`/
+ * `../metap-demo-waf` all wrap `LocaleProvider` yet none mounted `LocaleSwitcher` anywhere). */
 export function AppShellLayout({
   brand,
   navItems,
@@ -83,6 +88,9 @@ export function AppShellLayout({
               </nav>
             </div>
             <div className="flex items-center gap-3">
+              <div className="w-32">
+                <LocaleSwitcher compact />
+              </div>
               {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
               {user ? (
                 <div className="flex items-center gap-1">

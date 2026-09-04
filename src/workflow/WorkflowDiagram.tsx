@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import type { EntityWorkflow, WorkflowTransition } from "../metadata/types";
 import type { TransitionAvailability } from "../detail/recordCapabilities";
@@ -13,6 +14,50 @@ const PADDING_X = 56;
 /** Tall enough to clear a self-loop's arc plus its label, which are drawn above the node's top
  * edge (see `selfLoopGeometry`). */
 const PADDING_Y = 48;
+
+/** Fixed CSS pixel height of the pan/zoom viewport — the canvas used to be `height: auto` (grow
+ * to fit every row), which stopped working once nodes can be dragged anywhere: a viewport that
+ * resizes to its content can't have panning, there'd be nothing to pan within. `width` stays
+ * responsive (`100%` of the dialog), only `height` is fixed. */
+const VIEWPORT_HEIGHT = 420;
+const MIN_SCALE = 0.3;
+const MAX_SCALE = 3;
+
+function clampScale(scale: number): number {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+}
+
+type ViewTransform = { scale: number; tx: number; ty: number };
+
+/** Keeps the diagram's `(width, height)` box centred and fully visible in a `containerWidth x
+ * VIEWPORT_HEIGHT` viewport, never upscaled past 1:1 — same fit `maxWidth: 100%` used to give a
+ * static SVG, recomputed here so the "reset view" button can restore it after a pan/zoom/drag. */
+function fitView(
+  containerWidth: number,
+  diagramWidth: number,
+  diagramHeight: number,
+): ViewTransform {
+  const scale = Math.min(1, containerWidth / diagramWidth, VIEWPORT_HEIGHT / diagramHeight);
+  return {
+    scale,
+    tx: (containerWidth - diagramWidth * scale) / 2,
+    ty: (VIEWPORT_HEIGHT - diagramHeight * scale) / 2,
+  };
+}
+
+/** Rescales `view` so the world point under `(px, py)` (viewport-local CSS pixels) stays under
+ * the cursor after the zoom — the standard "zoom to cursor" formula, used by both wheel-zoom and
+ * the +/- buttons (which zoom around the viewport's centre instead of a cursor position). */
+function zoomAt(view: ViewTransform, px: number, py: number, factor: number): ViewTransform {
+  const nextScale = clampScale(view.scale * factor);
+  const worldX = (px - view.tx) / view.scale;
+  const worldY = (py - view.ty) / view.scale;
+  return { scale: nextScale, tx: px - worldX * nextScale, ty: py - worldY * nextScale };
+}
+
+type DragState =
+  | { kind: "pan"; startClientX: number; startClientY: number; startTx: number; startTy: number }
+  | { kind: "node"; state: string; startClientX: number; startClientY: number; startOffset: Point };
 
 /** Free space between two columns' node boxes (`220 - 168`) and between two rows' (`76 - 40`).
  * Every edge that can't run straight is routed through one of these gutters rather than across a
@@ -56,7 +101,11 @@ export function WorkflowDiagram({
   const { t } = useTranslation();
   const terminalStates = useMemo(() => new Set(workflow.terminalStates), [workflow]);
 
-  const { positions, width, height } = useMemo(() => {
+  const {
+    positions: basePositions,
+    width,
+    height,
+  } = useMemo(() => {
     const columns = groupByLevel(computeLevels(workflow));
     const map = new Map<string, NodePosition>();
     let maxRows = 1;
@@ -76,6 +125,137 @@ export function WorkflowDiagram({
       height: PADDING_Y + maxRows * ROW_HEIGHT,
     };
   }, [workflow]);
+
+  // A per-node drag nudges it off `basePositions`' BFS-column layout — reset whenever the
+  // workflow itself changes so a stale offset from a previous entity's diagram can't leak in.
+  const [nodeOffsets, setNodeOffsets] = useState<Record<string, Point>>({});
+  useEffect(() => setNodeOffsets({}), [workflow]);
+
+  const positions = useMemo(() => {
+    const map = new Map<string, NodePosition>();
+    basePositions.forEach((pos, state) => {
+      const offset = nodeOffsets[state];
+      map.set(state, offset ? { x: pos.x + offset.x, y: pos.y + offset.y, col: pos.col } : pos);
+    });
+    return map;
+  }, [basePositions, nodeOffsets]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<ViewTransform>({ scale: 1, tx: 0, ty: 0 });
+  const dragRef = useRef<DragState | null>(null);
+
+  // Hovering a node or an edge highlights the pair — the node plus every edge touching it (and
+  // each edge's own other endpoint), or an edge plus its 2 endpoints. Mutually exclusive: only 1
+  // of the 2 is ever non-null, whichever the pointer is currently over.
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [hoveredEdgeKey, setHoveredEdgeKey] = useState<string | null>(null);
+
+  // Fits the whole diagram in the viewport on first render and whenever the workflow's own size
+  // changes (a different entity, or a transition/state added to this one) — same "reset view" the
+  // toolbar button below offers, just automatic the moment there's a new layout to show.
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) {
+      return;
+    }
+    setView(fitView(el.clientWidth, width, height));
+  }, [width, height]);
+
+  // Native (non-React) listener: a synthetic React `onWheel` handler can't reliably
+  // `preventDefault` a wheel event, since some browsers treat React's delegated listener as
+  // passive — without it, zooming the diagram would also scroll the dialog behind it.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) {
+      return;
+    }
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setView((prev) => zoomAt(prev, e.clientX - rect.left, e.clientY - rect.top, factor));
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  function zoomByButton(factor: number) {
+    const el = containerRef.current;
+    const cx = el ? el.clientWidth / 2 : 0;
+    setView((prev) => zoomAt(prev, cx, VIEWPORT_HEIGHT / 2, factor));
+  }
+
+  function resetView() {
+    const el = containerRef.current;
+    if (!el) {
+      return;
+    }
+    setView(fitView(el.clientWidth, width, height));
+  }
+
+  // Pan: pointer-down on the canvas background (a node's own handler below calls
+  // `stopPropagation`, so this only fires for the background itself).
+  function handleCanvasPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = {
+      kind: "pan",
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startTx: view.tx,
+      startTy: view.ty,
+    };
+  }
+
+  function handleCanvasPointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.kind !== "pan") {
+      return;
+    }
+    const tx = drag.startTx + (e.clientX - drag.startClientX);
+    const ty = drag.startTy + (e.clientY - drag.startClientY);
+    setView((prev) => ({ ...prev, tx, ty }));
+  }
+
+  function handleCanvasPointerUp() {
+    if (dragRef.current?.kind === "pan") {
+      dragRef.current = null;
+    }
+  }
+
+  // Drag one node: screen-pixel delta is divided by the current zoom `scale` to get the diagram's
+  // own coordinate units, so a drag tracks the cursor 1:1 regardless of zoom level.
+  function handleNodePointerDown(e: React.PointerEvent<SVGGElement>, state: string) {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = {
+      kind: "node",
+      state,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startOffset: nodeOffsets[state] ?? { x: 0, y: 0 },
+    };
+  }
+
+  function handleNodePointerMove(e: React.PointerEvent<SVGGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.kind !== "node") {
+      return;
+    }
+    e.stopPropagation();
+    const dx = (e.clientX - drag.startClientX) / view.scale;
+    const dy = (e.clientY - drag.startClientY) / view.scale;
+    setNodeOffsets((prev) => ({
+      ...prev,
+      [drag.state]: { x: drag.startOffset.x + dx, y: drag.startOffset.y + dy },
+    }));
+  }
+
+  function handleNodePointerUp(e: React.PointerEvent<SVGGElement>) {
+    e.stopPropagation();
+    if (dragRef.current?.kind === "node") {
+      dragRef.current = null;
+    }
+  }
 
   /** One entry per transition, geometry resolved. `spread` fans apart transitions that share the
    * same `(from, to)` pair — without it they resolve to byte-identical paths and labels, so N
@@ -122,6 +302,34 @@ export function WorkflowDiagram({
     });
   }, [workflow, positions]);
 
+  /** `null` means nothing hovered — every node/edge renders at full opacity. Otherwise the exact
+   * set to keep at full opacity; everything else dims (see the render passes below). */
+  const highlight = useMemo(() => {
+    if (hoveredNode) {
+      const nodes = new Set<string>([hoveredNode]);
+      const edgeKeys = new Set<string>();
+      edges.forEach(({ key, transition }) => {
+        if (transition.from === hoveredNode || transition.to === hoveredNode) {
+          edgeKeys.add(key);
+          nodes.add(transition.from);
+          nodes.add(transition.to);
+        }
+      });
+      return { nodes, edgeKeys };
+    }
+    if (hoveredEdgeKey) {
+      const hovered = edges.find((edge) => edge.key === hoveredEdgeKey);
+      if (!hovered) {
+        return null;
+      }
+      return {
+        nodes: new Set([hovered.transition.from, hovered.transition.to]),
+        edgeKeys: new Set([hoveredEdgeKey]),
+      };
+    }
+    return null;
+  }, [hoveredNode, hoveredEdgeKey, edges]);
+
   const blockedActions = useMemo(() => {
     const blocked = new Set<string>();
     for (const [action, info] of transitionInfo) {
@@ -153,16 +361,58 @@ export function WorkflowDiagram({
         />
       </div>
 
-      <div className="overflow-auto rounded-md border border-border">
+      <div
+        ref={containerRef}
+        className="relative touch-none overflow-hidden rounded-md border border-border"
+        style={{ height: VIEWPORT_HEIGHT }}
+      >
+        <div className="absolute right-2 top-2 z-10 flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            aria-label={t("workflow.zoomIn")}
+            onClick={() => zoomByButton(1.2)}
+          >
+            +
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            aria-label={t("workflow.zoomOut")}
+            onClick={() => zoomByButton(1 / 1.2)}
+          >
+            −
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            aria-label={t("workflow.resetView")}
+            onClick={resetView}
+          >
+            {t("workflow.resetView")}
+          </Button>
+        </div>
+
+        {/* No `viewBox` — 1 SVG user unit = 1 CSS pixel, so screen-space pointer deltas from the
+            pan/zoom/drag handlers need no extra unit conversion beyond dividing by `view.scale`.
+            `width`/`height` here are the fixed viewport's, not the diagram's own (that's the `<g>`
+            transform's job now, not the intrinsic SVG size). */}
         <svg
-          // `viewBox` (plus the intrinsic size as a `max-width`) lets a wide graph scale down to
-          // the dialog instead of only ever being reachable by horizontal scrolling.
-          viewBox={`0 0 ${width} ${height}`}
-          width={width}
-          height={height}
-          style={{ maxWidth: "100%", height: "auto" }}
+          width="100%"
+          height={VIEWPORT_HEIGHT}
+          className="block cursor-grab active:cursor-grabbing"
           role="group"
           aria-label={t("workflow.visualize")}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerUp}
+          onPointerCancel={handleCanvasPointerUp}
         >
           <defs>
             <marker
@@ -189,57 +439,79 @@ export function WorkflowDiagram({
             </marker>
           </defs>
 
-          {/* Pass 1 — every arrow, so no label or node can cut one in half. */}
-          {edges.map(({ key, transition, geometry }) => {
-            const blocked = isBlocked(transition);
-            return (
-              <g key={key} role="img" aria-label={`${transition.from} → ${transition.to}`}>
-                {blocked ? <title>{transitionInfo.get(transition.action)?.reason}</title> : null}
-                <path
-                  d={geometry.path}
-                  fill="none"
-                  strokeWidth={1.5}
-                  strokeDasharray={blocked ? "4 3" : undefined}
-                  className={blocked ? "stroke-destructive" : "stroke-muted-foreground"}
-                  markerEnd={blocked ? "url(#workflow-arrow-blocked)" : "url(#workflow-arrow)"}
-                />
-              </g>
-            );
-          })}
+          <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
+            {/* Pass 1 — every arrow, so no label or node can cut one in half. Each edge also
+                carries an invisible, fatter `stroke="transparent"` copy of its own path purely as
+                a hover hit-area — the visible line is only 1.5px wide, far too thin to reliably
+                point at. */}
+            {edges.map(({ key, transition, geometry }) => {
+              const blocked = isBlocked(transition);
+              const related = highlight ? highlight.edgeKeys.has(key) : true;
+              return (
+                <g
+                  key={key}
+                  role="img"
+                  aria-label={`${transition.from} → ${transition.to}`}
+                  className="cursor-pointer transition-opacity"
+                  style={{ opacity: related ? 1 : 0.25 }}
+                  onMouseEnter={() => setHoveredEdgeKey(key)}
+                  onMouseLeave={() => setHoveredEdgeKey((prev) => (prev === key ? null : prev))}
+                >
+                  {blocked ? <title>{transitionInfo.get(transition.action)?.reason}</title> : null}
+                  <path d={geometry.path} fill="none" stroke="transparent" strokeWidth={12} />
+                  <path
+                    d={geometry.path}
+                    fill="none"
+                    strokeWidth={hoveredEdgeKey === key ? 2.5 : 1.5}
+                    strokeDasharray={blocked ? "4 3" : undefined}
+                    className={blocked ? "stroke-destructive" : "stroke-muted-foreground"}
+                    markerEnd={blocked ? "url(#workflow-arrow-blocked)" : "url(#workflow-arrow)"}
+                  />
+                </g>
+              );
+            })}
 
-          {/* Pass 2 — labels. A halo (`paintOrder="stroke"`) rather than an opaque background box:
+            {/* Pass 2 — labels. A halo (`paintOrder="stroke"`) rather than an opaque background box:
               it hugs the glyphs instead of blanking out a 14px band, so an arrow passing under a
               label stays readable on both sides of it. */}
-          {edges.map(({ key, transition, geometry }) => (
-            <text
-              key={key}
-              x={geometry.labelX}
-              y={geometry.labelY}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={10}
-              strokeWidth={3}
-              paintOrder="stroke"
-              strokeLinejoin="round"
-              className={`stroke-background ${
-                isBlocked(transition) ? "fill-destructive" : "fill-muted-foreground"
-              }`}
-            >
-              {transitionLabel(transition.action, transition.label)}
-            </text>
-          ))}
+            {edges.map(({ key, transition, geometry }) => (
+              <text
+                key={key}
+                x={geometry.labelX}
+                y={geometry.labelY}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={10}
+                strokeWidth={3}
+                paintOrder="stroke"
+                strokeLinejoin="round"
+                style={{ opacity: highlight && !highlight.edgeKeys.has(key) ? 0.25 : 1 }}
+                className={`stroke-background ${
+                  isBlocked(transition) ? "fill-destructive" : "fill-muted-foreground"
+                }`}
+              >
+                {transitionLabel(transition.action, transition.label)}
+              </text>
+            ))}
 
-          {/* Pass 3 — nodes last, so a box never swallows the arrow that points into it. */}
-          {Array.from(positions.entries()).map(([state, pos]) => (
-            <Node
-              key={state}
-              state={state}
-              pos={pos}
-              isCurrent={state === currentState}
-              isInitial={state === workflow.initialState}
-              isTerminal={terminalStates.has(state)}
-            />
-          ))}
+            {/* Pass 3 — nodes last, so a box never swallows the arrow that points into it. */}
+            {Array.from(positions.entries()).map(([state, pos]) => (
+              <Node
+                key={state}
+                state={state}
+                pos={pos}
+                isCurrent={state === currentState}
+                isInitial={state === workflow.initialState}
+                isTerminal={terminalStates.has(state)}
+                dimmed={highlight ? !highlight.nodes.has(state) : false}
+                onPointerDown={(e) => handleNodePointerDown(e, state)}
+                onPointerMove={handleNodePointerMove}
+                onPointerUp={handleNodePointerUp}
+                onMouseEnter={() => setHoveredNode(state)}
+                onMouseLeave={() => setHoveredNode((prev) => (prev === state ? null : prev))}
+              />
+            ))}
+          </g>
         </svg>
       </div>
 
@@ -343,7 +615,13 @@ function edgeGeometry(
     const y1 = from.y + NODE_HEIGHT / 2;
     const y2 = to.y + NODE_HEIGHT / 2;
     const midX = (x1 + x2) / 2 + spread * Math.min(10, (COLUMN_GAP - 8) / 2);
-    return orthogonal({ x: x1, y: y1 }, { x: midX, y: y1 }, { x: midX, y: y2 }, { x: x2, y: y2 }, -7);
+    return orthogonal(
+      { x: x1, y: y1 },
+      { x: midX, y: y1 },
+      { x: midX, y: y2 },
+      { x: x2, y: y2 },
+      -7,
+    );
   }
 
   // Everything else — a backward edge, or a forward one that skips a column (which used to run
@@ -380,12 +658,24 @@ function Node({
   isCurrent,
   isInitial,
   isTerminal,
+  dimmed,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   state: string;
   pos: NodePosition;
   isCurrent: boolean;
   isInitial: boolean;
   isTerminal: boolean;
+  dimmed: boolean;
+  onPointerDown: (e: React.PointerEvent<SVGGElement>) => void;
+  onPointerMove: (e: React.PointerEvent<SVGGElement>) => void;
+  onPointerUp: (e: React.PointerEvent<SVGGElement>) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }) {
   const rectClassName = isCurrent
     ? "fill-primary stroke-primary"
@@ -393,7 +683,16 @@ function Node({
   const textClassName = isCurrent ? "fill-primary-foreground" : "fill-foreground";
 
   return (
-    <g>
+    <g
+      className="cursor-grab transition-opacity active:cursor-grabbing"
+      style={{ opacity: dimmed ? 0.3 : 1 }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       {isInitial ? (
         <>
           <circle

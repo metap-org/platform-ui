@@ -15,12 +15,23 @@ type AuthContextValue = {
   /** Call once the backend has already set the session cookie (a successful `POST /auth/login`)
    *  so the rest of the app treats the caller as signed in immediately, instead of waiting on the
    *  next `["currentUser"]` refetch. Clears the query cache first — same reason the old
-   *  `setToken` did: nothing fetched under the previous (or no) session should linger. */
-  markAuthenticated: () => void;
+   *  `setToken` did: nothing fetched under the previous (or no) session should linger.
+   *
+   *  **Awaits `status` actually reflecting the new session before resolving** (2026-09-04) — a
+   *  caller that navigates right after calling this, without awaiting it, raced the refetch:
+   *  `queryClient.clear()` alone doesn't update `status` synchronously, so the destination
+   *  route's `RequireAuth` could still read the *pre-login* "anonymous" value on its very first
+   *  render and bounce straight back to `/login` — found live (`LoginForm`'s `handleSubmit`,
+   *  the only caller). Await this before navigating and that race can't happen. */
+  markAuthenticated: () => Promise<void>;
   /** `POST /auth/logout` to clear the session cookie server-side (a client can't clear a
-   *  `HttpOnly` cookie itself), then resets local state. Swallows a network failure — the caller
-   *  is about to be treated as logged out either way, and a logout that couldn't reach the server
-   *  is not worth blocking on or surfacing as an error. */
+   *  `HttpOnly` cookie itself), then resets local state and **awaits `status` actually settling
+   *  to "anonymous"** before resolving — same reasoning as `markAuthenticated`'s doc comment,
+   *  mirrored here so a caller that navigates to `/login` right after `await logout()` doesn't
+   *  land while `status` still reads stale "authenticated" (which would otherwise make
+   *  `LoginForm`'s own effect immediately navigate back home). Swallows a `POST /auth/logout`
+   *  network failure — the caller is about to be treated as logged out either way, and a logout
+   *  that couldn't reach the server is not worth blocking on or surfacing as an error. */
   logout: () => Promise<void>;
 };
 
@@ -46,13 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // `clear()` alone is enough to force a refetch — `AuthProvider`'s own `me` query above is
   // always actively mounted, so clearing the cache it's part of makes react-query recreate and
   // re-run it immediately, the same way `AuthContext`'s old `setToken` relied on a bare `clear()`.
-  const markAuthenticated = useCallback(() => {
+  // `refetchQueries` (not just `clear()`) is what makes this function's returned promise
+  // actually resolve once `status` has settled — see this fn's doc comment on the interface
+  // above for why that matters to callers.
+  const markAuthenticated = useCallback(async () => {
     queryClient.clear();
+    await queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
   }, [queryClient]);
 
   const logout = useCallback(async () => {
     await apiFetch("/auth/logout", { method: "POST" }).catch(() => undefined);
     queryClient.clear();
+    await queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
   }, [queryClient]);
 
   const value = useMemo(

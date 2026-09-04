@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
-import { apiFetch } from "./client";
 import { graphqlFetch } from "./graphqlClient";
 
 /** Mirrors `useApiQuery`'s options bag — same reasoning: extra `useQuery` knobs stay a trailing
@@ -10,18 +9,16 @@ type GraphQLQueryOptions = {
   staleTime?: number;
 };
 
-type TokenResponse = { data: { token: string } };
-
 /** GraphQL counterpart to `useApiQuery` — same calling convention (`queryKey`/`path`/`select`/
  *  `enabled`), `query`/`variables` in place of `useApiQuery`'s single REST `path` doing double
  *  duty as both the request target and its own identity. See `graphqlClient.ts`'s doc comment
  *  for when this is the right tool versus `useApiQuery`.
  *
- *  Unlike `useApiQuery`, this fetches `GET /auth/token` (cookie-authenticated, same as everything
- *  else) immediately before every actual GraphQL call to get a short-lived Bearer token for
- *  `crates/graphql-gateway` — see `graphqlFetch`'s doc comment for why that one target still
- *  needs a Bearer token when nothing else in this package does. The extra round trip only happens
- *  while `enabled`; react-query still caches/dedupes the combined query by `queryKey` as usual. */
+ *  Rides the existing session cookie (`graphqlFetch` with no `token`) — no `GET /auth/token`
+ *  round trip before every call anymore (removed 2026-09-04, alongside `crates/graphql-gateway`
+ *  gaining an opt-in cookie-auth mode: that endpoint existed *only* to feed this hook and
+ *  `waf.ts`'s `graphqlAuthed`, and cost every GraphQL call a second request for no reason once
+ *  the gateway could just accept the cookie directly). */
 export function useGraphQLQuery<TFetched, TSelected = TFetched>(
   queryKey: QueryKey,
   path: string,
@@ -35,10 +32,7 @@ export function useGraphQLQuery<TFetched, TSelected = TFetched>(
 
   return useQuery({
     queryKey,
-    queryFn: async () => {
-      const { data } = await apiFetch<TokenResponse>("/auth/token");
-      return graphqlFetch<TFetched>(path, data.token, query, variables);
-    },
+    queryFn: () => graphqlFetch<TFetched>(path, query, variables),
     select,
     enabled: status === "authenticated" && enabled,
     staleTime: options?.staleTime,

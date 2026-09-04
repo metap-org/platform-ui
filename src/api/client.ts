@@ -32,7 +32,10 @@ type ErrorBody = {
  * double-submit scheme this backs. `null` when absent (never logged in yet, or an older backend
  * that hasn't adopted cookie sessions at all — `apiFetch` degrades to sending no CSRF header,
  * which such a backend never checks for in the first place). */
-function readCsrfCookie(): string | null {
+// Exported — `graphqlClient.ts`'s cookie-auth path (`graphqlFetch` with no `token`) reads the
+// same cookie/header pair, since `crates/graphql-gateway`'s opt-in `COOKIE_AUTH_ENABLED` mode
+// requires the identical double-submit CSRF check REST already does.
+export function readCsrfCookie(): string | null {
   if (typeof document === "undefined") {
     return null;
   }
@@ -41,7 +44,7 @@ function readCsrfCookie(): string | null {
   return value !== undefined ? decodeURIComponent(value) : null;
 }
 
-const CSRF_HEADER_NAME = "X-CSRF-Token";
+export const CSRF_HEADER_NAME = "X-CSRF-Token";
 
 /** No `token` parameter (removed 2026-09-03, alongside the backend's move to cookie-based
  * sessions — `docs/audits/02-auth-permission-workflow-diagram-audit.md`'s follow-up). The session
