@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge, Button } from "@metap/ui";
+import { Badge, Button, ToastProvider } from "@metap/ui";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
@@ -37,7 +37,10 @@ function NavLink({ item }: { item: ShellNavItem }) {
 
 /** The shared page chrome every `@metap/platform-ui` consumer app assembles its authenticated
  * routes into, instead of hand-rolling header/nav per app (ported from `packages/platform-react`'s
- * Mantine `AppShell`-based version onto the `@metap/ui` design system). */
+ * Mantine `AppShell`-based version onto the `@metap/ui` design system). Also mounts `@metap/ui`'s
+ * `ToastProvider` once here, so `GeneratedForm`/`GeneratedList`'s success toasts (and any future
+ * `toast(...)` call anywhere under this shell) render without every consumer app wiring its own
+ * provider — the same "the library provides it" shape as `AuthContext`/`LocaleProvider`. */
 export function AppShellLayout({
   brand,
   navItems,
@@ -62,40 +65,42 @@ export function AppShellLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="h-[60px] border-b border-border">
-        <div className="flex h-full items-center justify-between gap-4 px-4">
-          <div className="flex items-center gap-6">
-            <navAdapter.Link
-              to={navAdapter.toHome()}
-              className="font-bold text-foreground no-underline"
-            >
-              {brand}
-            </navAdapter.Link>
-            <nav className="flex items-center gap-4">
-              {navItems.map((item) => (
-                <NavLink key={item.to} item={item} />
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
-            {user ? (
-              <div className="flex items-center gap-1">
-                {user.roles.map((role) => (
-                  <Badge key={role} variant="outline">
-                    {role}
-                  </Badge>
+    <ToastProvider>
+      <div className="min-h-screen bg-background">
+        <header className="h-[60px] border-b border-border">
+          <div className="flex h-full items-center justify-between gap-4 px-4">
+            <div className="flex items-center gap-6">
+              <navAdapter.Link
+                to={navAdapter.toHome()}
+                className="font-bold text-foreground no-underline"
+              >
+                {brand}
+              </navAdapter.Link>
+              <nav className="flex items-center gap-4">
+                {navItems.map((item) => (
+                  <NavLink key={item.to} item={item} />
                 ))}
-              </div>
-            ) : null}
-            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-              {t("shell.logout")}
-            </Button>
+              </nav>
+            </div>
+            <div className="flex items-center gap-3">
+              {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
+              {user ? (
+                <div className="flex items-center gap-1">
+                  {user.roles.map((role) => (
+                    <Badge key={role} variant="outline">
+                      {role}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+                {t("shell.logout")}
+              </Button>
+            </div>
           </div>
-        </div>
-      </header>
-      <main className="p-4">{children}</main>
-    </div>
+        </header>
+        <main className="p-4">{children}</main>
+      </div>
+    </ToastProvider>
   );
 }

@@ -6,6 +6,7 @@ import {
   buttonVariants,
   Button,
   Card,
+  Checkbox,
   IconButton,
   Input,
   Select,
@@ -16,6 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  toast,
 } from "@metap/ui";
 import { useApiInfiniteQuery } from "../api/useApiInfiniteQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
@@ -52,6 +54,9 @@ const ROW_HEIGHT = 40;
  *  evenly. `table-fixed` layout (below) only reads *this* row's cell widths to size every
  *  column; body cells don't need matching widths. */
 const ACTIONS_COLUMN_WIDTH = 140;
+/** Fixed width for the leading row-selection checkbox column, same reasoning as
+ *  `ACTIONS_COLUMN_WIDTH` above. */
+const SELECTION_COLUMN_WIDTH = 40;
 
 function SortIndicator({ direction }: { direction: "asc" | "desc" }) {
   return (
@@ -82,6 +87,12 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   const debouncedTextFilters = useDebouncedValue(filterInputs, 400);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // Selection is scoped to *loaded* rows only, not "every record matching the current filter" —
+  // there is no server-side "select all N across pages" concept, and silently expanding a
+  // selection to rows the user has never seen (via infinite scroll) is exactly the kind of
+  // surprise a bulk-delete action shouldn't have.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const listView = entity?.listViews[0];
   const fieldsByName = useMemo(
@@ -123,6 +134,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     refetch,
   } = useApiInfiniteQuery<ListPage>(
     ["records", entityName, sort, activeFilters],
@@ -138,6 +150,12 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   );
 
   const records = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
+
+  // A changed entity/sort/filter set means an entirely different set of rows is about to render
+  // — clear the selection rather than let it silently keep referencing rows no longer on screen.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [entityName, sort, activeFilters]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -206,6 +224,17 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         method: "DELETE",
         body: JSON.stringify({ version: record.version }),
       });
+      // Was silent on success (only `deleteError` below surfaced anything) — the row disappearing
+      // from the list was the only feedback a delete had actually gone through.
+      toast(t("common.deleteSuccess"));
+      setSelectedIds((prev) => {
+        if (!prev.has(record.id)) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.delete(record.id);
+        return next;
+      });
       await refetch();
     } catch (error) {
       setDeleteError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));
@@ -214,7 +243,68 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     }
   }
 
-  const columnCount = listView.fields.length + 1;
+  function toggleRowSelected(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllLoadedSelected(checked: boolean) {
+    setSelectedIds(checked ? new Set(records.map((r) => r.id)) : new Set());
+  }
+
+  async function handleBulkDelete() {
+    if (!window.confirm(t("common.bulkDeleteConfirm", { count: selectedIds.size }))) {
+      return;
+    }
+
+    // Only records still actually loaded — a selection surviving from before a refetch (there
+    // shouldn't be one, given the effect above, but this keeps the loop from ever calling DELETE
+    // with a stale/undefined version) is dropped rather than sent.
+    const targets = records.filter((record) => selectedIds.has(record.id));
+
+    setDeleteError(null);
+    setBulkDeleting(true);
+    const results = await Promise.allSettled(
+      targets.map((record) =>
+        apiFetch(`/api/${entityName}/${record.id}`, {
+          method: "DELETE",
+          body: JSON.stringify({ version: record.version }),
+        }),
+      ),
+    );
+    setBulkDeleting(false);
+
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const succeeded = results.length - failed;
+
+    if (succeeded > 0) {
+      toast(t("common.bulkDeleteSuccess", { count: succeeded }));
+    }
+    if (failed > 0) {
+      const firstError = results.find((r) => r.status === "rejected") as
+        PromiseRejectedResult | undefined;
+      const reason = firstError?.reason;
+      const detail = reason instanceof ApiError ? reason.message : t("common.somethingWentWrong");
+      setDeleteError(t("common.bulkDeletePartialError", { failed, total: results.length, detail }));
+    }
+
+    // Clear regardless of partial failure — a failed row is still visible in the list (refetch
+    // below), so the user can retry it individually via the row action rather than the bulk
+    // selection silently narrowing to "just the ones that failed".
+    setSelectedIds(new Set());
+    await refetch();
+  }
+
+  const columnCount = listView.fields.length + 2;
+  const allLoadedSelected = records.length > 0 && records.every((r) => selectedIds.has(r.id));
+  const someLoadedSelected = records.some((r) => selectedIds.has(r.id));
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-4 py-4">
@@ -222,13 +312,56 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {entityLabel(entity.label)}
         </h2>
-        <navAdapter.Link
-          to={navAdapter.toNewRecord(entityName)}
-          className={buttonVariants({ variant: "default" })}
-        >
-          {t("common.new")}
-        </navAdapter.Link>
+        <div className="flex items-center gap-2">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={t("common.refresh")}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            icon={
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-4 w-4${isFetching ? " animate-spin" : ""}`}
+              >
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            }
+          />
+          <navAdapter.Link
+            to={navAdapter.toNewRecord(entityName)}
+            className={buttonVariants({ variant: "default" })}
+          >
+            {t("common.new")}
+          </navAdapter.Link>
+        </div>
       </div>
+      {selectedIds.size > 0 ? (
+        <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-muted/40 px-4 py-2">
+          <span className="text-sm text-foreground">
+            {t("common.selectedCount", { count: selectedIds.size })}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              {t("common.clearSelection")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              loading={bulkDeleting}
+              onClick={() => void handleBulkDelete()}
+            >
+              {t("common.bulkDelete", { count: selectedIds.size })}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {deleteError ? (
         <Alert variant="destructive" className="flex items-center justify-between gap-2">
           <span>{deleteError}</span>
@@ -258,6 +391,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
           <Table className="table-fixed">
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
+                <TableHead style={{ width: SELECTION_COLUMN_WIDTH }}>
+                  <Checkbox
+                    aria-label={t("common.selectAllLoaded")}
+                    checked={allLoadedSelected}
+                    indeterminate={someLoadedSelected && !allLoadedSelected}
+                    onCheckedChange={toggleAllLoadedSelected}
+                  />
+                </TableHead>
                 {listView.fields.map((fieldName) => {
                   const field = fieldsByName.get(fieldName);
 
@@ -288,6 +429,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                 </TableHead>
               </TableRow>
               <TableRow className="bg-muted/40">
+                <TableHead />
                 {listView.fields.map((fieldName) => {
                   if (!listView.filters.includes(fieldName)) {
                     return <TableHead key={fieldName} />;
@@ -367,6 +509,13 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       className="absolute w-full hover:bg-muted/30"
                       style={{ transform: `translateY(${virtualRow.start}px)` }}
                     >
+                      <TableCell style={{ width: SELECTION_COLUMN_WIDTH }}>
+                        <Checkbox
+                          aria-label={t("common.selectRow")}
+                          checked={selectedIds.has(record.id)}
+                          onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
+                        />
+                      </TableCell>
                       {listView.fields.map((fieldName) => {
                         const field = fieldsByName.get(fieldName);
 

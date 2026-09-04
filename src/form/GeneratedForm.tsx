@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Spinner } from "@metap/ui";
+import { Alert, Button, Spinner, toast } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { useApiMutation } from "../api/useApiMutation";
@@ -102,6 +102,14 @@ export function GeneratedForm({
       const response = recordId
         ? await updateMutation.mutateAsync({ version: existing!.version, data: payload })
         : await createMutation.mutateAsync({ data: payload });
+      // Both flows were silent on success (only errors surfaced, via `formError`/`fieldErrors`
+      // below) — this is the one piece of positive feedback that was missing, not a duplicate of
+      // the inline error `Alert`.
+      toast(
+        t(recordId ? "form.updateSuccess" : "form.createSuccess", {
+          label: entityLabel(entity!.label),
+        }),
+      );
       onSaved(response.data);
     } catch (error) {
       if (error instanceof ApiError) {

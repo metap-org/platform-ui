@@ -75,6 +75,36 @@ còn lại của package.
 - Không có `Container`/`Stack`/`Title`/`Group`/`Text`/`Divider`/`Center` — thay bằng div/flex
   Tailwind thuần. Đây là lựa chọn kiến trúc chủ đích (Tailwind-first), không phải gap cần xử lý.
 
+## Toast notifications (2026-09-04)
+
+`@metap/ui`'s `Toast`/`ToastProvider` tồn tại từ trước nhưng chưa có consumer nào trong repo này
+dùng — `GeneratedForm`/`GeneratedList` chỉ báo lỗi (`Alert` inline), im lặng khi thành công.
+`AppShellLayout` giờ mount `<ToastProvider>` bọc `children` (cùng shape "library tự cung cấp" với
+`AuthContext`/`LocaleProvider`, không ép mọi consumer app tự wire provider) — `GeneratedForm` toast
+`form.createSuccess`/`updateSuccess` sau khi tạo/sửa thành công, `GeneratedList` toast
+`common.deleteSuccess` sau khi xoá. Không toast lỗi — lỗi đã có `Alert`/`deleteError` inline sẵn,
+thêm toast sẽ trùng lặp thông tin.
+
+## Row selection + bulk delete (2026-09-04)
+
+`GeneratedList` giờ có checkbox chọn dòng + "select all" ở header, và nút xoá hàng loạt khi có
+selection. **Phụ thuộc `design-system`#3** (thêm prop `aria-label` cho `Checkbox` — cần build lại
+`design-system` trước khi build `platform-ui` nếu kéo nhánh này về, vì `@metap/ui` là `link:` tới
+`dist/` đã build, không phải `src/` trực tiếp).
+
+Quyết định đáng ghi:
+- **Selection chỉ tính các dòng đã tải (loaded rows), không phải "toàn bộ record khớp filter"** —
+  danh sách dùng infinite scroll + `@tanstack/react-virtual`, không có khái niệm "chọn tất cả N
+  bản ghi trên mọi trang" ở tầng server. Mở rộng selection ra ngoài những gì user thực sự nhìn
+  thấy (qua cuộn trang tiếp) là kiểu bất ngờ không nên có ở 1 action xoá hàng loạt. Checkbox
+  "select all" ở header chỉ chọn/bỏ chọn các dòng nằm trong `records` (đã fetch) tại thời điểm đó.
+- Selection tự clear khi `entityName`/`sort`/`activeFilters` đổi (bộ dòng hiển thị đã hoàn toàn
+  khác) — và khi xoá 1 dòng riêng lẻ qua row action, dòng đó cũng tự rời khỏi selection.
+- Bulk delete dùng `Promise.allSettled` — thất bại một phần vẫn báo đủ (`bulkDeletePartialError`
+  hiện chi tiết lỗi đầu tiên + số lượng fail/tổng), thành công một phần vẫn toast số lượng thật sự
+  xoá được. Selection clear sau khi chạy dù pass hay fail — dòng fail vẫn còn trong list (sau
+  refetch), xoá lại qua row action riêng lẻ thay vì giữ selection chỉ còn "mấy cái fail".
+
 ## Component đã chuyển sang `design-system` (không còn ở đây)
 
 Không phải "gap giữa `@metap/ui` và Mantine" (mục trên) — đây là các UI atom từng bị build nhầm ở
