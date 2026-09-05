@@ -47,10 +47,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // must run unconditionally on every mount to determine `status` in the first place, unlike
   // every other query in this package). `retry: false`: a 401 here means "not logged in", not a
   // transient failure worth retrying.
+  // `refetchInterval` — Part B of `docs/features/31-session-expiry-redirect-and-refresh.md`: the
+  // backend's `GET /auth/me` reissues the session/CSRF cookies with a fresh
+  // `auth.sessionTtlSeconds` window on every call, as long as the caller is still within
+  // `auth.sessionAbsoluteMaxSeconds` of their original login (`crates/metap-http/src/routes/auth.rs`'s
+  // `try_refresh_session`). Polling here is what actually drives that sliding refresh for a
+  // continuously-active tab — without it, `me` would only ever run once per mount/focus/reconnect,
+  // never during a long stretch of uninterrupted use, and the session would still expire on the
+  // backend's fixed TTL regardless of activity. 20 minutes is deliberately well under the default
+  // 1h TTL (`AUTH_SESSION_TTL_SECONDS`'s default) so there's real margin against clock drift/a slow
+  // network before the cookie's own `Max-Age` would otherwise run out between polls.
+  // `refetchIntervalInBackground` defaults to `false`, so this pauses while the tab is hidden
+  // rather than polling a backgrounded/closed-lid browser forever.
   const me = useQuery({
     queryKey: ["currentUser"],
     queryFn: () => apiFetch<MeResponse>("/auth/me"),
     retry: false,
+    refetchInterval: 20 * 60 * 1000,
   });
 
   const status: AuthStatus = me.isLoading ? "unknown" : me.isError ? "anonymous" : "authenticated";
