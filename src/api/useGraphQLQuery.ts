@@ -15,7 +15,7 @@ type GraphQLQueryOptions = {
  *  for when this is the right tool versus `useApiQuery`.
  *
  *  Rides the existing session cookie (`graphqlFetch` with no `token`) — no `GET /auth/token`
- *  round trip before every call anymore (removed 2026-09-04, alongside `crates/graphql-gateway`
+ *  round trip before every call anymore (removed 2026-09-04, alongside `crates/metap-graphql-gateway`
  *  gaining an opt-in cookie-auth mode: that endpoint existed *only* to feed this hook and
  *  `waf.ts`'s `graphqlAuthed`, and cost every GraphQL call a second request for no reason once
  *  the gateway could just accept the cookie directly). */

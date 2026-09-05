@@ -42,7 +42,7 @@ function buildVariables(relatedViews: RelatedView[], id: string): Record<string,
  *
  * `graphqlPath` defaults to `/graphql` — either a service's own GraphQL mount
  * (`metap-graphql-http`) when every related entity lives in the same backend, or a gateway
- * aggregating several services (`crates/graphql-gateway`) when they don't, same as any other
+ * aggregating several services (`crates/metap-graphql-gateway`) when they don't, same as any other
  * consumer of `useGraphQLQuery`. Read-only by this component's own choice, not a transport
  * limitation (`graphqlFetch`/`useGraphQLQuery` support mutations fine — see `graphqlClient.ts`'s
  * doc comment) — a related-records panel has no natural mutation of its own to perform; mutating
