@@ -7,6 +7,7 @@ export * from "./api/client";
 export * from "./api/ApiErrorMessage";
 export * from "./api/graphqlClient";
 export * from "./api/graphqlNaming";
+export * from "./api/graphqlRecords";
 export * from "./api/useApiInfiniteQuery";
 export * from "./api/useApiMutation";
 export * from "./api/useApiQuery";
