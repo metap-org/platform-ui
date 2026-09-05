@@ -1,4 +1,5 @@
 import { CSRF_HEADER_NAME, readCsrfCookie } from "./client";
+import { notifySessionExpired } from "./sessionEvents";
 
 /** GraphQL counterpart to `client.ts`'s `apiFetch`. POSTs a query/variables body and unwraps
  *  `{data, errors}` instead of a plain JSON body. For a BFF gateway that aggregates several
@@ -91,6 +92,14 @@ async function flush(key: string, path: string, token?: string): Promise<void> {
     });
 
     if (!response.ok) {
+      // Same cookie session backs a same-origin GraphQL gateway call as backs REST (see this
+      // function's own doc comment) — a 401 here means that session died too, not just this one
+      // request (`docs/features/31-session-expiry-redirect-and-refresh.md`). A `token`-authed call
+      // (a different, gateway-only Bearer, minted fresh per call) is exempt: its own expiry says
+      // nothing about the browser's session cookie.
+      if (response.status === 401 && !token) {
+        notifySessionExpired();
+      }
       throw new Error(`GraphQL request to ${path} failed with status ${response.status}`);
     }
 

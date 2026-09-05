@@ -1,3 +1,11 @@
+import { notifySessionExpired } from "./sessionEvents";
+
+/** `apiFetch` calls that a 401 from them is expected/self-explaining, not a sign some *other*
+ * session just died — excluded from `notifySessionExpired` so login failures and the bootstrap
+ * "am I logged in" check don't trigger a redundant extra `["currentUser"]` refetch on top of the
+ * one they already are. */
+const SESSION_EXPIRY_EXEMPT_PATHS = ["/auth/login", "/auth/me", "/auth/logout"];
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -73,6 +81,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !SESSION_EXPIRY_EXEMPT_PATHS.includes(path)) {
+      notifySessionExpired();
+    }
+
     const body = (await response.json().catch(() => null)) as ErrorBody | null;
 
     if (body?.error) {

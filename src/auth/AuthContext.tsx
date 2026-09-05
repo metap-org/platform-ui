@@ -1,7 +1,8 @@
-import { createContext, useContext, useMemo, useCallback } from "react";
+import { createContext, useContext, useMemo, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { onSessionExpired } from "../api/sessionEvents";
 
 export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 
@@ -53,6 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const status: AuthStatus = me.isLoading ? "unknown" : me.isError ? "anonymous" : "authenticated";
+
+  // `docs/features/31-session-expiry-redirect-and-refresh.md` — without this, a 401 from some
+  // *other* query/mutation (not `me` itself) never updates `status`: react-query only re-runs
+  // `me` on mount/window-focus/reconnect by default, so a session that expired mid-use left
+  // `status` stuck on stale "authenticated" until the user happened to refocus the tab, and
+  // `RequireAuth`'s existing redirect-to-`/login` branch (gated on `status === "anonymous"`)
+  // never fired. `refetchQueries` (not `invalidateQueries`) forces it right now regardless of
+  // `staleTime`.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      void queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
+    });
+  }, [queryClient]);
 
   // Found live (2026-09-05, WAF portal): a bare `queryClient.clear()` followed immediately by
   // `refetchQueries({queryKey: ["currentUser"], type: "active"})` races with the `me` observer
