@@ -53,6 +53,7 @@ const en = {
     exportJson: "Export JSON",
     exportScopeHint:
       "Exports only the rows currently loaded, not every record matching the filter.",
+    toggleFilters: "Filters",
   },
   form: {
     editTitle: "Edit {{label}}",
@@ -332,6 +333,7 @@ const vi = {
     exportCsv: "Xuất CSV",
     exportJson: "Xuất JSON",
     exportScopeHint: "Chỉ xuất các dòng đã tải, không phải toàn bộ bản ghi khớp bộ lọc.",
+    toggleFilters: "Bộ lọc",
   },
   form: {
     editTitle: "Sửa {{label}}",

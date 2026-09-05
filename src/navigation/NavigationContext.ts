@@ -20,8 +20,18 @@ export type NavigationAdapter = {
   /** `className` (not part of `packages/platform-react`'s adapter shape) so a design-system-styled
    * caller can apply Tailwind utility classes directly — shadcn-style components have no Mantine
    * `component={Link}` polymorphism prop, so every nav-link site here renders `adapter.Link`
-   * itself instead of wrapping it in a UI-library anchor component. */
-  Link: FunctionComponent<{ to: string; children: ReactNode; className?: string }>;
+   * itself instead of wrapping it in a UI-library anchor component. `title`/`aria-label` (added
+   * 2026-09-05 for `GeneratedList`'s icon-only row actions, which need an accessible name with no
+   * visible text) are optional so an existing hand-rolled adapter that ignores them still
+   * type-checks — `ReactRouterNavigationProvider`'s real `react-router-dom` `Link` already
+   * forwards arbitrary anchor props to the underlying `<a>` natively, no change needed there. */
+  Link: FunctionComponent<{
+    to: string;
+    children: ReactNode;
+    className?: string;
+    title?: string;
+    "aria-label"?: string;
+  }>;
 };
 
 export const NavigationContext: Context<NavigationAdapter | null> =
