@@ -1,7 +1,8 @@
-import { createContext, useContext, useMemo, useCallback } from "react";
+import { createContext, useContext, useMemo, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
+import { onSessionExpired } from "../api/sessionEvents";
 
 export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 
@@ -46,13 +47,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // must run unconditionally on every mount to determine `status` in the first place, unlike
   // every other query in this package). `retry: false`: a 401 here means "not logged in", not a
   // transient failure worth retrying.
+  // `refetchInterval` — Part B of `docs/features/31-session-expiry-redirect-and-refresh.md`: the
+  // backend's `GET /auth/me` reissues the session/CSRF cookies with a fresh
+  // `auth.sessionTtlSeconds` window on every call, as long as the caller is still within
+  // `auth.sessionAbsoluteMaxSeconds` of their original login (`crates/metap-http/src/routes/auth.rs`'s
+  // `try_refresh_session`). Polling here is what actually drives that sliding refresh for a
+  // continuously-active tab — without it, `me` would only ever run once per mount/focus/reconnect,
+  // never during a long stretch of uninterrupted use, and the session would still expire on the
+  // backend's fixed TTL regardless of activity. 20 minutes is deliberately well under the default
+  // 1h TTL (`AUTH_SESSION_TTL_SECONDS`'s default) so there's real margin against clock drift/a slow
+  // network before the cookie's own `Max-Age` would otherwise run out between polls.
+  // `refetchIntervalInBackground` defaults to `false`, so this pauses while the tab is hidden
+  // rather than polling a backgrounded/closed-lid browser forever.
   const me = useQuery({
     queryKey: ["currentUser"],
     queryFn: () => apiFetch<MeResponse>("/auth/me"),
     retry: false,
+    refetchInterval: 20 * 60 * 1000,
   });
 
   const status: AuthStatus = me.isLoading ? "unknown" : me.isError ? "anonymous" : "authenticated";
+
+  // `docs/features/31-session-expiry-redirect-and-refresh.md` — without this, a 401 from some
+  // *other* query/mutation (not `me` itself) never updates `status`: react-query only re-runs
+  // `me` on mount/window-focus/reconnect by default, so a session that expired mid-use left
+  // `status` stuck on stale "authenticated" until the user happened to refocus the tab, and
+  // `RequireAuth`'s existing redirect-to-`/login` branch (gated on `status === "anonymous"`)
+  // never fired. `refetchQueries` (not `invalidateQueries`) forces it right now regardless of
+  // `staleTime`.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      void queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
+    });
+  }, [queryClient]);
 
   // Found live (2026-09-05, WAF portal): a bare `queryClient.clear()` followed immediately by
   // `refetchQueries({queryKey: ["currentUser"], type: "active"})` races with the `me` observer
