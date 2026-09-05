@@ -11,6 +11,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Input,
@@ -153,10 +155,10 @@ function downloadTextFile(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Exports exactly the rows currently loaded in the virtualizer's `records` array — same "loaded
- *  rows only" scope already established for row-selection/bulk-delete (2026-09-04), not every
- *  record matching the current filter on the server. Column order/keys follow `listView.fields`. */
-function exportLoadedRecords(
+/** Shared by both export modes below — `exportLoadedRecords` (rows already in memory) and
+ *  `exportAllMatchingRecords` (rows fetched fresh from the server) both end up with the same
+ *  `{data: Record<string, unknown>}[]` shape, so formatting/download only needs to be written once. */
+function formatAndDownloadRecords(
   format: "csv" | "json",
   entityName: string,
   fields: string[],
@@ -178,6 +180,57 @@ function exportLoadedRecords(
     return row;
   });
   downloadTextFile(`${entityName}.json`, JSON.stringify(rows, null, 2), "application/json");
+}
+
+/** Exports exactly the rows currently loaded in the virtualizer's `records` array — same "loaded
+ *  rows only" scope already established for row-selection/bulk-delete (2026-09-04), not every
+ *  record matching the current filter on the server. Column order/keys follow `listView.fields`.
+ *  See `exportAllMatchingRecords` below for the alternative "fetch everything from the API" mode
+ *  (added 2026-09-06 — this loaded-only mode alone was surprising: "export" reads as "give me
+ *  everything matching my filter", not "give me only what happened to scroll into view"). */
+function exportLoadedRecords(
+  format: "csv" | "json",
+  entityName: string,
+  fields: string[],
+  records: { data: Record<string, unknown> }[],
+) {
+  formatAndDownloadRecords(format, entityName, fields, records);
+}
+
+/** Fetches *every* record matching the current filter/sort — not just what's scrolled into view —
+ *  by paginating `GET /api/:entity` with the same `baseParams` (filter/sort) the list itself uses,
+ *  at the server's own max page size (`crates/metap-http/src/routes/records.rs`'s `limit` cap is
+ *  200) until `page.nextCursor` comes back null. Sequential, not parallel — cursor pagination is
+ *  inherently a chain (each page's cursor depends on the previous page), there's no page number to
+ *  fan out over. `onProgress` reports rows fetched so far so the caller can show something better
+ *  than a frozen button on a large export. */
+async function exportAllMatchingRecords(
+  format: "csv" | "json",
+  entityName: string,
+  fields: string[],
+  baseParams: URLSearchParams,
+  apiFetchFn: typeof apiFetch,
+  onProgress: (count: number) => void,
+): Promise<void> {
+  const allRecords: RecordDto[] = [];
+  const params = new URLSearchParams(baseParams);
+  params.set("limit", "200");
+  let cursor: string | null = null;
+
+  for (;;) {
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+    const page: ListPage = await apiFetchFn<ListPage>(`/api/${entityName}?${params.toString()}`);
+    allRecords.push(...page.data);
+    onProgress(allRecords.length);
+    cursor = page.page.nextCursor;
+    if (!cursor) {
+      break;
+    }
+  }
+
+  formatAndDownloadRecords(format, entityName, fields, allRecords);
 }
 
 /** `sort`/filter params double as this route's shareable URL state (feature 23,
@@ -223,6 +276,12 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // nobody was filtering. Toggled from the toolbar; filtering itself (state, URL sync, the API
   // query) is unaffected by this — collapsing the row only hides the inputs, it doesn't clear them.
   const [showFilters, setShowFilters] = useState(false);
+  // "Export all" (2026-09-06) fetches from the API instead of using the already-loaded `records`
+  // array — `exportingAllFormat` doubles as both "is an export in flight" and "which format", so
+  // the two menu items can independently show their own progress/spinner instead of one shared
+  // boolean leaving it ambiguous which one is running.
+  const [exportingAllFormat, setExportingAllFormat] = useState<"csv" | "json" | null>(null);
+  const [exportedSoFar, setExportedSoFar] = useState(0);
 
   const listView = entity?.listViews[0];
   const fieldsByName = useMemo(
@@ -387,6 +446,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     return <div>{t("common.noListView", { label: entityLabel(entity.label) })}</div>;
   }
 
+  // Narrowed to a plain `string[]` here, outside any nested function — TS's control-flow narrowing
+  // of `listView` from the guard above doesn't extend into `handleExportAll`'s nested closure body.
+  const listViewFields = listView.fields;
+
   function toggleSort(field: EntityField) {
     if (!field.sortable) {
       return;
@@ -495,6 +558,37 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     await refetch();
   }
 
+  async function handleExportAll(format: "csv" | "json") {
+    setDeleteError(null);
+    setExportingAllFormat(format);
+    setExportedSoFar(0);
+    // Local, not just the `exportedSoFar` state: the `catch` below needs the count *at the moment
+    // of failure*, but a state variable read from this closure would still hold whatever it was
+    // when `handleExportAll` started (0) — updates from `onProgress`'s `setExportedSoFar` calls
+    // during the `await` below don't re-run this closure.
+    let fetchedCount = 0;
+    try {
+      await exportAllMatchingRecords(
+        format,
+        entityName,
+        listViewFields,
+        baseParams,
+        apiFetch,
+        (count) => {
+          fetchedCount = count;
+          setExportedSoFar(count);
+        },
+      );
+      toast(t("common.exportAllSuccess", { count: fetchedCount }));
+    } catch (error) {
+      const detail = error instanceof ApiError ? error.message : t("common.somethingWentWrong");
+      toast(t("common.exportAllError", { count: fetchedCount, detail }), { variant: "destructive" });
+    } finally {
+      setExportingAllFormat(null);
+      setExportedSoFar(0);
+    }
+  }
+
   // CSS Grid, not an actual `<table>` (found live 2026-09-05 — tried an explicit `calc()` width
   // on every `<td>` first, on top of the existing `table-fixed`; neither fixed it). Root cause:
   // a `<tr>`/`<td>` with `position: absolute` (required for virtualization — see the body row
@@ -555,22 +649,48 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={records.length === 0}
-                title={t("common.exportScopeHint")}
+                disabled={exportingAllFormat !== null || records.length === 0}
+                loading={exportingAllFormat !== null}
+                title={
+                  exportingAllFormat !== null
+                    ? t("common.exportingAll", { count: exportedSoFar })
+                    : t("common.exportScopeHint")
+                }
               >
-                {t("common.export")}
+                {exportingAllFormat !== null
+                  ? t("common.exportingAll", { count: exportedSoFar })
+                  : t("common.export")}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t("common.exportLoadedGroup")}</DropdownMenuLabel>
               <DropdownMenuItem
+                disabled={exportingAllFormat !== null}
                 onSelect={() => exportLoadedRecords("csv", entityName, listView.fields, records)}
               >
                 {t("common.exportCsv")}
               </DropdownMenuItem>
               <DropdownMenuItem
+                disabled={exportingAllFormat !== null}
                 onSelect={() => exportLoadedRecords("json", entityName, listView.fields, records)}
               >
                 {t("common.exportJson")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel title={t("common.exportAllScopeHint")}>
+                {t("common.exportAllGroup")}
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                disabled={exportingAllFormat !== null}
+                onSelect={() => void handleExportAll("csv")}
+              >
+                {t("common.exportAllCsv")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={exportingAllFormat !== null}
+                onSelect={() => void handleExportAll("json")}
+              >
+                {t("common.exportAllJson")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

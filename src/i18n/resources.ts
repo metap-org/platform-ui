@@ -49,10 +49,19 @@ const en = {
     bulkDeleteSuccess: "Deleted {{count}} records.",
     bulkDeletePartialError: "{{failed}} of {{total}} deletes failed: {{detail}}",
     export: "Export",
+    exportLoadedGroup: "Loaded rows only",
     exportCsv: "Export CSV",
     exportJson: "Export JSON",
     exportScopeHint:
       "Exports only the rows currently loaded, not every record matching the filter.",
+    exportAllGroup: "All matching rows",
+    exportAllCsv: "Export all (CSV)",
+    exportAllJson: "Export all (JSON)",
+    exportAllScopeHint:
+      "Fetches every record matching the current filter from the server (paginated), not just what's loaded.",
+    exportingAll: "Exporting {{count}} rows so far…",
+    exportAllSuccess: "Exported {{count}} rows.",
+    exportAllError: "Export failed after fetching {{count}} rows: {{detail}}",
     toggleFilters: "Filters",
   },
   form: {
@@ -354,9 +363,18 @@ const vi = {
     bulkDeleteSuccess: "Đã xoá {{count}} bản ghi.",
     bulkDeletePartialError: "{{failed}}/{{total}} lượt xoá thất bại: {{detail}}",
     export: "Xuất file",
+    exportLoadedGroup: "Chỉ dòng đã tải",
     exportCsv: "Xuất CSV",
     exportJson: "Xuất JSON",
     exportScopeHint: "Chỉ xuất các dòng đã tải, không phải toàn bộ bản ghi khớp bộ lọc.",
+    exportAllGroup: "Toàn bộ bản ghi khớp bộ lọc",
+    exportAllCsv: "Xuất tất cả (CSV)",
+    exportAllJson: "Xuất tất cả (JSON)",
+    exportAllScopeHint:
+      "Gọi API lấy toàn bộ bản ghi khớp bộ lọc hiện tại (phân trang), không chỉ những dòng đã tải.",
+    exportingAll: "Đang xuất, đã tải {{count}} dòng…",
+    exportAllSuccess: "Đã xuất {{count}} dòng.",
+    exportAllError: "Xuất thất bại sau khi tải {{count}} dòng: {{detail}}",
     toggleFilters: "Bộ lọc",
   },
   form: {
