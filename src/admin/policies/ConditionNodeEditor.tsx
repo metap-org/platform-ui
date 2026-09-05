@@ -55,7 +55,7 @@ export function ConditionNodeEditor({
   onReplace: (next: PolicyCondition) => void;
   onRemove: () => void;
   subject: "context" | "record";
-  entity: EntitySummary;
+  entity: Pick<EntitySummary, "fields">;
   depth: number;
 }) {
   const { t } = useTranslation();

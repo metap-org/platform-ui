@@ -40,7 +40,7 @@ export function ValueEditor({
   onChange,
 }: {
   subject: "context" | "record";
-  entity: EntitySummary;
+  entity: Pick<EntitySummary, "fields">;
   attribute: string;
   op: ConditionOp;
   value: PolicyValue;

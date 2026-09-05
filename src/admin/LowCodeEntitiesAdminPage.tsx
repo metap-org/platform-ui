@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
   TagsInput,
-  Textarea,
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
@@ -31,6 +30,9 @@ import {
   type LowCodeVersionSummary,
 } from "./adminApi";
 import { AdminOnly } from "../auth/AdminOnly";
+import { ConditionBuilder } from "./policies/ConditionBuilder";
+import type { PolicyCondition } from "./policyCondition";
+import type { EntitySummary } from "../metadata/types";
 
 // Every FieldKind `metap_metadata::FieldKind` declares except "id" — the id column is
 // implicit/system-managed (`records.id`), never something an author picks for a new field.
@@ -575,14 +577,17 @@ type TransitionRow = {
   from: string;
   to: string;
   label: string;
-  // Raw JSON text for a `PolicyCondition`, same editing pattern as `PoliciesAdminPage`'s
-  // `conditionText` — `guard` is a recursive untagged enum (Attribute/All/Any), not something
-  // this page hand-models a structured editor for. "" = no guard (unconditional transition).
-  guardText: string;
+  // A real `PolicyCondition` object, edited via `ConditionBuilder` (2026-09-05,
+  // `docs/features/21-workflow-condition-builder.md`) — the same structured editor
+  // `PoliciesAdminPage`'s ABAC conditions use, since `WorkflowTransition.guard` is the identical
+  // `Option<PolicyCondition>` type (`crates/metap-metadata/src/entity.rs`). No more raw-JSON
+  // `Textarea`/`JSON.parse`, so there is no invalid-guard-JSON failure mode left to catch.
+  // `null` = no guard (unconditional transition).
+  guard: PolicyCondition | null;
 };
 
 function emptyTransitionRow(): TransitionRow {
-  return { id: crypto.randomUUID(), action: "", from: "", to: "", label: "", guardText: "" };
+  return { id: crypto.randomUUID(), action: "", from: "", to: "", label: "", guard: null };
 }
 
 function wireToTransitionRow(transition: unknown): TransitionRow {
@@ -593,12 +598,10 @@ function wireToTransitionRow(transition: unknown): TransitionRow {
     from: typeof t.from === "string" ? t.from : "",
     to: typeof t.to === "string" ? t.to : "",
     label: typeof t.label === "string" ? t.label : "",
-    guardText: t.guard !== undefined ? JSON.stringify(t.guard) : "",
+    guard: t.guard !== undefined ? (t.guard as PolicyCondition) : null,
   };
 }
 
-/** Throws on invalid guard JSON — the caller (`workflowRowToWire`) is expected to catch this
- * and turn it into a form error, same as `PoliciesAdminPage.handleCreate`'s `JSON.parse`. */
 function transitionRowToWire(row: TransitionRow): Record<string, unknown> {
   const wire: Record<string, unknown> = {
     action: row.action.trim(),
@@ -606,8 +609,8 @@ function transitionRowToWire(row: TransitionRow): Record<string, unknown> {
     to: row.to.trim(),
     label: row.label.trim(),
   };
-  if (row.guardText.trim().length > 0) {
-    wire.guard = JSON.parse(row.guardText);
+  if (row.guard !== null) {
+    wire.guard = row.guard;
   }
   return wire;
 }
@@ -645,8 +648,7 @@ function wireToWorkflowRow(workflow: unknown): WorkflowRow {
 /** Returns `undefined` (not an empty object) when `stateField` is blank, so
  * `JSON.stringify({ ...body, workflow })` omits the key entirely — matches
  * `LowCodeEntityDefinition::workflow`'s `#[serde(default, skip_serializing_if =
- * "Option::is_none")]` on the Rust side, an absent key rather than `null`. Throws on the
- * first invalid guard JSON among the transitions — the caller surfaces that as a form error. */
+ * "Option::is_none")]` on the Rust side, an absent key rather than `null`. */
 function workflowRowToWire(row: WorkflowRow): Record<string, unknown> | undefined {
   if (row.stateField.trim().length === 0) {
     return undefined;
@@ -665,12 +667,14 @@ const TransitionRowEditor = memo(function TransitionRowEditor({
   row,
   index,
   stateOptions,
+  conditionEntity,
   onUpdate,
   onRemove,
 }: {
   row: TransitionRow;
   index: number;
   stateOptions: string[];
+  conditionEntity: Pick<EntitySummary, "fields">;
   onUpdate: (index: number, patch: Partial<TransitionRow>) => void;
   onRemove: (index: number) => void;
 }) {
@@ -726,13 +730,17 @@ const TransitionRowEditor = memo(function TransitionRowEditor({
           <option key={s} value={s} />
         ))}
       </datalist>
-      <Textarea
-        label={t("admin.lowcode.workflow.transitionGuard")}
-        helperText={t("admin.lowcode.workflow.transitionGuardDescription")}
-        value={row.guardText}
-        onChange={(e) => onUpdate(index, { guardText: e.currentTarget.value })}
-        rows={1}
-      />
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-foreground">
+          {t("admin.lowcode.workflow.transitionGuard")}
+        </p>
+        <ConditionBuilder
+          value={row.guard}
+          onChange={(guard) => onUpdate(index, { guard })}
+          subject="record"
+          entity={conditionEntity}
+        />
+      </div>
     </div>
   );
 });
@@ -740,10 +748,12 @@ const TransitionRowEditor = memo(function TransitionRowEditor({
 function WorkflowBuilder({
   workflow,
   fieldNames,
+  conditionEntity,
   onChange,
 }: {
   workflow: WorkflowRow;
   fieldNames: string[];
+  conditionEntity: Pick<EntitySummary, "fields">;
   onChange: Dispatch<SetStateAction<WorkflowRow>>;
 }) {
   const { t } = useTranslation();
@@ -848,6 +858,7 @@ function WorkflowBuilder({
           row={row}
           index={index}
           stateOptions={stateOptions}
+          conditionEntity={conditionEntity}
           onUpdate={updateTransition}
           onRemove={removeTransition}
         />
@@ -998,13 +1009,7 @@ function LowCodeEntitiesAdminPageContent() {
       setFormError(t("admin.lowcode.workflow.transitionFieldsRequired"));
       return;
     }
-    let workflowWire: Record<string, unknown> | undefined;
-    try {
-      workflowWire = workflowRowToWire(workflow);
-    } catch {
-      setFormError(t("admin.lowcode.workflow.invalidGuardJson"));
-      return;
-    }
+    const workflowWire = workflowRowToWire(workflow);
 
     // Renaming a field (or removing it) can leave a list view's fields/filters/sortField
     // still pointing at the old name — `fieldNames` only tracks *current* field names, it
@@ -1060,6 +1065,28 @@ function LowCodeEntitiesAdminPageContent() {
   // defeating `ListViewRowEditor`'s memoization.
   const fieldNames = useMemo(
     () => [...fields.map((f) => f.name.trim()).filter(Boolean), ...IMPLICIT_SYSTEM_FIELDS],
+    [fields],
+  );
+
+  // Feeds the workflow guard's `ConditionBuilder` (2026-09-05,
+  // `docs/features/21-workflow-condition-builder.md`) — carries real `kind`/`enumValues` from the
+  // draft's own `fields` (unlike `fieldNames` above, which is just names), so `ValueEditor` can
+  // render the right control (enum `Select`, `NumberInput`, ...) for a guard condition the same
+  // way it already does for an ABAC policy condition.
+  const conditionEntity = useMemo<Pick<EntitySummary, "fields">>(
+    () => ({
+      fields: [
+        ...fields
+          .filter((f) => f.name.trim().length > 0)
+          .map((f) => ({
+            name: f.name.trim(),
+            label: f.label.trim() || f.name.trim(),
+            kind: f.kind as EntitySummary["fields"][number]["kind"],
+            enumValues: f.kind === "enum" ? f.enumValues : undefined,
+          })),
+        ...IMPLICIT_SYSTEM_FIELDS.map((name) => ({ name, label: name, kind: "string" as const })),
+      ],
+    }),
     [fields],
   );
 
@@ -1159,7 +1186,12 @@ function LowCodeEntitiesAdminPageContent() {
         />
         <FieldBuilder fields={fields} onChange={setFields} />
         <ListViewBuilder listViews={listViews} fieldNames={fieldNames} onChange={setListViews} />
-        <WorkflowBuilder workflow={workflow} fieldNames={fieldNames} onChange={setWorkflow} />
+        <WorkflowBuilder
+          workflow={workflow}
+          fieldNames={fieldNames}
+          conditionEntity={conditionEntity}
+          onChange={setWorkflow}
+        />
         <div className="flex items-center gap-2">
           <Button
             onClick={() => void handleSaveDraft()}

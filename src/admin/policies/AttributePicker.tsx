@@ -25,7 +25,7 @@ export function AttributePicker({
   onChange,
 }: {
   subject: "context" | "record";
-  entity: EntitySummary;
+  entity: Pick<EntitySummary, "fields">;
   value: string;
   onChange: (next: string) => void;
 }) {

@@ -18,7 +18,12 @@ export function ConditionBuilder({
   value: PolicyCondition | null;
   onChange: (next: PolicyCondition | null) => void;
   subject: "context" | "record";
-  entity: EntitySummary;
+  // `Pick`, not the full `EntitySummary` — this builder (and everything it delegates to) only
+  // ever reads `.fields`, and reuse for a workflow guard editor (a different `entity` shape
+  // entirely — a low-code draft, not a fetched `EntitySummary`) is otherwise blocked on
+  // satisfying properties it never touches. See `docs/features/
+  // 21-workflow-condition-builder.md`.
+  entity: Pick<EntitySummary, "fields">;
 }) {
   const { t } = useTranslation();
 

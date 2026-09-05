@@ -6,6 +6,10 @@ import {
   Card,
   IconButton,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -18,10 +22,12 @@ import { useEntity } from "../metadata/useEntity";
 import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { FieldValue } from "../field/FieldValue";
 import { useEntityLabels } from "../i18n/useEntityLabels";
+import { useTenantUsers } from "../auth/useTenantUsers";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { WorkflowActionBar } from "../workflow/WorkflowActionBar";
 import { WorkflowStepper } from "../workflow/WorkflowStepper";
 import { RelatedRecordsPanel } from "./RelatedRecordsPanel";
+import { useWorkflowEvents } from "./useWorkflowEvents";
 import type { RecordCapabilities } from "./recordCapabilities";
 
 type RecordDto = {
@@ -33,6 +39,54 @@ type RecordDto = {
 
 function stateValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+/** "History" tab content — `docs/features/20-record-detail-audit-trail-and-tabs.md`. Only
+ *  mounted (and only fetches) when the parent already confirmed `entity.workflow` exists, so a
+ *  non-workflow entity's `RecordDetail` never renders this tab at all, let alone requests
+ *  `/workflow-events` for it. */
+function WorkflowHistoryTab({ entityName, recordId }: { entityName: string; recordId: string }) {
+  const { t } = useTranslation();
+  const { data: events, isLoading, error } = useWorkflowEvents(entityName, recordId, true);
+  const users = useTenantUsers();
+
+  if (isLoading) {
+    return <Spinner size="sm" />;
+  }
+  if (error) {
+    return <ApiErrorMessage error={error} />;
+  }
+  if (!events || events.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t("detail.historyEmpty")}</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {events.map((event) => {
+        const actorEmail = event.actor
+          ? (users.find((u) => u.id === event.actor)?.email ?? event.actor)
+          : null;
+        return (
+          <li
+            key={event.id}
+            className="flex flex-col gap-0.5 border-b border-border pb-3 last:border-0"
+          >
+            <span className="text-sm text-foreground">
+              {t("detail.historyEntry", {
+                action: event.action,
+                from: event.from_state,
+                to: event.to_state,
+              })}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {new Date(event.created_at).toLocaleString()}
+              {actorEmail ? ` · ${t("detail.historyBy", { actor: actorEmail })}` : ""}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export function RecordDetail({ entityName, id }: { entityName: string; id: string }) {
@@ -87,6 +141,38 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
 
   const currentState = entity.workflow ? stateValue(record.data[entity.workflow.stateField]) : null;
   const visibleFields = entity.fields.filter((field) => field.kind !== "id");
+
+  // Shared between the plain layout (no workflow) and the "Details" tab (workflow entity) below
+  // — kept as one JSX expression rather than duplicated so the 2 layouts can't drift apart.
+  const fieldsAndRelated = (
+    <>
+      <Card>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 p-md sm:grid-cols-2">
+          {visibleFields.map((field) => {
+            const hint = getFieldLayoutHint(entityName, field.name, field.kind);
+            return (
+              <div key={field.name} className={hint.span === 2 ? "sm:col-span-2" : undefined}>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {fieldLabel(field.name, field.label)}
+                </dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  <FieldValue
+                    field={field}
+                    value={record.data[field.name]}
+                    entityName={entityName}
+                    fieldDisplayHints={entity.fieldDisplayHints}
+                  />
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </Card>
+      {entity.relatedViews && entity.relatedViews.length > 0 ? (
+        <RelatedRecordsPanel id={id} relatedViews={entity.relatedViews} />
+      ) : null}
+    </>
+  );
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 py-4">
@@ -210,32 +296,24 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
         </Alert>
       ) : null}
 
-      <Card>
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 p-md sm:grid-cols-2">
-          {visibleFields.map((field) => {
-            const hint = getFieldLayoutHint(entityName, field.name, field.kind);
-            return (
-              <div key={field.name} className={hint.span === 2 ? "sm:col-span-2" : undefined}>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {fieldLabel(field.name, field.label)}
-                </dt>
-                <dd className="mt-1 text-sm text-foreground">
-                  <FieldValue
-                    field={field}
-                    value={record.data[field.name]}
-                    entityName={entityName}
-                    fieldDisplayHints={entity.fieldDisplayHints}
-                  />
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
-      </Card>
-
-      {entity.relatedViews && entity.relatedViews.length > 0 ? (
-        <RelatedRecordsPanel id={id} relatedViews={entity.relatedViews} />
-      ) : null}
+      {entity.workflow ? (
+        <Tabs defaultValue="details">
+          <TabsList>
+            <TabsTrigger value="details">{t("detail.tabDetails")}</TabsTrigger>
+            <TabsTrigger value="history">{t("detail.tabHistory")}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="details" className="flex flex-col gap-4">
+            {fieldsAndRelated}
+          </TabsContent>
+          <TabsContent value="history">
+            <Card className="p-md">
+              <WorkflowHistoryTab entityName={entityName} recordId={id} />
+            </Card>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        fieldsAndRelated
+      )}
     </div>
   );
 }

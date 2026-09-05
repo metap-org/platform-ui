@@ -48,12 +48,18 @@ const en = {
     bulkDeleteConfirm: "Delete {{count}} selected records? This cannot be undone.",
     bulkDeleteSuccess: "Deleted {{count}} records.",
     bulkDeletePartialError: "{{failed}} of {{total}} deletes failed: {{detail}}",
+    export: "Export",
+    exportCsv: "Export CSV",
+    exportJson: "Export JSON",
+    exportScopeHint:
+      "Exports only the rows currently loaded, not every record matching the filter.",
   },
   form: {
     editTitle: "Edit {{label}}",
     newTitle: "New {{label}}",
     createSuccess: "{{label}} created.",
     updateSuccess: "{{label}} updated.",
+    unsavedChanges: "You have unsaved changes.",
   },
   error: {
     sessionExpired: "Session expired.",
@@ -73,6 +79,13 @@ const en = {
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     resetView: "Reset view",
+  },
+  detail: {
+    tabDetails: "Details",
+    tabHistory: "History",
+    historyEmpty: "No transitions yet.",
+    historyEntry: "{{action}}: {{from}} → {{to}}",
+    historyBy: "by {{actor}}",
   },
   login: {
     title: "Log In",
@@ -96,6 +109,13 @@ const en = {
     navPolicies: "Policies",
     navCronJobs: "Cron Jobs",
     navLowCode: "Entities (Low-code)",
+    loading: "Loading",
+    toggleNav: "Toggle navigation menu",
+    errorBoundaryTitle: "Something went wrong",
+    errorBoundaryDescription: "This part of the page failed to render.",
+    errorBoundaryRetry: "Retry",
+    commandPalettePlaceholder: "Go to page… (⌘K)",
+    commandPaletteEmpty: "No matching page.",
   },
   admin: {
     notAuthorized: "You don't have access to this page. It requires the admin role.",
@@ -246,11 +266,8 @@ const en = {
         transitionFromDescription: "Free text — matches a value of the state field above.",
         transitionTo: "To state",
         transitionGuard: "Guard",
-        transitionGuardDescription:
-          'Optional JSON PolicyCondition (e.g. {"attribute":"email","op":"neq","value":{"literal":""}}). Leave blank for an unconditional transition.',
         transitionFieldsRequired:
           "A configured workflow needs an initial state, and every transition needs an action, from, to, and label.",
-        invalidGuardJson: "One or more transition guards are not valid JSON.",
       },
       saveDraft: "Save draft",
       status: "Status",
@@ -311,12 +328,17 @@ const vi = {
     bulkDeleteConfirm: "Xoá {{count}} bản ghi đã chọn? Không thể hoàn tác.",
     bulkDeleteSuccess: "Đã xoá {{count}} bản ghi.",
     bulkDeletePartialError: "{{failed}}/{{total}} lượt xoá thất bại: {{detail}}",
+    export: "Xuất file",
+    exportCsv: "Xuất CSV",
+    exportJson: "Xuất JSON",
+    exportScopeHint: "Chỉ xuất các dòng đã tải, không phải toàn bộ bản ghi khớp bộ lọc.",
   },
   form: {
     editTitle: "Sửa {{label}}",
     newTitle: "Thêm {{label}}",
     createSuccess: "Đã tạo {{label}}.",
     updateSuccess: "Đã cập nhật {{label}}.",
+    unsavedChanges: "Có thay đổi chưa lưu.",
   },
   error: {
     sessionExpired: "Phiên đăng nhập đã hết hạn.",
@@ -336,6 +358,13 @@ const vi = {
     zoomIn: "Phóng to",
     zoomOut: "Thu nhỏ",
     resetView: "Đặt lại góc nhìn",
+  },
+  detail: {
+    tabDetails: "Chi tiết",
+    tabHistory: "Lịch sử",
+    historyEmpty: "Chưa có transition nào.",
+    historyEntry: "{{action}}: {{from}} → {{to}}",
+    historyBy: "bởi {{actor}}",
   },
   login: {
     title: "Đăng nhập",
@@ -359,6 +388,13 @@ const vi = {
     navPolicies: "Chính sách",
     navCronJobs: "Cron Jobs",
     navLowCode: "Entities (Low-code)",
+    loading: "Đang tải",
+    toggleNav: "Đóng/mở menu điều hướng",
+    errorBoundaryTitle: "Đã có lỗi xảy ra",
+    errorBoundaryDescription: "Phần này của trang không render được.",
+    errorBoundaryRetry: "Thử lại",
+    commandPalettePlaceholder: "Đi tới trang… (⌘K)",
+    commandPaletteEmpty: "Không tìm thấy trang phù hợp.",
   },
   admin: {
     notAuthorized: "Bạn không có quyền truy cập trang này. Trang này yêu cầu vai trò admin.",
@@ -508,11 +544,8 @@ const vi = {
         transitionFromDescription: "Gõ tự do — khớp với một giá trị của state field ở trên.",
         transitionTo: "Đến trạng thái",
         transitionGuard: "Guard",
-        transitionGuardDescription:
-          'JSON PolicyCondition, không bắt buộc (vd: {"attribute":"email","op":"neq","value":{"literal":""}}). Để trống nếu transition không điều kiện.',
         transitionFieldsRequired:
           "Workflow đã cấu hình cần trạng thái ban đầu, và mỗi transition cần đủ action, from, to, label.",
-        invalidGuardJson: "Một hoặc nhiều guard của transition không phải JSON hợp lệ.",
       },
       saveDraft: "Lưu draft",
       status: "Trạng thái",

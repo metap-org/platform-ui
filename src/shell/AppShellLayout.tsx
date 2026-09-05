@@ -1,12 +1,16 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge, Button, ToastProvider } from "@metap/ui";
+import { useIsFetching } from "@tanstack/react-query";
+import { Badge, Button, IconButton, ToastProvider } from "@metap/ui";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { useCurrentUserEmail } from "../auth/useTenantUsers";
 import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { AppCommandPalette } from "./AppCommandPalette";
 
 export type ShellNavItem = {
   to: string;
@@ -63,6 +67,11 @@ export function AppShellLayout({
   // per-render), so this costs nothing extra beyond what `useCurrentUser` already fetches.
   const email = useCurrentUserEmail();
   const navAdapter = useNavigationAdapter();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Any query in-flight anywhere under this shell, not just the current screen's own `Spinner` —
+  // `docs/features/23-ux-infrastructure-core.md`'s "global loading state", additive to (not a
+  // replacement for) per-screen loading UI.
+  const fetchingCount = useIsFetching();
 
   async function handleLogout() {
     await logout();
@@ -72,6 +81,14 @@ export function AppShellLayout({
   return (
     <ToastProvider>
       <div className="min-h-screen bg-background">
+        <AppCommandPalette navItems={navItems} />
+        {fetchingCount > 0 ? (
+          <div
+            role="progressbar"
+            aria-label={t("shell.loading")}
+            className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary"
+          />
+        ) : null}
         <header className="h-[60px] border-b border-border">
           <div className="flex h-full items-center justify-between gap-4 px-4">
             <div className="flex items-center gap-6">
@@ -81,19 +98,24 @@ export function AppShellLayout({
               >
                 {brand}
               </navAdapter.Link>
-              <nav className="flex items-center gap-4">
+              {/* Collapses below `md` — the hamburger toggle right after it takes over.
+                  `docs/features/23-ux-infrastructure-core.md`'s "responsive/mobile", previously
+                  0 handling here (`frontend-checklist.md`, "gần như chưa có"). */}
+              <nav className="hidden items-center gap-4 md:flex">
                 {navItems.map((item) => (
                   <NavLink key={item.to} item={item} />
                 ))}
               </nav>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-32">
+              <div className="hidden w-32 md:block">
                 <LocaleSwitcher compact />
               </div>
-              {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
+              {email ? (
+                <span className="hidden text-sm text-foreground/70 md:inline">{email}</span>
+              ) : null}
               {user ? (
-                <div className="flex items-center gap-1">
+                <div className="hidden items-center gap-1 md:flex">
                   {user.roles.map((role) => (
                     <Badge key={role} variant="outline">
                       {role}
@@ -101,13 +123,60 @@ export function AppShellLayout({
                   ))}
                 </div>
               ) : null}
-              <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:inline-flex"
+                onClick={() => void handleLogout()}
+              >
                 {t("shell.logout")}
               </Button>
+              <IconButton
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                aria-label={t("shell.toggleNav")}
+                aria-expanded={mobileNavOpen}
+                onClick={() => setMobileNavOpen((open) => !open)}
+                icon={
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    className="h-5 w-5"
+                  >
+                    {mobileNavOpen ? (
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    ) : (
+                      <path d="M4 6h16M4 12h16M4 18h16" />
+                    )}
+                  </svg>
+                }
+              />
             </div>
           </div>
+          {mobileNavOpen ? (
+            <div className="border-t border-border px-4 py-3 md:hidden">
+              <nav className="flex flex-col gap-3">
+                {navItems.map((item) => (
+                  <NavLink key={item.to} item={item} />
+                ))}
+              </nav>
+              <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+                <LocaleSwitcher compact />
+                {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
+                <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+                  {t("shell.logout")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </header>
-        <main className="p-4">{children}</main>
+        <main className="p-4">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
       </div>
     </ToastProvider>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,6 +8,10 @@ import {
   Button,
   Card,
   Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
   Input,
   Select,
@@ -74,16 +79,86 @@ function SortIndicator({ direction }: { direction: "asc" | "desc" }) {
   );
 }
 
+/** CSV cell escaping (RFC 4180-ish, enough for the ASCII-heavy metadata-driven values this
+ *  produces): quote a value that contains a comma/quote/newline, doubling any embedded quote. */
+function toCsvCell(value: unknown): string {
+  const str =
+    value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/** Exports exactly the rows currently loaded in the virtualizer's `records` array — same "loaded
+ *  rows only" scope already established for row-selection/bulk-delete (2026-09-04), not every
+ *  record matching the current filter on the server. Column order/keys follow `listView.fields`. */
+function exportLoadedRecords(
+  format: "csv" | "json",
+  entityName: string,
+  fields: string[],
+  records: { data: Record<string, unknown> }[],
+) {
+  if (format === "csv") {
+    const lines = [
+      fields.map(toCsvCell).join(","),
+      ...records.map((record) => fields.map((f) => toCsvCell(record.data[f])).join(",")),
+    ];
+    downloadTextFile(`${entityName}.csv`, lines.join("\n"), "text/csv;charset=utf-8;");
+    return;
+  }
+  const rows = records.map((record) => {
+    const row: Record<string, unknown> = {};
+    for (const field of fields) {
+      row[field] = record.data[field];
+    }
+    return row;
+  });
+  downloadTextFile(`${entityName}.json`, JSON.stringify(rows, null, 2), "application/json");
+}
+
+/** `sort`/filter params double as this route's shareable URL state (feature 23,
+ *  `docs/features/23-ux-infrastructure-core.md`) — same key names the API request itself already
+ *  uses (`baseParams` below), so there's one query-string shape, not two. `limit`/`cursor` are
+ *  deliberately excluded — scroll position isn't part of "deep link to this view". */
+function parseSortParam(value: string | null): SortState {
+  if (!value) return null;
+  const descending = value.startsWith("-");
+  const field = descending ? value.slice(1) : value;
+  return field ? { field, descending } : null;
+}
+
 export function GeneratedList({ entityName }: { entityName: string }) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
+  const [searchParams, setSearchParams] = useSearchParams();
   // Text filters are debounced (wait for the user to stop typing before refetching).
   const [filterInputs, setFilterInputs] = useState<Record<string, string>>({});
   // Enum filters come from a Select, not free text, so they refetch immediately on change.
   const [enumFilters, setEnumFilters] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<SortState>(null);
+  // Gates the URL->state write-back effect below until the one-time state<-URL hydration for
+  // *this* entity has actually run — without it, the write-back effect's first pass (same commit
+  // as the hydration effect, before its `setState` calls have re-rendered) would clobber the URL
+  // with the pre-hydration empty state. Reset per entity so navigating between 2 different
+  // `/records/:entityName` routes re-hydrates from that entity's own URL instead of carrying the
+  // previous entity's filters over.
+  const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const debouncedTextFilters = useDebouncedValue(filterInputs, 400);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -114,6 +189,63 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     }
     return result;
   }, [debouncedTextFilters, enumFilters]);
+
+  useEffect(() => {
+    setHydratedFromUrl(false);
+  }, [entityName]);
+
+  // One-time restore of sort/filter from the URL for this entity — needs `entity.fields` to know
+  // which filter keys are enum (routes into `enumFilters`, a `Select`) vs. text (`filterInputs`,
+  // debounced). Runs once per entity (`hydratedFromUrl` guard) so it never fights the write-back
+  // effect below or re-runs on every subsequent `searchParams` change it itself causes.
+  useEffect(() => {
+    if (!entity || hydratedFromUrl) return;
+
+    const sortFromUrl = parseSortParam(searchParams.get("sort"));
+    if (sortFromUrl) {
+      setSort(sortFromUrl);
+    }
+
+    const textFromUrl: Record<string, string> = {};
+    const enumFromUrl: Record<string, string> = {};
+    for (const [key, value] of searchParams.entries()) {
+      if (key === "sort" || key === "limit" || key === "cursor") continue;
+      const field = entity.fields.find((f) => f.name === key);
+      if (field?.kind === "enum") {
+        enumFromUrl[key] = value;
+      } else {
+        textFromUrl[key] = value;
+      }
+    }
+    if (Object.keys(textFromUrl).length > 0) {
+      setFilterInputs(textFromUrl);
+    }
+    if (Object.keys(enumFromUrl).length > 0) {
+      setEnumFilters(enumFromUrl);
+    }
+    setHydratedFromUrl(true);
+  }, [entity, hydratedFromUrl, searchParams]);
+
+  // Reflect current sort/filter into the URL once hydration above has settled — deep linking +
+  // F5-survives-filter (`docs/features/23-ux-infrastructure-core.md`). Deliberately a plain push
+  // (react-router's default), not `{ replace: true }`, so Back/Forward step through filter
+  // history rather than skip it — filter changes are already debounced 400ms, so this doesn't
+  // spam history per keystroke.
+  useEffect(() => {
+    if (!hydratedFromUrl) return;
+    const next = new URLSearchParams();
+    if (sort) {
+      next.set("sort", sort.descending ? `-${sort.field}` : sort.field);
+    }
+    for (const [key, value] of Object.entries(activeFilters)) {
+      next.set(key, value);
+    }
+    setSearchParams(next);
+    // `setSearchParams` intentionally excluded below: react-router hands back a new function
+    // identity on every navigation, which would otherwise re-run this effect on the very write
+    // it just performed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort, activeFilters, hydratedFromUrl]);
 
   const baseParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -333,6 +465,33 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               </svg>
             }
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              {/* `title` (not `aria-label` — the button has visible text) states the "loaded
+                  rows only" scope up front, same disclosure this component already gives
+                  row-selection/bulk-delete for the identical scope decision. */}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={records.length === 0}
+                title={t("common.exportScopeHint")}
+              >
+                {t("common.export")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => exportLoadedRecords("csv", entityName, listView.fields, records)}
+              >
+                {t("common.exportCsv")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => exportLoadedRecords("json", entityName, listView.fields, records)}
+              >
+                {t("common.exportJson")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <navAdapter.Link
             to={navAdapter.toNewRecord(entityName)}
             className={buttonVariants({ variant: "default" })}
@@ -388,7 +547,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               right below), and every other row — filter row, every virtualized data row — just
               inherits those widths, keeping header and body aligned regardless of how rows are
               positioned. */}
-          <Table className="table-fixed">
+          {/* `min-w` forces horizontal scroll on a narrow viewport instead of `table-fixed`
+              squeezing every column unreadably thin — `docs/features/23-ux-infrastructure-core.md`'s
+              responsive gap; the scroll container above already has `overflow-auto`. */}
+          <Table className="table-fixed min-w-[720px]">
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead style={{ width: SELECTION_COLUMN_WIDTH }}>
