@@ -21,17 +21,21 @@ export * from "./auth/useCurrentUser";
 export * from "./auth/useTenantUsers";
 export * from "./detail/recordCapabilities";
 export * from "./detail/RecordDetail";
+export * from "./detail/useWorkflowEvents";
 export * from "./field/fieldKindConfig";
 export * from "./field/FieldInput";
 export * from "./field/FieldValue";
 export * from "./form/GeneratedForm";
+export * from "./hooks/useAsyncAction";
 export * from "./hooks/useDebouncedValue";
+export * from "./hooks/useLocalStorage";
 export * from "./i18n/entityLabels";
 export * from "./i18n/i18n";
 export * from "./i18n/LocaleProvider";
 export * from "./i18n/LocaleSwitcher";
 export * from "./i18n/resources";
 export * from "./i18n/useEntityLabels";
+export * from "./lib/dates";
 export * from "./list/GeneratedList";
 export * from "./metadata/entityLayout";
 export * from "./metadata/types";
@@ -39,9 +43,12 @@ export * from "./metadata/useEntities";
 export * from "./metadata/useEntity";
 export * from "./navigation/NavigationContext";
 export * from "./navigation/ReactRouterNavigationProvider";
+export * from "./shell/AppCommandPalette";
 export * from "./shell/AppShellLayout";
+export * from "./shell/ErrorBoundary";
 export * from "./workflow/WorkflowActionBar";
 export * from "./workflow/WorkflowStepper";
+export * from "./workflow/WorkflowVisualizeDialog";
 // Exported so a consumer can embed the canvas outside a record's action bar — e.g. an admin screen
 // showing an entity's workflow with no particular record in hand
 // (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding A11).
