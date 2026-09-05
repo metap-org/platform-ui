@@ -41,7 +41,7 @@ type ErrorBody = {
  * that hasn't adopted cookie sessions at all — `apiFetch` degrades to sending no CSRF header,
  * which such a backend never checks for in the first place). */
 // Exported — `graphqlClient.ts`'s cookie-auth path (`graphqlFetch` with no `token`) reads the
-// same cookie/header pair, since `crates/graphql-gateway`'s opt-in `COOKIE_AUTH_ENABLED` mode
+// same cookie/header pair, since `crates/metap-graphql-gateway`'s opt-in `COOKIE_AUTH_ENABLED` mode
 // requires the identical double-submit CSRF check REST already does.
 export function readCsrfCookie(): string | null {
   if (typeof document === "undefined") {

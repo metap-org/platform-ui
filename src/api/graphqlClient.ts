@@ -64,7 +64,7 @@ function settleOne(body: GraphQLResponseBody<unknown>, path: string, item: Queue
  *  overlapping calls) sees zero wire-format change. 2+ items are sent as a JSON array in the same
  *  tick's order and read back as an array of `{data, errors}` in that same order
  *  (`GraphQLBatchRequest`/`Schema::execute_batch` on the gateway — see
- *  `metap/crates/graphql-gateway/src/server.rs` — accepts both shapes in the same POST body). */
+ *  `metap/crates/metap-graphql-gateway/src/server.rs` — accepts both shapes in the same POST body). */
 async function flush(key: string, path: string, token?: string): Promise<void> {
   const items = queues.get(key) ?? [];
   queues.delete(key);
@@ -124,7 +124,7 @@ async function flush(key: string, path: string, token?: string): Promise<void> {
   }
 }
 
-/** `token` is now optional (2026-09-04 — see `crates/graphql-gateway/src/server.rs`'s module doc
+/** `token` is now optional (2026-09-04 — see `crates/metap-graphql-gateway/src/server.rs`'s module doc
  *  comment for the backend half of this). Passed: sends `Authorization: Bearer <token>` — for a
  *  gateway deployment that hasn't opted into `COOKIE_AUTH_ENABLED` (a separate origin from the
  *  services that issue the session, or any other Bearer-only deployment). Omitted: rides the
