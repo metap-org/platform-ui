@@ -26,8 +26,93 @@ import {
 } from "./adminApi";
 import { AdminOnly } from "../auth/AdminOnly";
 
-const TARGET_TYPES = ["workflow_transition", "bulk_query_action", "webhook"];
+// `email`/`steps` were missing here (found live 2026-09-06,
+// `docs/features/01-fe-platform-overhaul.md`) — `metap_cron::TargetType` has had 6 variants since
+// Phase 39/`docs/features/02-workflow-engine.md`'s Increment 2, but this dropdown only ever
+// offered 3, so a job of either kind could not be created through this page at all.
+// `wait_event` is deliberately excluded — it's only valid as a step *inside* a `steps` chain
+// (`metap_cron::model::TargetType::WaitEvent`'s doc comment), rejected as a job's own top-level
+// target type at creation time.
+const TARGET_TYPES = ["workflow_transition", "bulk_query_action", "webhook", "email", "steps"];
 const DISPATCH_MODES = ["outbox", "direct"];
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+type KeyValueRow = { id: string; key: string; value: string };
+
+function emptyKeyValueRow(): KeyValueRow {
+  return { id: crypto.randomUUID(), key: "", value: "" };
+}
+
+/** Empty/whitespace-only keys are dropped rather than sent as `"": "..."` — a blank trailing row
+ *  left over from "Add" is the common case, not a real key a caller meant to set. */
+function keyValueRowsToObject(rows: KeyValueRow[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (key.length > 0) {
+      result[key] = row.value;
+    }
+  }
+  return result;
+}
+
+/** Shared by `bulk_query_action`'s `filter` and `webhook`'s `headers` — both are a flat
+ *  `Record<string, string>` (`metap_cron::model::TargetType`'s doc comment: `ListInput.filters`
+ *  is itself a flat `Vec<(String, String)>`, not a nested condition tree — this is *not* the same
+ *  grammar `ConditionBuilder`/`PolicyCondition` use, so that component doesn't apply here). */
+function KeyValueListEditor({
+  rows,
+  onChange,
+  keyLabel,
+  valueLabel,
+  addLabel,
+  removeLabel,
+}: {
+  rows: KeyValueRow[];
+  onChange: (rows: KeyValueRow[]) => void;
+  keyLabel: string;
+  valueLabel: string;
+  addLabel: string;
+  removeLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {rows.map((row, index) => (
+        <div key={row.id} className="flex items-end gap-2">
+          <Input
+            label={index === 0 ? keyLabel : undefined}
+            value={row.key}
+            onChange={(event) => {
+              const next = [...rows];
+              next[index] = { ...row, key: event.currentTarget.value };
+              onChange(next);
+            }}
+          />
+          <Input
+            label={index === 0 ? valueLabel : undefined}
+            value={row.value}
+            onChange={(event) => {
+              const next = [...rows];
+              next[index] = { ...row, value: event.currentTarget.value };
+              onChange(next);
+            }}
+          />
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={removeLabel}
+            className="text-destructive hover:text-destructive"
+            onClick={() => onChange(rows.filter((_, i) => i !== index))}
+            icon={<span className="text-base leading-none">×</span>}
+          />
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={() => onChange([...rows, emptyKeyValueRow()])}>
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
 
 function CronJobRuns({ jobId }: { jobId: string }) {
   const { t } = useTranslation();
@@ -81,17 +166,120 @@ function CronJobsAdminPageContent() {
   const [timezone, setTimezone] = useState("UTC");
   const [targetType, setTargetType] = useState<string>(TARGET_TYPES[0] ?? "webhook");
   const [dispatchMode, setDispatchMode] = useState<string>(DISPATCH_MODES[0] ?? "outbox");
-  const [targetConfigText, setTargetConfigText] = useState("{}");
+
+  // One state group per `TargetType` shape (`metap_cron::model::TargetType`'s doc comment is the
+  // source of truth for these) — replaces a single raw-JSON `Textarea` a caller had to hand-type
+  // against undocumented shape knowledge (`docs/features/01-fe-platform-overhaul.md`'s original
+  // gap). `steps` is the deliberate exception: it's a chain of the other 4 shapes, and a full
+  // recursive step-list editor is a separate, bigger effort — kept as labeled raw JSON for now
+  // rather than blocking the other 4 on it.
+  const [wtEntity, setWtEntity] = useState("");
+  const [wtRecordId, setWtRecordId] = useState("");
+  const [wtAction, setWtAction] = useState("");
+  const [bqaEntity, setBqaEntity] = useState("");
+  const [bqaAction, setBqaAction] = useState("");
+  const [bqaFilters, setBqaFilters] = useState<KeyValueRow[]>([emptyKeyValueRow()]);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookMethod, setWebhookMethod] = useState<string>(HTTP_METHODS[0] ?? "POST");
+  const [webhookHeaders, setWebhookHeaders] = useState<KeyValueRow[]>([]);
+  // JSON, not a plain string — `metap_cron::model::TargetType`'s own doc comment says
+  // `bodyTemplate?`, but the field `cron-scheduler::executor::webhook::WebhookConfig` actually
+  // deserializes is `body: Option<Value>` (found live 2026-09-06 cross-checking the real struct —
+  // that doc comment is stale/wrong), sent verbatim as the request body with no template
+  // substitution of any kind.
+  const [webhookBody, setWebhookBody] = useState("");
+  const [webhookAuthFromSecret, setWebhookAuthFromSecret] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [stepsJson, setStepsJson] = useState('{\n  "steps": []\n}');
+
   const [targetConfigError, setTargetConfigError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
+  function resetTargetConfigFields() {
+    setWtEntity("");
+    setWtRecordId("");
+    setWtAction("");
+    setBqaEntity("");
+    setBqaAction("");
+    setBqaFilters([emptyKeyValueRow()]);
+    setWebhookUrl("");
+    setWebhookMethod(HTTP_METHODS[0] ?? "POST");
+    setWebhookHeaders([]);
+    setWebhookBody("");
+    setWebhookAuthFromSecret(false);
+    setEmailTo("");
+    setEmailSubject("");
+    setEmailBody("");
+    setStepsJson('{\n  "steps": []\n}');
+  }
+
+  /** Builds the exact `target_config` shape `metap_cron::model::TargetType`'s doc comment
+   *  declares for the currently-selected `targetType`, from this component's own structured
+   *  fields — `null` on a JSON parse failure for `steps` (the one shape still hand-typed). */
+  function buildTargetConfig(): Record<string, unknown> | null {
+    switch (targetType) {
+      case "workflow_transition":
+        return { entity: wtEntity, recordId: wtRecordId, action: wtAction };
+      case "bulk_query_action":
+        return { entity: bqaEntity, action: bqaAction, filter: keyValueRowsToObject(bqaFilters) };
+      case "webhook": {
+        const headers = keyValueRowsToObject(webhookHeaders);
+        let body: unknown;
+        if (webhookBody.trim().length > 0) {
+          try {
+            body = JSON.parse(webhookBody);
+          } catch {
+            return null;
+          }
+        }
+        return {
+          url: webhookUrl,
+          method: webhookMethod,
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
+          ...(body !== undefined ? { body } : {}),
+          ...(webhookAuthFromSecret ? { authorizationFromSecret: true } : {}),
+        };
+      }
+      case "email": {
+        const recipients = emailTo
+          .split(",")
+          .map((address) => address.trim())
+          .filter((address) => address.length > 0);
+        return {
+          to: recipients.length === 1 ? recipients[0] : recipients,
+          subject: emailSubject,
+          body: emailBody,
+        };
+      }
+      case "steps":
+      default:
+        try {
+          return JSON.parse(stepsJson || "{}") as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+    }
+  }
+
+  // Live validation feedback for `webhook`'s body field as the admin types, separate from
+  // `targetConfigError` (which is only set on submit, for `steps`) since this one's field is
+  // always visible while `targetType === "webhook"`, not gated behind a submit attempt.
+  let webhookBodyJsonError = false;
+  if (webhookBody.trim().length > 0) {
+    try {
+      JSON.parse(webhookBody);
+    } catch {
+      webhookBodyJsonError = true;
+    }
+  }
+
   async function handleCreate() {
     setTargetConfigError(null);
-    let targetConfig: unknown;
-    try {
-      targetConfig = JSON.parse(targetConfigText || "{}");
-    } catch {
+    const targetConfig = buildTargetConfig();
+    if (targetConfig === null) {
       setTargetConfigError(t("common.invalidJson"));
       return;
     }
@@ -108,7 +296,7 @@ function CronJobsAdminPageContent() {
       });
       setName("");
       setCronExpr("");
-      setTargetConfigText("{}");
+      resetTargetConfigFields();
       await refetch();
     } catch {
       // surfaced via createJob.error below
@@ -168,14 +356,128 @@ function CronJobsAdminPageContent() {
           value={dispatchMode}
           onValueChange={(value) => setDispatchMode(value)}
         />
-        <Textarea
-          label={t("admin.cronJobs.targetConfig")}
-          helperText={t("admin.cronJobs.targetConfigDescription")}
-          value={targetConfigText}
-          onChange={(event) => setTargetConfigText(event.currentTarget.value)}
-          error={targetConfigError ?? undefined}
-          rows={3}
-        />
+        <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t("admin.cronJobs.targetConfig")}
+          </span>
+          {targetType === "workflow_transition" ? (
+            <>
+              <Input
+                label={t("admin.cronJobs.targetEntity")}
+                value={wtEntity}
+                onChange={(event) => setWtEntity(event.currentTarget.value)}
+              />
+              <Input
+                label={t("admin.cronJobs.targetRecordId")}
+                value={wtRecordId}
+                onChange={(event) => setWtRecordId(event.currentTarget.value)}
+              />
+              <Input
+                label={t("admin.cronJobs.targetAction")}
+                value={wtAction}
+                onChange={(event) => setWtAction(event.currentTarget.value)}
+              />
+            </>
+          ) : null}
+          {targetType === "bulk_query_action" ? (
+            <>
+              <Input
+                label={t("admin.cronJobs.targetEntity")}
+                value={bqaEntity}
+                onChange={(event) => setBqaEntity(event.currentTarget.value)}
+              />
+              <Input
+                label={t("admin.cronJobs.targetAction")}
+                value={bqaAction}
+                onChange={(event) => setBqaAction(event.currentTarget.value)}
+              />
+              <span className="text-xs text-muted-foreground">
+                {t("admin.cronJobs.targetFilters")}
+              </span>
+              <KeyValueListEditor
+                rows={bqaFilters}
+                onChange={setBqaFilters}
+                keyLabel={t("admin.cronJobs.filterField")}
+                valueLabel={t("admin.cronJobs.filterValue")}
+                addLabel={t("admin.cronJobs.addFilter")}
+                removeLabel={t("common.delete")}
+              />
+            </>
+          ) : null}
+          {targetType === "webhook" ? (
+            <>
+              <Input
+                label={t("admin.cronJobs.targetUrl")}
+                value={webhookUrl}
+                onChange={(event) => setWebhookUrl(event.currentTarget.value)}
+              />
+              <Select
+                label={t("admin.cronJobs.targetMethod")}
+                options={HTTP_METHODS.map((v) => ({ value: v, label: v }))}
+                value={webhookMethod}
+                onValueChange={(value) => setWebhookMethod(value)}
+              />
+              <span className="text-xs text-muted-foreground">
+                {t("admin.cronJobs.targetHeaders")}
+              </span>
+              <KeyValueListEditor
+                rows={webhookHeaders}
+                onChange={setWebhookHeaders}
+                keyLabel={t("admin.cronJobs.headerName")}
+                valueLabel={t("admin.cronJobs.headerValue")}
+                addLabel={t("admin.cronJobs.addHeader")}
+                removeLabel={t("common.delete")}
+              />
+              <Textarea
+                label={t("admin.cronJobs.targetBody")}
+                helperText={t("admin.cronJobs.targetBodyDescription")}
+                value={webhookBody}
+                onChange={(event) => setWebhookBody(event.currentTarget.value)}
+                error={webhookBodyJsonError ? t("common.invalidJson") : undefined}
+                rows={2}
+              />
+              <Toggle
+                checked={webhookAuthFromSecret}
+                onCheckedChange={setWebhookAuthFromSecret}
+                label={t("admin.cronJobs.targetAuthFromSecret")}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("admin.cronJobs.targetAuthFromSecretDescription")}
+              </p>
+            </>
+          ) : null}
+          {targetType === "email" ? (
+            <>
+              <Input
+                label={t("admin.cronJobs.targetEmailTo")}
+                helperText={t("admin.cronJobs.targetEmailToDescription")}
+                value={emailTo}
+                onChange={(event) => setEmailTo(event.currentTarget.value)}
+              />
+              <Input
+                label={t("admin.cronJobs.targetEmailSubject")}
+                value={emailSubject}
+                onChange={(event) => setEmailSubject(event.currentTarget.value)}
+              />
+              <Textarea
+                label={t("admin.cronJobs.targetEmailBody")}
+                value={emailBody}
+                onChange={(event) => setEmailBody(event.currentTarget.value)}
+                rows={3}
+              />
+            </>
+          ) : null}
+          {targetType === "steps" ? (
+            <Textarea
+              label={t("admin.cronJobs.targetConfig")}
+              helperText={t("admin.cronJobs.targetStepsDescription")}
+              value={stepsJson}
+              onChange={(event) => setStepsJson(event.currentTarget.value)}
+              error={targetConfigError ?? undefined}
+              rows={6}
+            />
+          ) : null}
+        </div>
         <Button
           onClick={() => void handleCreate()}
           disabled={name.trim().length === 0 || cronExpr.trim().length === 0}
