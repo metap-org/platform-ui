@@ -54,21 +54,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const status: AuthStatus = me.isLoading ? "unknown" : me.isError ? "anonymous" : "authenticated";
 
-  // `clear()` alone is enough to force a refetch — `AuthProvider`'s own `me` query above is
-  // always actively mounted, so clearing the cache it's part of makes react-query recreate and
-  // re-run it immediately, the same way `AuthContext`'s old `setToken` relied on a bare `clear()`.
-  // `refetchQueries` (not just `clear()`) is what makes this function's returned promise
-  // actually resolve once `status` has settled — see this fn's doc comment on the interface
-  // above for why that matters to callers.
+  // Found live (2026-09-05, WAF portal): a bare `queryClient.clear()` followed immediately by
+  // `refetchQueries({queryKey: ["currentUser"], type: "active"})` races with the `me` observer
+  // above. `clear()` synchronously removes the `["currentUser"]` query from the cache; whether
+  // `refetchQueries`'s own cache scan (right after, same tick) still finds anything to refetch
+  // depends on whether the observer has already recreated the query object by then — it usually
+  // has, but not always, and when it loses, `refetchQueries` matches nothing, resolves as a
+  // silent no-op, and this function's promise resolves with `status` never actually settling to
+  // "authenticated". A caller that then navigates (`LoginForm`) lands on a route whose
+  // `RequireAuth` reads a stuck "unknown"/stale status forever — no error, just a login that
+  // "does nothing" every so often. Fix: never remove the `currentUser` query itself — refetch it
+  // directly (it's always active, so this can't fail to find it) and only *then* drop every other
+  // cached query (previous session's tenant-scoped data), which is the actual thing `clear()` was
+  // for.
   const markAuthenticated = useCallback(async () => {
-    queryClient.clear();
     await queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "currentUser" });
   }, [queryClient]);
 
   const logout = useCallback(async () => {
     await apiFetch("/auth/logout", { method: "POST" }).catch(() => undefined);
-    queryClient.clear();
     await queryClient.refetchQueries({ queryKey: ["currentUser"], type: "active" });
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "currentUser" });
   }, [queryClient]);
 
   const value = useMemo(
