@@ -354,6 +354,931 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/admin/lowcode/audit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cross-entity audit feed for the caller's tenant, newest first */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                /** @enum {string} */
+                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
+                actorTenantId?: string | null;
+                actorUserId?: string | null;
+                entityName?: string;
+                /** Format: date-time */
+                occurredAt?: string;
+                restoredFromVersion?: number | null;
+                versionNumber?: number | null;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List every DB-authored entity (draft/published status, enabled flag) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                entities?: {
+                  enabled?: boolean;
+                  name?: string;
+                  published?: boolean;
+                }[];
+              };
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Enable/disable a published entity — takes effect immediately, no restart */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            enabled: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/audit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Audit log for one entity (draft-saved/published/rolled-back/enabled/disabled) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                /** @enum {string} */
+                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
+                actorTenantId?: string | null;
+                actorUserId?: string | null;
+                entityName?: string;
+                /** Format: date-time */
+                occurredAt?: string;
+                restoredFromVersion?: number | null;
+                versionNumber?: number | null;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get the current draft for an entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                fields?: {
+                  computed?: {
+                    dependsOn: string[];
+                    expression: string;
+                  };
+                  enumValues?: string[];
+                  indexed?: boolean;
+                  /** @enum {string} */
+                  kind:
+                    | "id"
+                    | "string"
+                    | "number"
+                    | "boolean"
+                    | "date"
+                    | "datetime"
+                    | "money"
+                    | "enum"
+                    | "reference"
+                    | "json";
+                  label: string;
+                  max?: number;
+                  maxLength?: number;
+                  min?: number;
+                  minLength?: number;
+                  name: string;
+                  refDisplayField?: string;
+                  refEntity?: string;
+                  required?: boolean;
+                  /** @enum {string} */
+                  searchMode?: "substring" | "fts";
+                  searchable?: boolean;
+                  sortable?: boolean;
+                  /** @enum {string} */
+                  storage?: "native" | "column";
+                  unique?: boolean;
+                }[];
+                label: string;
+                listViews?: {
+                  defaultSort?: string;
+                  fields: string[];
+                  filters: string[];
+                  label: string;
+                  maxLimit: number;
+                  name: string;
+                  requiredFields?: string[];
+                }[];
+                name?: string;
+                workflow?: {
+                  initialState: string;
+                  stateField: string;
+                  terminalStates: string[];
+                  transitions: {
+                    action: string;
+                    from: string;
+                    guard?: unknown;
+                    label: string;
+                    setFields?: Record<string, never>;
+                    to: string;
+                    validator?: unknown;
+                  }[];
+                };
+              };
+            };
+          };
+        };
+        /** @description No draft exists for this entity */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    /** Save (create or overwrite) the draft for an entity */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            fields?: {
+              computed?: {
+                dependsOn: string[];
+                expression: string;
+              };
+              enumValues?: string[];
+              indexed?: boolean;
+              /** @enum {string} */
+              kind:
+                | "id"
+                | "string"
+                | "number"
+                | "boolean"
+                | "date"
+                | "datetime"
+                | "money"
+                | "enum"
+                | "reference"
+                | "json";
+              label: string;
+              max?: number;
+              maxLength?: number;
+              min?: number;
+              minLength?: number;
+              name: string;
+              refDisplayField?: string;
+              refEntity?: string;
+              required?: boolean;
+              /** @enum {string} */
+              searchMode?: "substring" | "fts";
+              searchable?: boolean;
+              sortable?: boolean;
+              /** @enum {string} */
+              storage?: "native" | "column";
+              unique?: boolean;
+            }[];
+            label: string;
+            listViews?: {
+              defaultSort?: string;
+              fields: string[];
+              filters: string[];
+              label: string;
+              maxLimit: number;
+              name: string;
+              requiredFields?: string[];
+            }[];
+            workflow?: {
+              initialState: string;
+              stateField: string;
+              terminalStates: string[];
+              transitions: {
+                action: string;
+                from: string;
+                guard?: unknown;
+                label: string;
+                setFields?: Record<string, never>;
+                to: string;
+                validator?: unknown;
+              }[];
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Publish the current draft as a new version — validates shape, name-reservation, cross-reference */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                versionNumber?: number;
+              };
+            };
+          };
+        };
+        /** @description No draft exists for this entity */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Entity name reserved by a code-authored entity */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Draft failed shape validation */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/publish/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dry-run `publish` — same checks, no side effect */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                impact?: unknown;
+                valid?: boolean;
+                wouldBeVersion?: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/published": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get the currently published version's definition */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                definition?: {
+                  fields?: {
+                    computed?: {
+                      dependsOn: string[];
+                      expression: string;
+                    };
+                    enumValues?: string[];
+                    indexed?: boolean;
+                    /** @enum {string} */
+                    kind:
+                      | "id"
+                      | "string"
+                      | "number"
+                      | "boolean"
+                      | "date"
+                      | "datetime"
+                      | "money"
+                      | "enum"
+                      | "reference"
+                      | "json";
+                    label: string;
+                    max?: number;
+                    maxLength?: number;
+                    min?: number;
+                    minLength?: number;
+                    name: string;
+                    refDisplayField?: string;
+                    refEntity?: string;
+                    required?: boolean;
+                    /** @enum {string} */
+                    searchMode?: "substring" | "fts";
+                    searchable?: boolean;
+                    sortable?: boolean;
+                    /** @enum {string} */
+                    storage?: "native" | "column";
+                    unique?: boolean;
+                  }[];
+                  label: string;
+                  listViews?: {
+                    defaultSort?: string;
+                    fields: string[];
+                    filters: string[];
+                    label: string;
+                    maxLimit: number;
+                    name: string;
+                    requiredFields?: string[];
+                  }[];
+                  name?: string;
+                  workflow?: {
+                    initialState: string;
+                    stateField: string;
+                    terminalStates: string[];
+                    transitions: {
+                      action: string;
+                      from: string;
+                      guard?: unknown;
+                      label: string;
+                      setFields?: Record<string, never>;
+                      to: string;
+                      validator?: unknown;
+                    }[];
+                  };
+                };
+                /** Format: date-time */
+                publishedAt?: string;
+                restoredFromVersion?: number | null;
+                versionNumber?: number;
+              };
+            };
+          };
+        };
+        /** @description Never published */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/rollback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore a previously published version as the new current version */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            toVersionNumber: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                versionNumber?: number;
+              };
+            };
+          };
+        };
+        /** @description Version not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/entities/{name}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List every published version's metadata (newest first) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          name: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                /** Format: date-time */
+                publishedAt?: string;
+                restoredFromVersion?: number | null;
+                versionNumber?: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export published entity definitions as a portable snapshot */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Comma-separated entity names; omitted exports every published entity */
+          entities?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                entities?: {
+                  definition?: {
+                    fields?: {
+                      computed?: {
+                        dependsOn: string[];
+                        expression: string;
+                      };
+                      enumValues?: string[];
+                      indexed?: boolean;
+                      /** @enum {string} */
+                      kind:
+                        | "id"
+                        | "string"
+                        | "number"
+                        | "boolean"
+                        | "date"
+                        | "datetime"
+                        | "money"
+                        | "enum"
+                        | "reference"
+                        | "json";
+                      label: string;
+                      max?: number;
+                      maxLength?: number;
+                      min?: number;
+                      minLength?: number;
+                      name: string;
+                      refDisplayField?: string;
+                      refEntity?: string;
+                      required?: boolean;
+                      /** @enum {string} */
+                      searchMode?: "substring" | "fts";
+                      searchable?: boolean;
+                      sortable?: boolean;
+                      /** @enum {string} */
+                      storage?: "native" | "column";
+                      unique?: boolean;
+                    }[];
+                    label: string;
+                    listViews?: {
+                      defaultSort?: string;
+                      fields: string[];
+                      filters: string[];
+                      label: string;
+                      maxLimit: number;
+                      name: string;
+                      requiredFields?: string[];
+                    }[];
+                    name?: string;
+                    workflow?: {
+                      initialState: string;
+                      stateField: string;
+                      terminalStates: string[];
+                      transitions: {
+                        action: string;
+                        from: string;
+                        guard?: unknown;
+                        label: string;
+                        setFields?: Record<string, never>;
+                        to: string;
+                        validator?: unknown;
+                      }[];
+                    };
+                  };
+                  name?: string;
+                }[];
+                notFound?: string[];
+              };
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/lowcode/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a snapshot as drafts (never auto-publishes) — best-effort, per-entity outcome */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            entities: {
+              definition: {
+                fields?: {
+                  computed?: {
+                    dependsOn: string[];
+                    expression: string;
+                  };
+                  enumValues?: string[];
+                  indexed?: boolean;
+                  /** @enum {string} */
+                  kind:
+                    | "id"
+                    | "string"
+                    | "number"
+                    | "boolean"
+                    | "date"
+                    | "datetime"
+                    | "money"
+                    | "enum"
+                    | "reference"
+                    | "json";
+                  label: string;
+                  max?: number;
+                  maxLength?: number;
+                  min?: number;
+                  minLength?: number;
+                  name: string;
+                  refDisplayField?: string;
+                  refEntity?: string;
+                  required?: boolean;
+                  /** @enum {string} */
+                  searchMode?: "substring" | "fts";
+                  searchable?: boolean;
+                  sortable?: boolean;
+                  /** @enum {string} */
+                  storage?: "native" | "column";
+                  unique?: boolean;
+                }[];
+                label: string;
+                listViews?: {
+                  defaultSort?: string;
+                  fields: string[];
+                  filters: string[];
+                  label: string;
+                  maxLimit: number;
+                  name: string;
+                  requiredFields?: string[];
+                }[];
+                workflow?: {
+                  initialState: string;
+                  stateField: string;
+                  terminalStates: string[];
+                  transitions: {
+                    action: string;
+                    from: string;
+                    guard?: unknown;
+                    label: string;
+                    setFields?: Record<string, never>;
+                    to: string;
+                    validator?: unknown;
+                  }[];
+                };
+              };
+              name: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                failed?: {
+                  error?: string;
+                  name?: string;
+                }[];
+                imported?: string[];
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/admin/policies": {
     parameters: {
       query?: never;
@@ -769,14 +1694,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/waf.ddos_policies": {
+  "/api/accounting.journal": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** List DDoS Policy */
+    /** List Journal Entry */
     get: {
       parameters: {
         query?: never;
@@ -796,7 +1721,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Create DDoS Policy */
+    /** Create Journal Entry */
     post: {
       parameters: {
         query?: never;
@@ -808,14 +1733,16 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
+              account: string;
+              code: string;
+              creditAmount: number;
+              debitAmount: number;
+              description?: string;
+              /** Format: date */
+              entryDate: string;
+              referenceMovement?: string;
               /** @enum {string} */
-              action: "log" | "challenge" | "block";
-              burstWindow: number;
-              enabled?: boolean;
-              requestRateThreshold: number;
-              /** @enum {string} */
-              sensitivity: "low" | "medium" | "high" | "aggressive";
-              zoneId: string;
+              status?: "draft" | "posted" | "voided";
             };
           };
         };
@@ -836,14 +1763,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/waf.ddos_policies/{id}": {
+  "/api/accounting.journal/{id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get one DDoS Policy */
+    /** Get one Journal Entry */
     get: {
       parameters: {
         query?: never;
@@ -861,14 +1788,16 @@ export interface paths {
           content: {
             "application/json": {
               data?: {
+                account: string;
+                code: string;
+                creditAmount: number;
+                debitAmount: number;
+                description?: string;
+                /** Format: date */
+                entryDate: string;
+                referenceMovement?: string;
                 /** @enum {string} */
-                action: "log" | "challenge" | "block";
-                burstWindow: number;
-                enabled?: boolean;
-                requestRateThreshold: number;
-                /** @enum {string} */
-                sensitivity: "low" | "medium" | "high" | "aggressive";
-                zoneId: string;
+                status?: "draft" | "posted" | "voided";
               };
             };
           };
@@ -884,7 +1813,7 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    /** Delete DDoS Policy */
+    /** Delete Journal Entry */
     delete: {
       parameters: {
         query?: never;
@@ -911,7 +1840,7 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    /** Update DDoS Policy */
+    /** Update Journal Entry */
     patch: {
       parameters: {
         query?: never;
@@ -923,14 +1852,16 @@ export interface paths {
         content: {
           "application/json": {
             data?: {
+              account: string;
+              code: string;
+              creditAmount: number;
+              debitAmount: number;
+              description?: string;
+              /** Format: date */
+              entryDate: string;
+              referenceMovement?: string;
               /** @enum {string} */
-              action: "log" | "challenge" | "block";
-              burstWindow: number;
-              enabled?: boolean;
-              requestRateThreshold: number;
-              /** @enum {string} */
-              sensitivity: "low" | "medium" | "high" | "aggressive";
-              zoneId: string;
+              status?: "draft" | "posted" | "voided";
             };
             version?: number;
           };
@@ -948,401 +1879,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/api/waf.firewall_rules": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Firewall Rule */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create Firewall Rule */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              /** @enum {string} */
-              action: "allow" | "block" | "challenge" | "log";
-              enabled?: boolean;
-              matchCondition: unknown;
-              name: string;
-              priority: number;
-              rateLimitThreshold?: number;
-              rateLimitWindow?: number;
-              /** @enum {string} */
-              ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
-              zoneId: string;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/waf.firewall_rules/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get one Firewall Rule */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** @enum {string} */
-                action: "allow" | "block" | "challenge" | "log";
-                enabled?: boolean;
-                matchCondition: unknown;
-                name: string;
-                priority: number;
-                rateLimitThreshold?: number;
-                rateLimitWindow?: number;
-                /** @enum {string} */
-                ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
-                zoneId: string;
-              };
-            };
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete Firewall Rule */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update Firewall Rule */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              /** @enum {string} */
-              action: "allow" | "block" | "challenge" | "log";
-              enabled?: boolean;
-              matchCondition: unknown;
-              name: string;
-              priority: number;
-              rateLimitThreshold?: number;
-              rateLimitWindow?: number;
-              /** @enum {string} */
-              ruleType: "waf" | "rateLimit" | "ipFirewall" | "geoFirewall";
-              zoneId: string;
-            };
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  "/api/waf.zones": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Zone */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    /** Create Zone */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              configVersion?: number;
-              /** @enum {string} */
-              dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
-              hasConfig?: boolean;
-              hostname: string;
-              /** Format: date-time */
-              lastDnsCheckAt?: string;
-              originAddress: string;
-              /** @enum {string} */
-              protectionMode: "monitor" | "enforce";
-              /** @enum {string} */
-              status?: "pending" | "active" | "paused" | "suspended";
-              /** @enum {string} */
-              verificationMethod?: "dnsTxt" | "httpFile";
-              /** @enum {string} */
-              verificationStatus?: "unverified" | "verified";
-              verificationToken?: string;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/waf.zones/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get one Zone */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                configVersion?: number;
-                /** @enum {string} */
-                dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
-                hasConfig?: boolean;
-                hostname: string;
-                /** Format: date-time */
-                lastDnsCheckAt?: string;
-                originAddress: string;
-                /** @enum {string} */
-                protectionMode: "monitor" | "enforce";
-                /** @enum {string} */
-                status?: "pending" | "active" | "paused" | "suspended";
-                /** @enum {string} */
-                verificationMethod?: "dnsTxt" | "httpFile";
-                /** @enum {string} */
-                verificationStatus?: "unverified" | "verified";
-                verificationToken?: string;
-              };
-            };
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete Zone */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update Zone */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            data?: {
-              configVersion?: number;
-              /** @enum {string} */
-              dnsRoutingStatus?: "notRouted" | "routed" | "unknown";
-              hasConfig?: boolean;
-              hostname: string;
-              /** Format: date-time */
-              lastDnsCheckAt?: string;
-              originAddress: string;
-              /** @enum {string} */
-              protectionMode: "monitor" | "enforce";
-              /** @enum {string} */
-              status?: "pending" | "active" | "paused" | "suspended";
-              /** @enum {string} */
-              verificationMethod?: "dnsTxt" | "httpFile";
-              /** @enum {string} */
-              verificationStatus?: "unverified" | "verified";
-              verificationToken?: string;
-            };
-            version?: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    trace?: never;
-  };
-  "/api/waf.zones/{id}/transitions/{action}": {
+  "/api/accounting.journal/{id}/transitions/{action}": {
     parameters: {
       query?: never;
       header?: never;
@@ -1351,7 +1888,4219 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Transition Zone */
+    /** Transition Journal Entry */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/crm.customers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Customer */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Customer */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              email?: string;
+              name: string;
+              phone?: string;
+              referredBy?: string;
+              /** @enum {string} */
+              status?: "draft" | "active" | "blocked";
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/crm.customers/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Customer */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                code: string;
+                email?: string;
+                name: string;
+                phone?: string;
+                referredBy?: string;
+                /** @enum {string} */
+                status?: "draft" | "active" | "blocked";
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Customer */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Customer */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              email?: string;
+              name: string;
+              phone?: string;
+              referredBy?: string;
+              /** @enum {string} */
+              status?: "draft" | "active" | "blocked";
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/crm.customers/{id}/transitions/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transition Customer */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/hr.departments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Department */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Department */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/hr.departments/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Department */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Department */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Department */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/hr.employees": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Employee */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Employee */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              departmentId?: string;
+              locationId?: string;
+              managerId?: string;
+              name: string;
+              positionId?: string;
+              userId?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/hr.employees/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Employee */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                departmentId?: string;
+                locationId?: string;
+                managerId?: string;
+                name: string;
+                positionId?: string;
+                userId?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Employee */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Employee */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              departmentId?: string;
+              locationId?: string;
+              managerId?: string;
+              name: string;
+              positionId?: string;
+              userId?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/hr.locations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Location */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Location */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              address?: string;
+              name: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/hr.locations/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Location */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                address?: string;
+                name: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Location */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Location */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              address?: string;
+              name: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/hr.positions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Position */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Position */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              title: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/hr.positions/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Position */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                title: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Position */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Position */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              title: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/inventory.movements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Inventory Movement */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Inventory Movement */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              /** @enum {string} */
+              movementType: "in" | "out" | "transfer";
+              notes?: string;
+              quantity: number;
+              referenceOrder?: string;
+              /** @enum {string} */
+              status?:
+                "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
+              warehouse: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/inventory.movements/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Inventory Movement */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                code: string;
+                /** @enum {string} */
+                movementType: "in" | "out" | "transfer";
+                notes?: string;
+                quantity: number;
+                referenceOrder?: string;
+                /** @enum {string} */
+                status?:
+                  "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
+                warehouse: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Inventory Movement */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Inventory Movement */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              /** @enum {string} */
+              movementType: "in" | "out" | "transfer";
+              notes?: string;
+              quantity: number;
+              referenceOrder?: string;
+              /** @enum {string} */
+              status?:
+                "draft" | "pending_approval" | "approved" | "posted" | "reversed" | "rejected";
+              warehouse: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/inventory.movements/{id}/transitions/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transition Inventory Movement */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sales.orders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Sales Order */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Sales Order */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              customer: string;
+              notes?: string;
+              /** Format: date */
+              orderDate: string;
+              /** @enum {string} */
+              status?: "draft" | "confirmed" | "shipped" | "cancelled";
+              totalAmount: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/sales.orders/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Sales Order */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                code: string;
+                customer: string;
+                notes?: string;
+                /** Format: date */
+                orderDate: string;
+                /** @enum {string} */
+                status?: "draft" | "confirmed" | "shipped" | "cancelled";
+                totalAmount: number;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Sales Order */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Sales Order */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              code: string;
+              customer: string;
+              notes?: string;
+              /** Format: date */
+              orderDate: string;
+              /** @enum {string} */
+              status?: "draft" | "confirmed" | "shipped" | "cancelled";
+              totalAmount: number;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/sales.orders/{id}/transitions/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transition Sales Order */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.concurrent_publish_e8ecacd167754957b8785f417bdd54ad": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.concurrent_publish_e8ecacd167754957b8785f417bdd54ad/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.cross_impact_dependent_8aaaf79d2d234d8aa2d841f4d0924652": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              a_ref?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.cross_impact_dependent_8aaaf79d2d234d8aa2d841f4d0924652/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                a_ref?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              a_ref?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.cross_impact_target_598f56aa4fe54a809ebfe0ea5e0598a9": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.cross_impact_target_598f56aa4fe54a809ebfe0ea5e0598a9/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.disable_toggle_f1b481adb74148faae0f8028c3d71192": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.disable_toggle_f1b481adb74148faae0f8028c3d71192/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.export_all_a_4dc009e478eb4b9ead889f4464e6e803": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.export_all_a_4dc009e478eb4b9ead889f4464e6e803/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.export_all_b_5faccab00da4480ebe8801966e586d0c": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.export_all_b_5faccab00da4480ebe8801966e586d0c/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.export_filter_a_b8fe1eba6daa4c00a51e1b0464ee9907": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.export_filter_a_b8fe1eba6daa4c00a51e1b0464ee9907/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.export_filter_b_812d14e8102d48bc93b75142a20f19ca": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.export_filter_b_812d14e8102d48bc93b75142a20f19ca/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.impact_a6b8d11520a843518a44b968dcddebc0": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              category?: string;
+              name?: string;
+              /** @enum {string} */
+              status?: "draft" | "active";
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.impact_a6b8d11520a843518a44b968dcddebc0/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                category?: string;
+                name?: string;
+                /** @enum {string} */
+                status?: "draft" | "active";
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              category?: string;
+              name?: string;
+              /** @enum {string} */
+              status?: "draft" | "active";
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.list_all_a_3f14a5af7be948d7a1c8cd852108d603": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.list_all_a_3f14a5af7be948d7a1c8cd852108d603/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.list_all_b_c6c8ef4b8e6f4f14b2c64fb675bc933e": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.list_all_b_c6c8ef4b8e6f4f14b2c64fb675bc933e/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.list_versions_54b48f3ea19b46adb3aa50fe0855a6b8": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.list_versions_54b48f3ea19b46adb3aa50fe0855a6b8/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.orc_e2e_happy_9bed19e119394c87867357887d9844bb": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Orchestrator E2E */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Orchestrator E2E */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              title: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.orc_e2e_happy_9bed19e119394c87867357887d9844bb/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Orchestrator E2E */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                title: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Orchestrator E2E */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Orchestrator E2E */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              title: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.preview_427a812e87bf4f34984fe397fd4c0848": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.preview_427a812e87bf4f34984fe397fd4c0848/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.rollback_ok_a3880b1d65ae46359a19d1cd405f3f61": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.rollback_ok_a3880b1d65ae46359a19d1cd405f3f61/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.rollback_unknown_d2a988826057443784b28148a44bf6f8": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.rollback_unknown_d2a988826057443784b28148a44bf6f8/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.versioning_aa48caed3e584c0f9769d0a7b60199db": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Renamed */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Renamed */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.versioning_aa48caed3e584c0f9769d0a7b60199db/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Renamed */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                name?: string;
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Renamed */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Renamed */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              name?: string;
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.workflow_guard_818ef82974b74b0babe5e9fd2aebb547": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    /** Create Test Entity */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              email?: string;
+              name?: string;
+              /** @enum {string} */
+              status?: "draft" | "active";
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/test.workflow_guard_818ef82974b74b0babe5e9fd2aebb547/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get one Test Entity */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data?: {
+                email?: string;
+                name?: string;
+                /** @enum {string} */
+                status?: "draft" | "active";
+              };
+            };
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Test Entity */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Test Entity */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            data?: {
+              email?: string;
+              name?: string;
+              /** @enum {string} */
+              status?: "draft" | "active";
+            };
+            version?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/api/test.workflow_guard_818ef82974b74b0babe5e9fd2aebb547/{id}/transitions/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transition Test Entity */
     post: {
       parameters: {
         query?: never;
@@ -2293,6 +7042,178 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/platform/exit-impersonation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Ends an impersonation session started by [`impersonate_tenant`] and restores the caller's own
+     *     platform-admin session. Deliberately **not** `PlatformAdminContext`-gated — by the time this
+     *     is called, the caller's token is scoped to the tenant it impersonated, not
+     *     `PLATFORM_TENANT_ID`, so it could never pass that gate. Plain `AuthContext` instead: the real
+     *     authorization check is "does `lowcode_impersonation_sessions` have an active row for exactly
+     *     this `(tenantId, userId)` pair" — a normal tenant user calling this by mistake simply has no
+     *     matching row and gets `403`, same outcome `PlatformAdminContext` would have produced, just
+     *     checked a different way for a caller that can no longer prove `platform_admin` any other way.
+     */
+    post: operations["exit_impersonation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/impersonation-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Whether the caller's *current* session is an impersonation started via [`impersonate_tenant`]
+     *     — the frontend's only way to know, since `GET /auth/me`'s `roles` shows the *target* tenant's
+     *     own roles (e.g. `["admin"]`) while impersonating, indistinguishable from a real tenant admin
+     *     by role/tenant alone. Plain `AuthContext`, same reasoning as [`exit_impersonation`].
+     */
+    get: operations["impersonation_status"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/reconciler/wave-rollout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * `docs/multi-tenant-platform-design.md` §6.4's canary → wave rollout, over HTTP — the missing
+     *     piece `docs/roadmap.md` Phase 44 left "cố ý chưa làm" (`metap_reconciler::orchestrator::advance_wave`
+     *     was Rust-only, no route). Platform-level, not tenant-scoped — `tenantIds` names arbitrary
+     *     tenants across the fleet, so this is `PlatformAdminContext`-gated like every other route in
+     *     this crate, not a per-tenant `AdminContext` one. Always runs against `state.pool` (the
+     *     platform's shared pool): `advance_wave` UPSERTs every tenant in one query against one
+     *     connection, matching the §6.4 scenario this backs — many `Schema`-strategy tenants sharing
+     *     `reconciler_entity_deployments` in that one database. A `DedicatedDb` tenant's own separate
+     *     copy of that table (see `reconciler-orchestrator`'s crate doc comment) isn't reachable from
+     *     here — put a `DedicatedDb` tenant through `dev-tools enqueue-reconcile` (or a future
+     *     per-tenant equivalent of this route) instead, one at a time.
+     */
+    post: operations["wave_rollout"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/tenants": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["list_tenants"];
+    put?: never;
+    post: operations["provision_tenant"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/tenants/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["get_tenant"];
+    put?: never;
+    post?: never;
+    /**
+     * Deprovisions a tenant (`docs/roadmap.md` Phase 16, 2026-08-21) — a one-way operation, unlike
+     *     suspend (see [`set_tenant_status`]'s doc comment and `TenantStatus::Deleted`'s doc comment
+     *     in `metap-control` for exactly what this does and, just as deliberately, does not do:
+     *     `Router::begin` refuses the tenant permanently with a 404 from here on, but no row in
+     *     `records`/`users`/... is touched and (for `DedicatedDb`) no physical database is dropped).
+     *     `204` on success; `404` if `id` doesn't match any `control.tenants` row, same convention as
+     *     `get_tenant`.
+     */
+    delete: operations["delete_tenant"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/tenants/{id}/impersonate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Starts a support/debug session as tenant `id`, without knowing that tenant's own credentials
+     *     (`docs/features/01-platform-admin-tenant-switcher.md`). `PlatformAdminContext`-gated like
+     *     every other route here — this is the *only* one of the pair still callable that way, since
+     *     once it succeeds the caller's own token is scoped to `id`, not `PLATFORM_TENANT_ID`, and can
+     *     no longer pass `PlatformAdminContext` at all (see [`exit_impersonation`]'s doc comment).
+     * @description Grants a **real** `user_roles` row (`metap_peripherals::assign_role`, routed through
+     *     `state.router.begin(id)` exactly like `../../../metap/crates/metap-http/src/routes/admin.rs`'s
+     *     own `assign_role` handler) rather than a bypass claim on the JWT — `AuthContext`'s live role
+     *     lookup never trusts anything *in* the token itself
+     *     (`../../../metap/crates/metap-http/src/auth.rs`'s doc comment), so a claim-based shortcut
+     *     here would be a real regression of that invariant, not a shortcut. `lowcode_impersonation_sessions`
+     *     records the grant so [`exit_impersonation`] and the reaper (`services/reconciler-orchestrator`)
+     *     can find it again — that table is never consulted by `AuthContext`, purely bookkeeping.
+     */
+    post: operations["impersonate_tenant"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/tenants/{id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Suspend/resume a tenant. Enforcement already exists (`Router::begin` already rejects
+     *     `Suspended` with a 403 — see `PostgresTenantRegistry::set_status`'s doc comment); this only
+     *     writes the column that check reads, subject to `RegistryCache`'s existing 30s TTL.
+     *     Deliberately can't set `"deleted"` through this route — see [`delete_tenant`], a separate
+     *     one-way operation.
+     */
+    patch: operations["set_tenant_status"];
+    trace?: never;
+  };
   "/preferences": {
     parameters: {
       query?: never;
@@ -2519,6 +7440,152 @@ export interface components {
         }[];
       };
     };
+    ExitImpersonationDto: {
+      /** Format: uuid */
+      tenantId: string;
+    };
+    ExitImpersonationResponse: {
+      data: components["schemas"]["ExitImpersonationDto"];
+    };
+    GetTenantResponse: {
+      data: components["schemas"]["TenantRoutingDto"];
+    };
+    ImpersonateDto: {
+      /** Format: int64 */
+      expiresInSeconds: number;
+      /** Format: uuid */
+      tenantId: string;
+    };
+    ImpersonateResponse: {
+      data: components["schemas"]["ImpersonateDto"];
+    };
+    /**
+     * @description The real handler emits one of 2 flat shapes (`{"impersonating": true, "expiresAt": "..."}` or
+     *     `{"impersonating": false}`) — not a serde-tagged enum, since the discriminator is a JSON
+     *     *boolean*, and serde's internally-tagged representation can only tag on a string value. A
+     *     tagged enum here would have documented `impersonating` as the *string* `"true"`/`"false"`,
+     *     not the boolean the handler actually writes.
+     */
+    ImpersonationStatusDto: {
+      /** Format: date-time */
+      expiresAt?: string | null;
+      impersonating: boolean;
+    };
+    ImpersonationStatusResponse: {
+      data: components["schemas"]["ImpersonationStatusDto"];
+    };
+    ListTenantsResponse: {
+      data: components["schemas"]["TenantSummaryDto"][];
+    };
+    ProvisionTenantBody: {
+      adminEmail: string;
+      adminPassword: string;
+      /**
+       * @description Required (and only meaningful) when `strategy == "dedicated_db"` — the connection
+       *     string this function migrates and creates the admin user on. The caller is responsible
+       *     for actually setting `dsnSecretRef=<this value>` in the serving process's environment
+       *     before the tenant is routed to; provisioning only writes the registry row.
+       */
+      dedicatedDatabaseUrl?: string | null;
+      /**
+       * @description Required (and only meaningful) when `strategy == "dedicated_db"` — the env var name
+       *     `Router`'s `EnvStore` will look up to resolve this tenant's DSN.
+       */
+      dsnSecretRef?: string | null;
+      /**
+       * @description `"schema"` (trial) or `"dedicated_db"` (paid) — see
+       *     `metap_control::provision_schema_tenant`/`provision_dedicated_db_tenant`'s doc comments
+       *     for what each actually does. `"schema"` still pins `schema_name` to `"public"` — no
+       *     real per-tenant schema isolation yet (`docs/roadmap.md` Phase 16).
+       */
+      strategy: string;
+      /** Format: uuid */
+      tenantId: string;
+    };
+    ProvisionTenantResponse: {
+      data: components["schemas"]["ProvisionedTenantDto"];
+    };
+    ProvisionedTenantDto: {
+      /** Format: uuid */
+      adminUserId: string;
+      /** Format: uuid */
+      tenantId: string;
+    };
+    SetTenantStatusBody: {
+      /**
+       * @description Deliberately narrower than the full `control.tenants.status` domain
+       *     (`Provisioning`/`Migrating`/`Expired` are set by flows that don't exist yet — this
+       *     endpoint is only for an operator flipping a tenant between active and suspended).
+       */
+      status: string;
+    };
+    SetTenantStatusDto: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+    };
+    SetTenantStatusResponse: {
+      data: components["schemas"]["SetTenantStatusDto"];
+    };
+    TenantRoutingDto: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+      strategy: components["schemas"]["TenantStrategyDto"];
+    };
+    TenantStrategyDto:
+      | {
+          schemaName: string;
+          /** @enum {string} */
+          type: "schema";
+        }
+      | {
+          dsnSecretRef: string;
+          /** @enum {string} */
+          type: "dedicated_db";
+        };
+    TenantSummaryDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      id: string;
+      status: string;
+      strategy: components["schemas"]["TenantStrategyDto"];
+      tier: string;
+      /** Format: date-time */
+      trialExpiresAt?: string | null;
+    };
+    WaveRolloutBody: {
+      entityName: string;
+      /**
+       * Format: int32
+       * @description Halts (does not advance) if the previous wave's blocked rate exceeds this
+       */
+      maxErrorRatePercent: number;
+      /** Format: int64 */
+      packVersion: number;
+      tenantIds: string[];
+      /**
+       * Format: int32
+       * @description 0 = canary, 1 = 5%, 2 = 25%, 3+ = 100%
+       */
+      wave: number;
+    };
+    WaveRolloutDto:
+      | {
+          /** @enum {string} */
+          decision: "advanced";
+          tenantsInWave: number;
+        }
+      | {
+          /** @enum {string} */
+          decision: "halted";
+          /** Format: int32 */
+          errorRatePercent: number;
+        };
+    WaveRolloutResponse: {
+      data: components["schemas"]["WaveRolloutDto"];
+    };
   };
   responses: never;
   parameters: never;
@@ -2527,4 +7594,263 @@ export interface components {
   pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+  exit_impersonation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExitImpersonationResponse"];
+        };
+      };
+      /** @description No active impersonation session for this caller */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  impersonation_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ImpersonationStatusResponse"];
+        };
+      };
+    };
+  };
+  wave_rollout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WaveRolloutBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WaveRolloutResponse"];
+        };
+      };
+    };
+  };
+  list_tenants: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListTenantsResponse"];
+        };
+      };
+    };
+  };
+  provision_tenant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ProvisionTenantBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProvisionTenantResponse"];
+        };
+      };
+      /** @description Validation failed (unknown strategy, or missing dedicated_db fields) */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description A tenant with this id already exists */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  get_tenant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Tenant id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetTenantResponse"];
+        };
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_tenant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Tenant id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  impersonate_tenant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Tenant id to impersonate */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ImpersonateResponse"];
+        };
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  set_tenant_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Tenant id */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetTenantStatusBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetTenantStatusResponse"];
+        };
+      };
+      /** @description Invalid status */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+}
