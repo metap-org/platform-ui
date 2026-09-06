@@ -12,34 +12,12 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List this tenant's config keys with their effective values
-     * @description Any authenticated caller. The tenant comes from the token, never from the request, so there is no way to read another tenant's values. `overridden` distinguishes a value this tenant set from one inherited from the fleet default. An entry with secret=true is a credential and carries set/secretRef instead of value — the credential itself is never returned by any endpoint.
+     * Read is `AuthContext`, not `AdminContext`: every one of these keys shapes what the app looks
+     *     like or how long a session lasts for the user reading it, so an ordinary member seeing the
+     *     effective values is expected. Writing is admin-gated below.
+     * @description Any authenticated caller. The tenant comes from the token, never from the request, so there is no way to read another tenant's values. `overridden` distinguishes a value this tenant set from one inherited from the fleet default.
      */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not authenticated */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["list_tenant_config"];
     put?: never;
     post?: never;
     delete?: never;
@@ -56,100 +34,14 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /**
-     * Set one config key for the caller's own tenant
-     * @description Requires the admin role. Rejects a platform-global or operator-tier key with 403 and an out-of-range value with 422. For a secret key the value is the plaintext credential: it is written to the deployment's secret backend and only a server-derived reference is stored, so it is write-only — no endpoint returns it afterwards. DELETE on a secret key revokes the credential rather than merely unlinking it.
-     */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          key: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            value: unknown;
-          };
-        };
-      };
-      responses: {
-        /** @description Stored */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Key is not writable by a tenant admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description No such config key */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Value rejected by the key's validator */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description The secret backend refused or was unreachable (secret keys only) */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /** @description Requires the admin role. Rejects a platform-global or operator-tier key with 403 and an out-of-range value with 422. For a secret key the value is the plaintext credential: it is written to the deployment's secret backend and only a server-derived reference is stored, so it is write-only — no endpoint returns it afterwards. DELETE on a secret key revokes the credential rather than merely unlinking it. */
+    put: operations["set_tenant_config"];
     post?: never;
-    /** Clear this tenant's override so the key falls back to the fleet default */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          key: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Reset, returns the inherited value now in effect */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Key is not writable by a tenant admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description No such config key */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Clears this tenant's override. The key then reads back the fleet default a platform admin set,
+     *     or the value declared in Rust if there is none — never `null`.
+     */
+    delete: operations["reset_tenant_config"];
     options?: never;
     head?: never;
     patch?: never;
@@ -162,64 +54,9 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List cron jobs for the caller's tenant */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["list_cron_jobs"];
     put?: never;
-    /** Create a cron job */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            cronExpr?: string;
-            /** @enum {string} */
-            dispatchMode?: "outbox" | "direct";
-            enabled?: boolean;
-            maxAttempts?: number;
-            name?: string;
-            retryBackoffSeconds?: number;
-            targetConfig?: unknown;
-            /** @enum {string} */
-            targetType?: "workflow_transition" | "bulk_query_action" | "webhook" | "email";
-            timezone?: string;
-            triggerConfig?: unknown;
-            /** @enum {string} */
-            triggerType?: "schedule" | "on_transition" | "on_record_event";
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["create_cron_job"];
     delete?: never;
     options?: never;
     head?: never;
@@ -233,87 +70,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get one cron job */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_cron_job"];
     put?: never;
     post?: never;
-    /** Delete a cron job */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    delete: operations["delete_cron_job"];
     options?: never;
     head?: never;
-    /** Update a cron job (partial) */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    patch: operations["update_cron_job"];
     trace?: never;
   };
   "/admin/cron-jobs/{id}/runs": {
@@ -323,29 +86,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List recent runs for a cron job */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-        };
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["list_cron_job_runs"];
     put?: never;
     post?: never;
     delete?: never;
@@ -361,41 +102,14 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Cross-entity audit feed for the caller's tenant, newest first */
-    get: {
-      parameters: {
-        query?: {
-          limit?: number;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** @enum {string} */
-                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
-                actorTenantId?: string | null;
-                actorUserId?: string | null;
-                entityName?: string;
-                /** Format: date-time */
-                occurredAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number | null;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    /**
+     * Cross-entity counterpart to `list_audit_events` — "operational visibility" (Phase 11C,
+     *     `docs/roadmap.md`): the last deliverable of Phase C without its own admin API surface yet.
+     *     `?limit=N` (default 50, clamped to 200) — same "every list has a max limit" convention
+     *     `QueryPlanner` follows, applied here since this bypasses `QueryPlanner`/`records` entirely
+     *     (a fixed, non-metadata-driven table).
+     */
+    get: operations["list_recent_audit_events"];
     put?: never;
     post?: never;
     delete?: never;
@@ -411,35 +125,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List every DB-authored entity (draft/published status, enabled flag) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                entities?: {
-                  enabled?: boolean;
-                  name?: string;
-                  published?: boolean;
-                }[];
-              };
-            };
-          };
-        };
-      };
-    };
+    get: operations["list_entities"];
     put?: never;
     post?: never;
     delete?: never;
@@ -461,33 +147,13 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    /** Enable/disable a published entity — takes effect immediately, no restart */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            enabled: boolean;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Toggles an entity's enabled flag and immediately rebuilds + swaps the live registry (same
+     *     as `publish`/`rollback`) so a disable takes effect without a restart — a disabled entity
+     *     disappears from `GET /metadata/entities` and `/api/:entity` starts 404ing on it right
+     *     away, and re-enabling brings it straight back with no republish needed.
+     */
+    patch: operations["set_enabled"];
     trace?: never;
   };
   "/admin/lowcode/entities/{name}/audit": {
@@ -497,41 +163,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Audit log for one entity (draft-saved/published/rolled-back/enabled/disabled) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** @enum {string} */
-                action?: "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled";
-                actorTenantId?: string | null;
-                actorUserId?: string | null;
-                entityName?: string;
-                /** Format: date-time */
-                occurredAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number | null;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    /**
+     * `docs/roadmap.md` Phase 11 Phase C's "audit log cho metadata" — who/when
+     *     draft-saved/published/rolled-back/enabled/disabled this entity, newest first.
+     */
+    get: operations["list_audit_events"];
     put?: never;
     post?: never;
     delete?: never;
@@ -547,186 +183,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get the current draft for an entity */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                fields?: {
-                  computed?: {
-                    dependsOn: string[];
-                    expression: string;
-                  };
-                  enumValues?: string[];
-                  indexed?: boolean;
-                  /** @enum {string} */
-                  kind:
-                    | "id"
-                    | "string"
-                    | "number"
-                    | "boolean"
-                    | "date"
-                    | "datetime"
-                    | "money"
-                    | "enum"
-                    | "reference"
-                    | "json";
-                  label: string;
-                  max?: number;
-                  maxLength?: number;
-                  min?: number;
-                  minLength?: number;
-                  name: string;
-                  refDisplayField?: string;
-                  refEntity?: string;
-                  required?: boolean;
-                  /** @enum {string} */
-                  searchMode?: "substring" | "fts";
-                  searchable?: boolean;
-                  sortable?: boolean;
-                  /** @enum {string} */
-                  storage?: "native" | "column";
-                  unique?: boolean;
-                }[];
-                label: string;
-                listViews?: {
-                  defaultSort?: string;
-                  fields: string[];
-                  filters: string[];
-                  label: string;
-                  maxLimit: number;
-                  name: string;
-                  requiredFields?: string[];
-                }[];
-                name?: string;
-                workflow?: {
-                  initialState: string;
-                  stateField: string;
-                  terminalStates: string[];
-                  transitions: {
-                    action: string;
-                    from: string;
-                    guard?: unknown;
-                    label: string;
-                    setFields?: Record<string, never>;
-                    to: string;
-                    validator?: unknown;
-                  }[];
-                };
-              };
-            };
-          };
-        };
-        /** @description No draft exists for this entity */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    /** Save (create or overwrite) the draft for an entity */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            fields?: {
-              computed?: {
-                dependsOn: string[];
-                expression: string;
-              };
-              enumValues?: string[];
-              indexed?: boolean;
-              /** @enum {string} */
-              kind:
-                | "id"
-                | "string"
-                | "number"
-                | "boolean"
-                | "date"
-                | "datetime"
-                | "money"
-                | "enum"
-                | "reference"
-                | "json";
-              label: string;
-              max?: number;
-              maxLength?: number;
-              min?: number;
-              minLength?: number;
-              name: string;
-              refDisplayField?: string;
-              refEntity?: string;
-              required?: boolean;
-              /** @enum {string} */
-              searchMode?: "substring" | "fts";
-              searchable?: boolean;
-              sortable?: boolean;
-              /** @enum {string} */
-              storage?: "native" | "column";
-              unique?: boolean;
-            }[];
-            label: string;
-            listViews?: {
-              defaultSort?: string;
-              fields: string[];
-              filters: string[];
-              label: string;
-              maxLimit: number;
-              name: string;
-              requiredFields?: string[];
-            }[];
-            workflow?: {
-              initialState: string;
-              stateField: string;
-              terminalStates: string[];
-              transitions: {
-                action: string;
-                from: string;
-                guard?: unknown;
-                label: string;
-                setFields?: Record<string, never>;
-                to: string;
-                validator?: unknown;
-              }[];
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_draft"];
+    put: operations["save_draft"];
     post?: never;
     delete?: never;
     options?: never;
@@ -743,54 +201,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Publish the current draft as a new version — validates shape, name-reservation, cross-reference */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description No draft exists for this entity */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Entity name reserved by a code-authored entity */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Draft failed shape validation */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["publish"];
     delete?: never;
     options?: never;
     head?: never;
@@ -806,35 +217,12 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Dry-run `publish` — same checks, no side effect */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                impact?: unknown;
-                valid?: boolean;
-                wouldBeVersion?: number;
-              };
-            };
-          };
-        };
-      };
-    };
+    /**
+     * `docs/roadmap.md` Phase 11 Phase B's publish preview/validation report — runs the exact
+     *     checks `publish` would (shape, name-reservation, cross-reference) with no side effect, so
+     *     an operator can validate a draft before committing to a new published version.
+     */
+    post: operations["preview_publish"];
     delete?: never;
     options?: never;
     head?: never;
@@ -848,106 +236,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get the currently published version's definition */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                definition?: {
-                  fields?: {
-                    computed?: {
-                      dependsOn: string[];
-                      expression: string;
-                    };
-                    enumValues?: string[];
-                    indexed?: boolean;
-                    /** @enum {string} */
-                    kind:
-                      | "id"
-                      | "string"
-                      | "number"
-                      | "boolean"
-                      | "date"
-                      | "datetime"
-                      | "money"
-                      | "enum"
-                      | "reference"
-                      | "json";
-                    label: string;
-                    max?: number;
-                    maxLength?: number;
-                    min?: number;
-                    minLength?: number;
-                    name: string;
-                    refDisplayField?: string;
-                    refEntity?: string;
-                    required?: boolean;
-                    /** @enum {string} */
-                    searchMode?: "substring" | "fts";
-                    searchable?: boolean;
-                    sortable?: boolean;
-                    /** @enum {string} */
-                    storage?: "native" | "column";
-                    unique?: boolean;
-                  }[];
-                  label: string;
-                  listViews?: {
-                    defaultSort?: string;
-                    fields: string[];
-                    filters: string[];
-                    label: string;
-                    maxLimit: number;
-                    name: string;
-                    requiredFields?: string[];
-                  }[];
-                  name?: string;
-                  workflow?: {
-                    initialState: string;
-                    stateField: string;
-                    terminalStates: string[];
-                    transitions: {
-                      action: string;
-                      from: string;
-                      guard?: unknown;
-                      label: string;
-                      setFields?: Record<string, never>;
-                      to: string;
-                      validator?: unknown;
-                    }[];
-                  };
-                };
-                /** Format: date-time */
-                publishedAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description Never published */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_published"];
     put?: never;
     post?: never;
     delete?: never;
@@ -965,46 +254,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Restore a previously published version as the new current version */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            toVersionNumber: number;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                versionNumber?: number;
-              };
-            };
-          };
-        };
-        /** @description Version not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["rollback"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1018,36 +268,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List every published version's metadata (newest first) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          name: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                /** Format: date-time */
-                publishedAt?: string;
-                restoredFromVersion?: number | null;
-                versionNumber?: number;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    get: operations["list_versions"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1063,100 +284,17 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Export published entity definitions as a portable snapshot */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Comma-separated entity names; omitted exports every published entity */
-          entities?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                entities?: {
-                  definition?: {
-                    fields?: {
-                      computed?: {
-                        dependsOn: string[];
-                        expression: string;
-                      };
-                      enumValues?: string[];
-                      indexed?: boolean;
-                      /** @enum {string} */
-                      kind:
-                        | "id"
-                        | "string"
-                        | "number"
-                        | "boolean"
-                        | "date"
-                        | "datetime"
-                        | "money"
-                        | "enum"
-                        | "reference"
-                        | "json";
-                      label: string;
-                      max?: number;
-                      maxLength?: number;
-                      min?: number;
-                      minLength?: number;
-                      name: string;
-                      refDisplayField?: string;
-                      refEntity?: string;
-                      required?: boolean;
-                      /** @enum {string} */
-                      searchMode?: "substring" | "fts";
-                      searchable?: boolean;
-                      sortable?: boolean;
-                      /** @enum {string} */
-                      storage?: "native" | "column";
-                      unique?: boolean;
-                    }[];
-                    label: string;
-                    listViews?: {
-                      defaultSort?: string;
-                      fields: string[];
-                      filters: string[];
-                      label: string;
-                      maxLimit: number;
-                      name: string;
-                      requiredFields?: string[];
-                    }[];
-                    name?: string;
-                    workflow?: {
-                      initialState: string;
-                      stateField: string;
-                      terminalStates: string[];
-                      transitions: {
-                        action: string;
-                        from: string;
-                        guard?: unknown;
-                        label: string;
-                        setFields?: Record<string, never>;
-                        to: string;
-                        validator?: unknown;
-                      }[];
-                    };
-                  };
-                  name?: string;
-                }[];
-                notFound?: string[];
-              };
-            };
-          };
-        };
-      };
-    };
+    /**
+     * Merge this into `metap_http::build_router`'s `extra_routes` argument to expose the
+     *     low-code admin API on a running server — never merged automatically by `metap-http` itself.
+     *     `docs/roadmap.md` Phase 11 Phase C's "import/export định nghĩa app" — portable snapshot of
+     *     published entity definitions, for moving a low-code app between deployments (definitions
+     *     are global to a deployment, not tenant-scoped — see this file's top doc comment — so this
+     *     is not a cross-tenant copy). `?entities=a,b,c` filters to those names, omitted exports
+     *     everything published; a requested name with no published version is reported under
+     *     `notFound` instead of erroring the whole request.
+     */
+    get: operations["export_entities"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1174,105 +312,16 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Import a snapshot as drafts (never auto-publishes) — best-effort, per-entity outcome */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            entities: {
-              definition: {
-                fields?: {
-                  computed?: {
-                    dependsOn: string[];
-                    expression: string;
-                  };
-                  enumValues?: string[];
-                  indexed?: boolean;
-                  /** @enum {string} */
-                  kind:
-                    | "id"
-                    | "string"
-                    | "number"
-                    | "boolean"
-                    | "date"
-                    | "datetime"
-                    | "money"
-                    | "enum"
-                    | "reference"
-                    | "json";
-                  label: string;
-                  max?: number;
-                  maxLength?: number;
-                  min?: number;
-                  minLength?: number;
-                  name: string;
-                  refDisplayField?: string;
-                  refEntity?: string;
-                  required?: boolean;
-                  /** @enum {string} */
-                  searchMode?: "substring" | "fts";
-                  searchable?: boolean;
-                  sortable?: boolean;
-                  /** @enum {string} */
-                  storage?: "native" | "column";
-                  unique?: boolean;
-                }[];
-                label: string;
-                listViews?: {
-                  defaultSort?: string;
-                  fields: string[];
-                  filters: string[];
-                  label: string;
-                  maxLimit: number;
-                  name: string;
-                  requiredFields?: string[];
-                }[];
-                workflow?: {
-                  initialState: string;
-                  stateField: string;
-                  terminalStates: string[];
-                  transitions: {
-                    action: string;
-                    from: string;
-                    guard?: unknown;
-                    label: string;
-                    setFields?: Record<string, never>;
-                    to: string;
-                    validator?: unknown;
-                  }[];
-                };
-              };
-              name: string;
-            }[];
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                failed?: {
-                  error?: string;
-                  name?: string;
-                }[];
-                imported?: string[];
-              };
-            };
-          };
-        };
-      };
-    };
+    /**
+     * The write side of import/export — writes each entity in the bundle as a *draft*
+     *     (`metap_lowcode::save_draft`, same shape validation an operator authoring through the admin
+     *     UI gets), never auto-publishes. Publishing stays a deliberate, per-entity next step through
+     *     the existing `POST .../publish` (with its full name-reservation/cross-reference/
+     *     migration-impact checks) — import intentionally doesn't bypass any of that. Best-effort like
+     *     `bulk_query_action` cron targets: one bad entity in the batch doesn't fail the rest, the
+     *     response reports each name's outcome individually.
+     */
+    post: operations["import_entities"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1286,61 +335,9 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List policies for the caller's tenant, optionally filtered by entity */
-    get: {
-      parameters: {
-        query?: {
-          entity?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["list_policies"];
     put?: never;
-    /** Create a policy */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            action: string;
-            condition?: unknown;
-            /** @enum {string} */
-            effect?: "allow" | "deny";
-            entity: string;
-            field?: string;
-            roles?: string[];
-            /** @enum {string} */
-            subject?: "context" | "record";
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["create_policy"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1356,34 +353,13 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Explain why a given entity/action/field/record would be allowed or denied for the caller */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            action: string;
-            entity: string;
-            field?: string;
-            record?: Record<string, never>;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * The response body is `{"data": PolicyExplanation}` (`metap-permission`) — left undocumented
+     *     beyond the request shape, same fidelity the old hand-written `openapi_paths::admin_paths` had
+     *     for this route (no response schema either), since `PolicyExplanation`/`PolicyTraceEntry`
+     *     don't derive `ToSchema` and adding it is out of scope for this pass.
+     */
+    post: operations["explain_policy"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1398,35 +374,14 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Replace the entire RBAC permission-matrix state for one entity in a single atomic call */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            entity: string;
-            grants: {
-              action: string;
-              role?: string | null;
-            }[];
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * The RBAC permission matrix's single save call — replaces every basic-shaped policy for
+     *     `body.entity` with exactly `body.grants` in one atomic transaction
+     *     (`PolicyStore::sync_basic_policies`), instead of the matrix firing one `POST`/`DELETE` per
+     *     checkbox click. Never touches an Advanced-tab policy (condition/field/record-subject/deny) —
+     *     see that trait method's doc comment for the exact boundary.
+     */
+    put: operations["sync_matrix_policies"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1443,33 +398,19 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Bulk-create one context-subject, no-condition RBAC policy per action for `roles` on `entity` */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            actions?: string[];
-            entity: string;
-            roles: string[];
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Bulk-creates one context-subject, no-condition (pure RBAC) policy per action for `roles` on
+     *     `entity` — the ergonomic counterpart to `create_policy` now that `PermissionService` denies
+     *     by default when an entity/action has no policy at all (`docs/roadmap.md`'s permission-review
+     *     findings, 2026-08-21): a fresh entity or a fresh tenant used to just work for every role
+     *     until an operator restricted it; now an operator has to grant *something* before any
+     *     non-admin role can touch a new entity at all. One call here instead of up to 5 separate
+     *     `POST /admin/policies` calls. Idempotent per action in spirit but not in fact — calling this
+     *     twice with the same `entity`/`roles` creates duplicate policy rows (each still evaluates the
+     *     same OR-combined result, so it's harmless, just untidy); `DELETE /admin/policies/:id` is how
+     *     an operator cleans that up.
+     */
+    post: operations["seed_default_policies"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1486,27 +427,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Delete a policy */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    delete: operations["delete_policy"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1519,60 +440,20 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List every user + their role assignments in the caller's tenant */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["listAdminUsers"];
     put?: never;
-    /** Provision a new local-login user, optionally assigning roles */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            email: string;
-            password: string;
-            roles?: string[];
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Email already taken */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Provisions a new local-login user (`docs/roadmap.md` Phase 15) — the admin-driven
+     *     counterpart to `dev-tools create-user`'s dev-seeding path; both call
+     *     `metap_peripherals::create_user`, so the two can't diverge on how a password gets hashed.
+     * @description Runs the insert and every role assignment inside one `Router::begin(tenant_id)` transaction
+     *     (`docs/roadmap.md` Phase 16 gap, closed 2026-08-20) rather than one connection per call —
+     *     besides reaching the right physical database for a `DedicatedDb`-strategy tenant, this also
+     *     closes a pre-existing atomicity gap: a role assignment failing partway used to leave a user
+     *     row committed with only some of `body.roles` granted, with no way to tell which; now the
+     *     whole request commits or rolls back together.
+     */
+    post: operations["create_user"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1588,27 +469,16 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Invalidate this user's cached `AUTH_CONTEXT_ENTITY` attributes */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          userId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Explicit invalidation for `AUTH_CONTEXT_ENTITY`'s cache
+     *     (`docs/features/03-organization-identity.md`) — an operator's second option alongside just
+     *     waiting out the TTL (`metap_http::cache::ContextAttributesCache`) after editing a user's
+     *     membership record (e.g. `departmentId`), so an org-scoped policy takes effect on that user's
+     *     very next request instead of up to `AUTH_CONTEXT_CACHE_TTL_SECONDS` later. No-op (still
+     *     `204`) if the cache had nothing for this user — invalidating something that was never cached,
+     *     or already expired, isn't an error.
+     */
+    post: operations["invalidate_context"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1624,33 +494,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Assign a role to a user */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          userId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            role: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["assign_role"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1667,28 +511,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke a role from a user */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          userId: string;
-          role: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    delete: operations["revoke_role"];
     options?: never;
     head?: never;
     patch?: never;
@@ -6138,90 +4961,9 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List attachments on a record */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          entity: string;
-          record_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                contentType?: string | null;
-                /** Format: date-time */
-                createdAt?: string;
-                entityName?: string;
-                filename?: string;
-                id?: string;
-                key?: string;
-                recordId?: string;
-                size?: number;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    get: operations["list_attachments"];
     put?: never;
-    /** Upload an attachment (multipart/form-data, one file field) */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          entity: string;
-          record_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "multipart/form-data": Record<string, never>;
-        };
-      };
-      responses: {
-        /** @description Created */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                contentType?: string | null;
-                /** Format: date-time */
-                createdAt?: string;
-                entityName?: string;
-                filename?: string;
-                id?: string;
-                key?: string;
-                recordId?: string;
-                size?: number;
-              };
-            };
-          };
-        };
-        /** @description Object storage not configured */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["upload_attachment"];
     delete?: never;
     options?: never;
     head?: never;
@@ -6238,36 +4980,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Delete an attachment */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          entity: string;
-          record_id: string;
-          attachment_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description No content */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Object storage not configured */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    delete: operations["delete_attachment"];
     options?: never;
     head?: never;
     patch?: never;
@@ -6280,45 +4993,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Download an attachment's bytes */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          entity: string;
-          record_id: string;
-          attachment_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/octet-stream": unknown;
-          };
-        };
-        /** @description Not found */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Object storage not configured */
-        503: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["download_attachment"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6334,38 +5009,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Transition history for one record */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          entity: string;
-          record_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                action?: string;
-                fromState?: string | null;
-                /** Format: date-time */
-                occurredAt?: string;
-                toState?: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    get: operations["list_workflow_events"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6383,46 +5027,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Local email/password login — mints a JWT */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            email: string;
-            password: string;
-            tenantId?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                token?: string;
-              };
-            };
-          };
-        };
-        /** @description Invalid credentials */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    post: operations["login"];
     delete?: never;
     options?: never;
     head?: never;
@@ -6436,33 +5041,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Identity + roles for the caller's own token */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                roles?: string[];
-                tenantId?: string;
-                userId?: string;
-              };
-            };
-          };
-        };
-      };
-    };
+    get: operations["me"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6478,44 +5057,20 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** OIDC callback — verifies the IdP response, JIT-provisions the user, mints a JWT */
-    get: {
-      parameters: {
-        query: {
-          code: string;
-          state: string;
-        };
-        header?: never;
-        path: {
-          tenant_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Redirect back to the tenant's frontend with `#token=...` */
-        302: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid/expired OIDC flow state */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description OIDC verification failed */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Exchanges the IdP's callback code, JIT-provisions (or reuses) the local `users` row, mints
+     *     the exact same kind of session JWT local login does (`metap_peripherals::mint_jwt` — from
+     *     here on, an OIDC-authenticated session is indistinguishable from a local one to every other
+     *     route), and redirects the browser back to the tenant's configured frontend.
+     * @description The session cookies are set directly on this redirect response (2026-09-03) — superseding the
+     *     previous `#token=...` URL-fragment handoff (`@metap/platform-ui`'s `OidcCallbackPage`, before
+     *     it switched to reacting to auth status instead of reading a fragment). That approach existed
+     *     to keep the token out of server access logs and `Referer` headers, which a fragment achieves
+     *     but a `Set-Cookie` header achieves *more completely*: the token now never touches the URL at
+     *     all, not even transiently in the browser's address bar or history before client script could
+     *     scrub it. See `crate::cookies`'s doc comment for the cookies themselves.
+     */
+    get: operations["oidc_callback"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6531,34 +5086,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Redirects the browser to the tenant's configured IdP */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          tenant_id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Redirect to IdP */
-        302: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description OIDC not configured for this tenant */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Redirects the browser to the tenant's IdP. Stashes the CSRF token this generates (as the
+     *     cache key) alongside the nonce/PKCE verifier the callback needs — `openidconnect` embeds the
+     *     CSRF token as the `state` query param on the URL it returns, so the callback gets it back
+     *     automatically from the IdP redirect.
+     */
+    get: operations["oidc_login"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6574,33 +5108,12 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Which login providers (local/basic/oidc) a tenant has enabled */
-    get: {
-      parameters: {
-        query: {
-          tenantId: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                providers?: string[];
-              };
-            };
-          };
-        };
-      };
-    };
+    /**
+     * Public (no auth) — lets the frontend's login page decide which buttons to show (e.g. "Sign in
+     *     with SSO") for a given tenant without leaking any secret; `metap_auth::enabled_providers`
+     *     returns kinds only, never the `tenant_auth_configs.config` payload itself.
+     */
+    get: operations["list_providers"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6616,60 +5129,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get the caller's own dashboard layout (falls back to the tenant default) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                id?: string;
-                layout?: unknown;
-                ownerUserId?: string | null;
-                /** Format: date-time */
-                updatedAt?: string;
-              };
-            };
-          };
-        };
-      };
-    };
-    /** Save the caller's own dashboard layout */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            layout: unknown;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_my_dashboard"];
+    put: operations["save_my_dashboard"];
     post?: never;
     delete?: never;
     options?: never;
@@ -6684,50 +5145,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get the tenant's default dashboard layout */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
-    /** Save the tenant's default dashboard layout (admin only) */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            layout: unknown;
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_tenant_default_dashboard"];
+    put: operations["save_tenant_default_dashboard"];
     post?: never;
     delete?: never;
     options?: never;
@@ -6742,33 +5161,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Liveness/readiness check */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              checks?: {
-                database?: boolean;
-              };
-              /** @enum {string} */
-              status?: "ok" | "degraded";
-            };
-          };
-        };
-      };
-    };
+    get: operations["health"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6906,34 +5299,11 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List every platform-writable config key with its effective value
+     * `Operator` keys are absent from this listing entirely, not rendered as forbidden — an API that
+     *     cannot write them has no reason to disclose their values either.
      * @description Requires the platform_admin role. Covers both the platformGlobal tier and the fleet default of each tenant tier key (level/tenantOverridable say which). Operator-tier keys are never listed.
      */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Caller is not a platform admin */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["list_config"];
     put?: never;
     post?: never;
     delete?: never;
@@ -6950,93 +5320,14 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /**
-     * Set one platform-global config key, or a tenant key's fleet default
-     * @description Rejects an operator-tier key with 403 and an out-of-range value with 422. The response's appliesImmediately reports whether the change takes effect without a restart (false for the rate-limit keys, which are baked into a middleware layer at router-build time).
-     */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          key: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            value: unknown;
-          };
-        };
-      };
-      responses: {
-        /** @description Stored */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Key is not writable at this tier */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description No such config key */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Value rejected by the key's validator */
-        422: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /** @description Rejects an operator-tier key with 403 and an out-of-range value with 422. The response's appliesImmediately reports whether the change takes effect without a restart (false for the rate-limit keys, which are baked into a middleware layer at router-build time). */
+    put: operations["set_config"];
     post?: never;
-    /** Clear an override so the key falls back to its declared default */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          key: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Reset, returns the default now in effect */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Key is not writable at this tier */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description No such config key */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /**
+     * Clears an override so the key falls back to its declared default — distinct from setting it to
+     *     the default's current value, which would pin it against a future change to that default.
+     */
+    delete: operations["reset_config"];
     options?: never;
     head?: never;
     patch?: never;
@@ -7221,57 +5512,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get the caller's own preferences */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                locale?: string;
-              };
-            };
-          };
-        };
-      };
-    };
-    /** Update the caller's own preferences */
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          "application/json": {
-            /** @enum {string} */
-            locale: "en" | "vi";
-          };
-        };
-      };
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    get: operations["get_preferences"];
+    put: operations["update_preferences"];
     post?: never;
     delete?: never;
     options?: never;
@@ -7286,28 +5528,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /**
-     * Branding for the tenant serving this hostname, before any login
-     * @description Unauthenticated. Returns only keys declared public in the config registry (theme colour, logo, display name) — never any other key, at any tier. The tenant is resolved from the Host header; an unrecognised hostname returns the fleet-wide values rather than a 404, so this endpoint cannot be used to discover which hostnames belong to a tenant.
-     */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-      };
-    };
+    /** @description Unauthenticated. Returns only keys declared public in the config registry (theme colour, logo, display name) — never any other key, at any tier. The tenant is resolved from the Host header; an unrecognised hostname returns the fleet-wide values rather than a 404, so this endpoint cannot be used to discover which hostnames belong to a tenant. */
+    get: operations["public_config"];
     put?: never;
     post?: never;
     delete?: never;
@@ -7323,32 +5545,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List every user in the caller's tenant (id + email only) */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description OK */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              data?: {
-                email?: string;
-                id?: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
+    get: operations["listTenantUsers"];
     put?: never;
     post?: never;
     delete?: never;
@@ -7361,6 +5558,247 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AssignRoleBody: {
+      role: string;
+    };
+    AssignRoleResponse: {
+      data: components["schemas"]["AssignedRoleDto"];
+    };
+    AssignedRoleDto: {
+      role: string;
+      /** Format: uuid */
+      userId: string;
+    };
+    AttachmentDto: {
+      contentType?: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      entityName: string;
+      filename: string;
+      /** Format: uuid */
+      id: string;
+      key: string;
+      /** Format: uuid */
+      recordId: string;
+      /** Format: int64 */
+      size: number;
+    };
+    /**
+     * @description `Serialize`/`ToSchema` exist only so `metap-lowcode-http`'s OpenAPI docs can reference this
+     *     real type for its 2 audit-feed response shapes — the actual HTTP responses still build their
+     *     JSON by hand (`audit_event_to_json`, `metap-lowcode-http/src/routes/audit.rs`), field names
+     *     happen to already match this struct's own camelCase renaming exactly, so this is a doc-only
+     *     convenience, not a behavior change.
+     */
+    AuditEvent: {
+      action: string;
+      actorTenantId: string;
+      actorUserId?: string | null;
+      entityName: string;
+      /** Format: date-time */
+      occurredAt: string;
+      /** Format: int32 */
+      restoredFromVersion?: number | null;
+      /** Format: int32 */
+      versionNumber?: number | null;
+    };
+    AuditEventsResponse: {
+      data: components["schemas"]["AuditEvent"][];
+    };
+    /**
+     * @description See `EntityField.computed`'s doc comment. `expression` is a minimal string template, not a
+     *     general expression language — `"{firstName} {lastName}"` — each `{fieldName}` token is
+     *     replaced with that field's value from the record being written (empty string if absent/null),
+     *     evaluated by `metap_crud`'s `recompute_fields` after payload validation, before the write
+     *     lands. `depends_on` is redundant with the tokens `expression` actually references (kept
+     *     separate, not parsed out of `expression`, so `compiler::validate` can check it without writing
+     *     a template parser in the metadata crate) — `compiler::validate` requires every token in
+     *     `expression` to also be listed here.
+     */
+    ComputedSpec: {
+      dependsOn: string[];
+      expression: string;
+    };
+    ConfigItemDto: {
+      key: string;
+      level: string;
+      tenantOverridable: boolean;
+      value: unknown;
+    };
+    CreateCronJobBody: {
+      cronExpr?: string | null;
+      dispatchMode?: string;
+      enabled?: boolean;
+      /** Format: int32 */
+      maxAttempts?: number;
+      name: string;
+      /** Format: int32 */
+      retryBackoffSeconds?: number;
+      targetConfig: unknown;
+      targetType: string;
+      timezone?: string;
+      triggerConfig?: unknown;
+      triggerType?: string;
+    };
+    CreatePolicyBody: {
+      action: string;
+      condition?: unknown;
+      /**
+       * @description `"allow"` (default) or `"deny"` — see `PolicyEffect`'s doc comment (`metap-permission`)
+       *     for what `"deny"` actually does (overrides any matching `allow`, regardless of order).
+       */
+      effect?: string | null;
+      entity: string;
+      field?: string | null;
+      roles?: string[] | null;
+      subject?: string | null;
+    };
+    CreatePolicyResponse: {
+      data: components["schemas"]["PolicyDto"];
+    };
+    CreateUserBody: {
+      email: string;
+      password: string;
+      roles?: string[];
+    };
+    CreateUserResponse: {
+      data: components["schemas"]["CreatedUserDto"];
+    };
+    CreatedUserDto: {
+      email: string;
+      roles: string[];
+      /** Format: uuid */
+      userId: string;
+    };
+    CronJob: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      createdBy?: string | null;
+      cronExpr?: string | null;
+      dispatchMode: string;
+      enabled: boolean;
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      lastRunAt?: string | null;
+      /** Format: int32 */
+      maxAttempts: number;
+      name: string;
+      /** Format: date-time */
+      nextRunAt?: string | null;
+      /** Format: int32 */
+      retryBackoffSeconds: number;
+      targetConfig: unknown;
+      targetType: string;
+      /** Format: uuid */
+      tenantId: string;
+      timezone: string;
+      triggerConfig?: unknown;
+      triggerType: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    CronJobResponse: {
+      data: components["schemas"]["CronJob"];
+    };
+    CronJobRun: {
+      /** Format: int32 */
+      attempt: number;
+      /** Format: date-time */
+      createdAt: string;
+      error?: string | null;
+      /** Format: date-time */
+      finishedAt?: string | null;
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      jobId: string;
+      responseSummary?: unknown;
+      /** Format: date-time */
+      scheduledFor: string;
+      /** Format: date-time */
+      startedAt?: string | null;
+      status: string;
+      /** Format: uuid */
+      tenantId: string;
+    };
+    DashboardConfigDto: {
+      /** Format: uuid */
+      id: string;
+      layout: unknown;
+      /** Format: uuid */
+      ownerUserId?: string | null;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    DraftBody: {
+      fields?: components["schemas"]["EntityField"][];
+      label: string;
+      listViews?: components["schemas"]["EntityListView"][];
+      workflow?: null | components["schemas"]["EntityWorkflow"];
+    };
+    EntityField: {
+      computed?: null | components["schemas"]["ComputedSpec"];
+      enumValues?: string[] | null;
+      indexed?: boolean | null;
+      kind: components["schemas"]["FieldKind"];
+      label: string;
+      /** Format: double */
+      max?: number | null;
+      /** Format: int32 */
+      maxLength?: number | null;
+      /**
+       * Format: double
+       * @description Inclusive lower/upper bound, checked by `metap-crud::validate_payload` — only meaningful
+       *     on `Number`/`Money` fields (`compiler::validate` rejects it set on any other kind). `None`
+       *     means unbounded on that side.
+       */
+      min?: number | null;
+      /**
+       * Format: int32
+       * @description Inclusive bound on a `String` value's character count, checked by
+       *     `metap-crud::validate_payload` — only meaningful on `String` fields (`compiler::validate`
+       *     rejects it set on any other kind). `None` means unbounded on that side.
+       */
+      minLength?: number | null;
+      name: string;
+      refDisplayField?: string | null;
+      refEntity?: string | null;
+      required?: boolean | null;
+      /** @description "substring" (default) or "fts" — only meaningful when `searchable: true`. */
+      searchMode?: string | null;
+      searchable?: boolean | null;
+      sortable?: boolean | null;
+      storage?: null | components["schemas"]["FieldStorage"];
+      unique?: boolean | null;
+    };
+    EntityListView: {
+      defaultSort?: string | null;
+      fields: string[];
+      filters: string[];
+      label: string;
+      /** Format: int32 */
+      maxLimit: number;
+      name: string;
+      /**
+       * @description Subset of `fields` a caller may not hide from this list view's column-visibility toggle
+       *     (`@metap/platform-ui`'s `GeneratedList`, `docs/features/32-generated-list-column-visibility.md`)
+       *     — same "unchecked, must be a subset of `fields`" contract `filters` already has above, not
+       *     itself validated against `fields`. Empty (the default, including for every old low-code
+       *     definition predating this field — `#[serde(default)]`) means every column is hideable,
+       *     the exact pre-existing behavior. Deliberately independent of `EntityField.required`
+       *     (validation — "must have a value") rather than reusing it: a field can be required to fill
+       *     in but not important enough to always show in *this* view, and a nullable field (e.g.
+       *     `status`) is often exactly the one a caller wants pinned visible.
+       */
+      requiredFields?: string[];
+    };
+    EntityStatusDto: {
+      enabled: boolean;
+      name: string;
+      published: boolean;
+    };
     EntitySummary: {
       fieldDisplayHints?: {
         enumTones?: {
@@ -7440,6 +5878,12 @@ export interface components {
         }[];
       };
     };
+    EntityWorkflow: {
+      initialState: string;
+      stateField: string;
+      terminalStates: string[];
+      transitions: components["schemas"]["WorkflowTransition"][];
+    };
     ExitImpersonationDto: {
       /** Format: uuid */
       tenantId: string;
@@ -7447,8 +5891,80 @@ export interface components {
     ExitImpersonationResponse: {
       data: components["schemas"]["ExitImpersonationDto"];
     };
+    ExplainBody: {
+      action: string;
+      entity: string;
+      field?: string | null;
+      record?: unknown;
+    };
+    ExportEntitiesDto: {
+      entities: components["schemas"]["ExportedEntityDto"][];
+      notFound: string[];
+    };
+    ExportEntitiesResponse: {
+      data: components["schemas"]["ExportEntitiesDto"];
+    };
+    ExportedEntityDto: {
+      definition: components["schemas"]["LowCodeEntityDefinition"];
+      name: string;
+    };
+    /** @enum {string} */
+    FieldKind:
+      | "id"
+      | "string"
+      | "number"
+      | "boolean"
+      | "date"
+      | "datetime"
+      | "money"
+      | "enum"
+      | "reference"
+      | "json";
+    /**
+     * @description Explicit override of the storage tier `resolve_field_storage_tier` would otherwise derive
+     *     from `indexed`/`sortable`/`unique`/`searchable` (`docs/multi-tenant-platform-design.md` §3.2,
+     *     `docs/features/04-table-per-entity.md` step 1). Metadata only today — the shared `records`
+     *     JSONB table (`crates/metap-crud`) does not yet consult this; it exists so a future
+     *     per-entity reconciler has "where should this field live" as input without re-deriving the
+     *     rule. `None` (the common case) means "derive from flags".
+     * @enum {string}
+     */
+    FieldStorage: "native" | "column";
+    GetDashboardResponse: {
+      data?: null | components["schemas"]["DashboardConfigDto"];
+    };
+    GetDraftResponse: {
+      data: components["schemas"]["LowCodeEntityDefinition"];
+    };
+    GetPreferencesResponse: {
+      data: components["schemas"]["PreferencesDto"];
+    };
+    GetPublishedResponse: {
+      data: components["schemas"]["PublishedVersion"];
+    };
     GetTenantResponse: {
       data: components["schemas"]["TenantRoutingDto"];
+    };
+    HealthChecks: {
+      database: boolean;
+    };
+    HealthResponse: {
+      checks: components["schemas"]["HealthChecks"];
+      /** @example ok */
+      status: string;
+    };
+    /** @enum {string} */
+    ImpactKind:
+      | "fieldRemoved"
+      | "fieldKindChanged"
+      | "fieldMadeRequired"
+      | "fieldMadeUnique"
+      | "enumValueRemoved"
+      | "referencedByOtherEntity";
+    ImpactWarning: {
+      field: string;
+      kind: components["schemas"]["ImpactKind"];
+      message: string;
     };
     ImpersonateDto: {
       /** Format: int64 */
@@ -7474,8 +5990,149 @@ export interface components {
     ImpersonationStatusResponse: {
       data: components["schemas"]["ImpersonationStatusDto"];
     };
+    ImportBody: {
+      entities: components["schemas"]["ImportEntity"][];
+    };
+    ImportEntitiesDto: {
+      failed: components["schemas"]["ImportFailureDto"][];
+      imported: string[];
+    };
+    ImportEntitiesResponse: {
+      data: components["schemas"]["ImportEntitiesDto"];
+    };
+    ImportEntity: {
+      definition: components["schemas"]["LowCodeEntityDefinition"];
+      name: string;
+    };
+    ImportFailureDto: {
+      error: string;
+      name: string;
+    };
+    ListAdminUsersResponse: {
+      data: components["schemas"]["UserRolesDto"][];
+    };
+    ListAttachmentsResponse: {
+      data: components["schemas"]["AttachmentDto"][];
+    };
+    ListConfigResponse: {
+      data: components["schemas"]["ConfigItemDto"][];
+    };
+    ListCronJobRunsResponse: {
+      data: components["schemas"]["CronJobRun"][];
+    };
+    ListCronJobsResponse: {
+      data: components["schemas"]["CronJob"][];
+    };
+    ListEntitiesData: {
+      entities: components["schemas"]["EntityStatusDto"][];
+    };
+    ListEntitiesResponse: {
+      data: components["schemas"]["ListEntitiesData"];
+    };
+    ListPoliciesResponse: {
+      data: components["schemas"]["PolicyDto"][];
+    };
+    ListTenantConfigResponse: {
+      data: components["schemas"]["TenantConfigItemDto"][];
+    };
     ListTenantsResponse: {
       data: components["schemas"]["TenantSummaryDto"][];
+    };
+    ListUsersResponse: {
+      data: components["schemas"]["UserSummaryDto"][];
+    };
+    ListVersionsResponse: {
+      data: components["schemas"]["VersionSummary"][];
+    };
+    LoginBody: {
+      email: string;
+      password: string;
+      /**
+       * Format: uuid
+       * @description Optional (`docs/roadmap.md` Phase 16 gap, closed 2026-08-20) — when the caller knows
+       *     which tenant it's logging into, this routes credential verification through
+       *     `Router::begin(tenantId)`, required for a `DedicatedDb`-strategy tenant whose `users`
+       *     table lives only in that tenant's own database, never in the shared control-plane pool
+       *     the omitted-field path below still checks by email alone. Omitting it keeps today's
+       *     behavior unchanged (global-by-email lookup against the shared pool) — the right default
+       *     for `Schema`-strategy tenants, which currently all share one physical `public` schema
+       *     anyway (`docs/roadmap.md` Phase 16: "schema/trial vẫn ghim public, chưa có isolation
+       *     thật"), so email is already the only practical lookup key for them.
+       */
+      tenantId?: string | null;
+    };
+    LoginDto: {
+      token: string;
+    };
+    LoginResponse: {
+      data: components["schemas"]["LoginDto"];
+    };
+    LowCodeEntityDefinition: {
+      fields: components["schemas"]["EntityField"][];
+      label: string;
+      listViews?: components["schemas"]["EntityListView"][];
+      name: string;
+      workflow?: null | components["schemas"]["EntityWorkflow"];
+    };
+    MatrixGrant: {
+      action: string;
+      /** @description `None` = the matrix's pinned "Everyone" row (an open, `roles IS NULL` policy). */
+      role?: string | null;
+    };
+    /**
+     * @description Identity + roles for the caller's own token — the frontend's only way to know "am I an
+     *     admin" for UI gating, since roles are deliberately never encoded on the JWT itself (see
+     *     `crate::auth`'s doc comment): they're looked up fresh here the same way every other
+     *     `AuthContext` route does.
+     *
+     *     `email` is looked up here too (2026-09-03) rather than left for the caller to resolve. The JWT
+     *     carries only `sub`, so a frontend wanting to show "who am I" previously had to fetch the whole
+     *     tenant user list and search it — see `metap_peripherals::find_user_by_id`'s doc comment. It is
+     *     deliberately **additive and best-effort**: any failure resolving it (router unavailable, no
+     *     matching row, a token whose `sub` isn't a real user) yields `null` and the identity/roles
+     *     payload is returned unchanged, because those are what every caller actually gates on.
+     */
+    MeDto: {
+      email?: string | null;
+      roles: string[];
+      tenantId: string;
+      userId?: string | null;
+    };
+    MeResponse: {
+      data: components["schemas"]["MeDto"];
+    };
+    PolicyDto: {
+      action: string;
+      condition?: unknown;
+      /** Format: uuid */
+      createdBy?: string | null;
+      effect: string;
+      entity: string;
+      field?: string | null;
+      /** Format: uuid */
+      id: string;
+      roles?: string[] | null;
+      subject: string;
+      /** Format: uuid */
+      tenantId: string;
+    };
+    PreferencesDto: {
+      locale: string;
+    };
+    PreviewPublishDto: {
+      impact: components["schemas"]["ImpactWarning"][];
+      valid: boolean;
+      /** Format: int32 */
+      wouldBeVersion: number;
+    };
+    PreviewPublishResponse: {
+      data: components["schemas"]["PreviewPublishDto"];
+    };
+    ProvidersDto: {
+      providers: string[];
+    };
+    ProvidersResponse: {
+      data: components["schemas"]["ProvidersDto"];
     };
     ProvisionTenantBody: {
       adminEmail: string;
@@ -7511,6 +6168,81 @@ export interface components {
       /** Format: uuid */
       tenantId: string;
     };
+    PublicConfigItemDto: {
+      key: string;
+      value: unknown;
+    };
+    PublicConfigResponse: {
+      data: components["schemas"]["PublicConfigItemDto"][];
+    };
+    /**
+     * @description `Serialize`/`ToSchema` exist only for `metap-lowcode-http`'s OpenAPI docs to reference —
+     *     `routes/publish.rs`'s `get_published` still builds its response JSON by hand, field names
+     *     happen to already match this struct's own camelCase renaming exactly.
+     */
+    PublishedVersion: {
+      definition: components["schemas"]["LowCodeEntityDefinition"];
+      /** Format: date-time */
+      publishedAt: string;
+      /** Format: int32 */
+      restoredFromVersion?: number | null;
+      /** Format: int32 */
+      versionNumber: number;
+    };
+    RollbackBody: {
+      /** Format: int32 */
+      toVersionNumber: number;
+    };
+    SaveDashboardResponse: {
+      data: components["schemas"]["DashboardConfigDto"];
+    };
+    SaveDraftResponse: {
+      data: components["schemas"]["LowCodeEntityDefinition"];
+    };
+    SaveLayoutBody: {
+      layout: unknown;
+    };
+    SeedDefaultPoliciesBody: {
+      /**
+       * @description Defaults to all 5 known actions when omitted/empty — the common "grant this role
+       *     everything on this entity" case right after onboarding it.
+       */
+      actions?: string[];
+      entity: string;
+      roles: string[];
+    };
+    SeedDefaultPoliciesResponse: {
+      data: components["schemas"]["PolicyDto"][];
+    };
+    SetConfigBody: {
+      value: unknown;
+    };
+    SetConfigDto: {
+      appliesImmediately: boolean;
+      key: string;
+      value: unknown;
+    };
+    SetConfigResponse: {
+      data: components["schemas"]["SetConfigDto"];
+    };
+    SetEnabledBody: {
+      enabled: boolean;
+    };
+    SetEnabledDto: {
+      enabled: boolean;
+      name: string;
+    };
+    SetEnabledResponse: {
+      data: components["schemas"]["SetEnabledDto"];
+    };
+    SetTenantConfigDto: {
+      key: string;
+      overridden: boolean;
+      value: unknown;
+    };
+    SetTenantConfigResponse: {
+      data: components["schemas"]["SetTenantConfigDto"];
+    };
     SetTenantStatusBody: {
       /**
        * @description Deliberately narrower than the full `control.tenants.status` domain
@@ -7526,6 +6258,24 @@ export interface components {
     };
     SetTenantStatusResponse: {
       data: components["schemas"]["SetTenantStatusDto"];
+    };
+    SyncMatrixBody: {
+      entity: string;
+      /**
+       * @description The complete desired set of `(role, action)` grants for this entity — anything not
+       *     listed here is removed. See `PermissionService::sync_basic_policies`'s doc comment.
+       */
+      grants: components["schemas"]["MatrixGrant"][];
+    };
+    SyncMatrixResponse: {
+      data: components["schemas"]["PolicyDto"][];
+    };
+    TenantConfigItemDto: {
+      key: string;
+      level: string;
+      overridden: boolean;
+      public: boolean;
+      value: unknown;
     };
     TenantRoutingDto: {
       /** Format: uuid */
@@ -7554,6 +6304,61 @@ export interface components {
       tier: string;
       /** Format: date-time */
       trialExpiresAt?: string | null;
+    };
+    UpdateCronJobBody: {
+      cronExpr?: string | null;
+      dispatchMode?: string | null;
+      enabled?: boolean | null;
+      /** Format: int32 */
+      maxAttempts?: number | null;
+      name?: string | null;
+      /** Format: int32 */
+      retryBackoffSeconds?: number | null;
+      targetConfig?: unknown;
+      targetType?: string | null;
+      timezone?: string | null;
+      triggerConfig?: unknown;
+      triggerType?: string | null;
+    };
+    UpdatePreferencesBody: {
+      locale: string;
+    };
+    /**
+     * @description Never actually constructed — the real extractor is `axum::extract::Multipart`, which has no
+     *     `ToSchema` of its own; this only documents the multipart shape (single `file` field).
+     */
+    UploadAttachmentForm: {
+      /** Format: binary */
+      file: string;
+    };
+    UploadAttachmentResponse: {
+      data: components["schemas"]["AttachmentDto"];
+    };
+    UserRolesDto: {
+      roles: string[];
+      /** Format: uuid */
+      userId: string;
+    };
+    UserSummaryDto: {
+      email: string;
+      /** Format: uuid */
+      id: string;
+    };
+    VersionNumberDto: {
+      /** Format: int32 */
+      versionNumber: number;
+    };
+    VersionNumberResponse: {
+      data: components["schemas"]["VersionNumberDto"];
+    };
+    /** @description Same doc-only reasoning as `PublishedVersion` above — `routes/publish.rs`'s `list_versions`. */
+    VersionSummary: {
+      /** Format: date-time */
+      publishedAt: string;
+      /** Format: int32 */
+      restoredFromVersion?: number | null;
+      /** Format: int32 */
+      versionNumber: number;
     };
     WaveRolloutBody: {
       entityName: string;
@@ -7586,6 +6391,87 @@ export interface components {
     WaveRolloutResponse: {
       data: components["schemas"]["WaveRolloutDto"];
     };
+    /**
+     * @description One row of `workflow_events` — the read side of `record_event`'s append-only audit log.
+     *     Generic across every entity/app (a plain data row, no business meaning attached), same shape
+     *     as `metap_attachments::AttachmentRecord`.
+     */
+    WorkflowEvent: {
+      action: string;
+      /** Format: uuid */
+      actor?: string | null;
+      /** Format: date-time */
+      created_at: string;
+      entity: string;
+      from_state: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      record_id: string;
+      to_state: string;
+    };
+    WorkflowEventsResponse: {
+      data: components["schemas"]["WorkflowEvent"][];
+    };
+    /**
+     * @description `guard` is a `PolicyCondition` (`metap-permission`, the same declarative type policies
+     *     use) rather than a server-side predicate function — this is why this crate depends on
+     *     `metap-permission`. It crosses the wire like any other field (`GET /metadata/entities` is
+     *     authenticated, not admin-gated, so any tenant user can already see it — same exposure
+     *     level as the `capabilities.transitions` guard *results* `CrudService::get` already
+     *     computes from it). Unlike the old TS-era shape (`entity-wire-schema.ts`, where `guard` was
+     *     a server-side predicate *function* and genuinely couldn't be serialized), the Rust port's
+     *     guard was always data — it stayed `#[serde(skip)]` here only to mirror that old exclusion,
+     *     not because anything about `PolicyCondition` prevents it. Un-skipped 2026-08-17 (Phase 11
+     *     Phase B, `docs/roadmap.md`) so DB-authored (low-code) entities can carry a workflow with
+     *     guards at all — `metap-lowcode`'s `LowCodeEntityDefinition` round-trips this same struct
+     *     through Postgres `jsonb`, and `#[serde(skip)]` would have silently dropped every guard on
+     *     every save. `metap_workflow::run_guard` was already entity-agnostic before this change
+     *     (it evaluates a `PolicyCondition` against record data + context, no code-authored
+     *     assumption anywhere) — this was purely a serialization gap, not a runtime one.
+     */
+    WorkflowTransition: {
+      action: string;
+      from: string;
+      /**
+       * @description `value_type = serde_json::Value` rather than deriving `ToSchema` on
+       *     `metap_permission::PolicyCondition` itself — same reasoning
+       *     `metap-metadata/src/openapi.rs`'s hand-written schema already documented for this exact
+       *     field: `PolicyCondition`/`PolicyValue` are `metap-permission`'s wire format, not this
+       *     crate's to re-derive. `serde_json::Value`'s own `ToSchema` impl (utoipa's built-in one)
+       *     produces an "any value" schema, matching that hand-written `{}` shape.
+       */
+      guard?: unknown;
+      label: string;
+      /**
+       * @description A declarative, entity-agnostic post-function: field values to set automatically when
+       *     this transition fires, applied *after* `validator` passes (so these system-computed
+       *     values are never themselves subject to a validator meant for user-submitted input) and
+       *     *before* the record is written. Each value is a `PolicyValue` — a literal, or
+       *     `fromContext` (e.g. `{"assignee": {"fromContext": "userId"}}` to auto-assign to whoever
+       *     performed the transition) — reusing the exact type `guard`/`validator` already resolve
+       *     values with, not arbitrary code: a transition that needs to run real business logic
+       *     (call another service, compute something from other records) still goes through the
+       *     existing outbox → `EventBus`/`metap-cron` path, matching every other entity-specific
+       *     side-effect in this codebase (`CLAUDE.md`'s "no `metap-*` library crate gets
+       *     business-entity knowledge" boundary rules out anything more dynamic than this living
+       *     here).
+       */
+      setFields?: unknown;
+      to: string;
+      /**
+       * @description A second, distinct check from `guard` — matches the real "condition vs. validator" split
+       *     a workflow engine like Jira's makes: `guard` decides whether this transition is even
+       *     offered/attemptable, evaluated against the record's *current* data before any payload is
+       *     merged in; `validator` decides whether *this specific attempt* is acceptable, evaluated
+       *     against the record's data *after* `CrudService::transition`'s payload is merged in (e.g.
+       *     `{"attribute": "resolution", "op": "neq", "value": {"literal": null}}` to require a
+       *     `resolution` field be submitted with the transition). Same `PolicyCondition` type as
+       *     `guard` — no new evaluator needed, `metap_workflow::run_validator` just points it at
+       *     different data.
+       */
+      validator?: unknown;
+    };
   };
   responses: never;
   parameters: never;
@@ -7595,6 +6481,1391 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_tenant_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListTenantConfigResponse"];
+        };
+      };
+      /** @description Not authenticated */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  set_tenant_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetConfigBody"];
+      };
+    };
+    responses: {
+      /** @description Stored */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetTenantConfigResponse"];
+        };
+      };
+      /** @description Key is not writable by a tenant admin */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No such config key */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Value rejected by the key's validator */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The secret backend refused or was unreachable (secret keys only) */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  reset_tenant_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Reset, returns the inherited value now in effect */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetTenantConfigResponse"];
+        };
+      };
+      /** @description Key is not writable by a tenant admin */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No such config key */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_cron_jobs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListCronJobsResponse"];
+        };
+      };
+    };
+  };
+  create_cron_job: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateCronJobBody"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CronJobResponse"];
+        };
+      };
+    };
+  };
+  get_cron_job: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CronJobResponse"];
+        };
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_cron_job: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  update_cron_job: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateCronJobBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CronJobResponse"];
+        };
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_cron_job_runs: {
+    parameters: {
+      query?: {
+        /** @description Max 200, default 50 */
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListCronJobRunsResponse"];
+        };
+      };
+    };
+  };
+  list_recent_audit_events: {
+    parameters: {
+      query?: {
+        /** @description Max 200, default 50 */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuditEventsResponse"];
+        };
+      };
+    };
+  };
+  list_entities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListEntitiesResponse"];
+        };
+      };
+    };
+  };
+  set_enabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetEnabledBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetEnabledResponse"];
+        };
+      };
+    };
+  };
+  list_audit_events: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuditEventsResponse"];
+        };
+      };
+    };
+  };
+  get_draft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetDraftResponse"];
+        };
+      };
+      /** @description No draft exists for this entity */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  save_draft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DraftBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SaveDraftResponse"];
+        };
+      };
+    };
+  };
+  publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["VersionNumberResponse"];
+        };
+      };
+      /** @description No draft exists for this entity */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Entity name reserved by a code-authored entity */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Draft failed shape validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  preview_publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PreviewPublishResponse"];
+        };
+      };
+    };
+  };
+  get_published: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetPublishedResponse"];
+        };
+      };
+      /** @description Never published */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  rollback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RollbackBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["VersionNumberResponse"];
+        };
+      };
+      /** @description Version not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_versions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListVersionsResponse"];
+        };
+      };
+    };
+  };
+  export_entities: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated entity names; omitted exports every published entity */
+        entities?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ExportEntitiesResponse"];
+        };
+      };
+    };
+  };
+  import_entities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ImportBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ImportEntitiesResponse"];
+        };
+      };
+    };
+  };
+  list_policies: {
+    parameters: {
+      query?: {
+        entity?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListPoliciesResponse"];
+        };
+      };
+    };
+  };
+  create_policy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreatePolicyBody"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CreatePolicyResponse"];
+        };
+      };
+    };
+  };
+  explain_policy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ExplainBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  sync_matrix_policies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SyncMatrixBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SyncMatrixResponse"];
+        };
+      };
+    };
+  };
+  seed_default_policies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SeedDefaultPoliciesBody"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeedDefaultPoliciesResponse"];
+        };
+      };
+    };
+  };
+  delete_policy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  listAdminUsers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListAdminUsersResponse"];
+        };
+      };
+    };
+  };
+  create_user: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateUserBody"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CreateUserResponse"];
+        };
+      };
+      /** @description Email already taken */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  invalidate_context: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  assign_role: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssignRoleBody"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AssignRoleResponse"];
+        };
+      };
+    };
+  };
+  revoke_role: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+        role: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_attachments: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListAttachmentsResponse"];
+        };
+      };
+    };
+  };
+  upload_attachment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["UploadAttachmentForm"];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UploadAttachmentResponse"];
+        };
+      };
+      /** @description Object storage not configured */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_attachment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+        /** @description Attachment id */
+        attachment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Object storage not configured */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  download_attachment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+        /** @description Attachment id */
+        attachment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Object storage not configured */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_workflow_events: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkflowEventsResponse"];
+        };
+      };
+    };
+  };
+  login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LoginBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoginResponse"];
+        };
+      };
+      /** @description Invalid credentials */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  me: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MeResponse"];
+        };
+      };
+    };
+  };
+  oidc_callback: {
+    parameters: {
+      query: {
+        code: string;
+        state: string;
+      };
+      header?: never;
+      path: {
+        tenant_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect back to the tenant's frontend */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid/expired OIDC flow state */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description OIDC verification failed */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  oidc_login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenant_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect to IdP */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description OIDC not configured for this tenant */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_providers: {
+    parameters: {
+      query: {
+        tenantId: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ProvidersResponse"];
+        };
+      };
+    };
+  };
+  get_my_dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetDashboardResponse"];
+        };
+      };
+    };
+  };
+  save_my_dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SaveLayoutBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SaveDashboardResponse"];
+        };
+      };
+    };
+  };
+  get_tenant_default_dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetDashboardResponse"];
+        };
+      };
+    };
+  };
+  save_tenant_default_dashboard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SaveLayoutBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SaveDashboardResponse"];
+        };
+      };
+    };
+  };
+  health: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HealthResponse"];
+        };
+      };
+    };
+  };
+  list_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListConfigResponse"];
+        };
+      };
+      /** @description Caller is not a platform admin */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  set_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetConfigBody"];
+      };
+    };
+    responses: {
+      /** @description Stored */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetConfigResponse"];
+        };
+      };
+      /** @description Key is not writable at this tier */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No such config key */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Value rejected by the key's validator */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  reset_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Reset, returns the default now in effect */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SetConfigResponse"];
+        };
+      };
+      /** @description Key is not writable at this tier */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No such config key */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   exit_impersonation: {
     parameters: {
       query?: never;
@@ -7850,6 +8121,97 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  get_preferences: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetPreferencesResponse"];
+        };
+      };
+    };
+  };
+  update_preferences: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdatePreferencesBody"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GetPreferencesResponse"];
+        };
+      };
+      /** @description Unsupported locale */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  public_config: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PublicConfigResponse"];
+        };
+      };
+    };
+  };
+  listTenantUsers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListUsersResponse"];
+        };
       };
     };
   };
