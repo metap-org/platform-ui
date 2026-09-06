@@ -1,0 +1,286 @@
+type JiraComments {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  issue: JiraIssues
+  authorEmail: String
+  body: String
+}
+
+type JiraCommentsConnection {
+  records: [JiraComments!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraEpics {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  project: JiraProjects
+  name: String
+  description: String
+}
+
+type JiraEpicsConnection {
+  records: [JiraEpics!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraIssueLinks {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  fromIssue: JiraIssues
+  toIssue: JiraIssues
+  linkType: String
+}
+
+type JiraIssueLinksConnection {
+  records: [JiraIssueLinks!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraIssues {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  title: String
+  description: String
+  priority: String
+  project: JiraProjects
+  sprint: JiraSprints
+  epic: JiraEpics
+  issueType: String
+  parentIssue: JiraIssues
+  storyPoints: Float
+  originalEstimateMinutes: Float
+  labels: Json
+  assigneeEmail: String
+  reporterEmail: String
+  dueDate: String
+}
+
+type JiraIssuesConnection {
+  records: [JiraIssues!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraProjects {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  key: String
+  name: String
+  description: String
+}
+
+type JiraProjectsConnection {
+  records: [JiraProjects!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraSprints {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  project: JiraProjects
+  name: String
+  goal: String
+  startDate: String
+  endDate: String
+}
+
+type JiraSprintsConnection {
+  records: [JiraSprints!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraWatchers {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  issue: JiraIssues
+  userEmail: String
+}
+
+type JiraWatchersConnection {
+  records: [JiraWatchers!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+type JiraWorklogs {
+  id: String
+  entity: String
+  code: String
+  status: String
+  createdAt: String
+  updatedAt: String
+  version: Int
+  capabilities: Json
+  issue: JiraIssues
+  authorEmail: String
+  timeSpentMinutes: Float
+  workDate: String
+  description: String
+}
+
+type JiraWorklogsConnection {
+  records: [JiraWorklogs!]!
+  nextCursor: String
+  hasMore: Boolean!
+}
+
+scalar Json
+
+type Mutation {
+  createJiraWatchers(data: Json!): JiraWatchers
+  updateJiraWatchers(id: ID!, expectedVersion: Int!, data: Json!): JiraWatchers
+  deleteJiraWatchers(id: ID!, expectedVersion: Int!): JiraWatchers
+  createJiraSprints(data: Json!): JiraSprints
+  updateJiraSprints(id: ID!, expectedVersion: Int!, data: Json!): JiraSprints
+  deleteJiraSprints(id: ID!, expectedVersion: Int!): JiraSprints
+  transitionJiraSprints(id: ID!, action: String!, expectedVersion: Int!, data: Json): JiraSprints
+  createJiraComments(data: Json!): JiraComments
+  updateJiraComments(id: ID!, expectedVersion: Int!, data: Json!): JiraComments
+  deleteJiraComments(id: ID!, expectedVersion: Int!): JiraComments
+  createJiraIssueLinks(data: Json!): JiraIssueLinks
+  updateJiraIssueLinks(id: ID!, expectedVersion: Int!, data: Json!): JiraIssueLinks
+  deleteJiraIssueLinks(id: ID!, expectedVersion: Int!): JiraIssueLinks
+  createJiraWorklogs(data: Json!): JiraWorklogs
+  updateJiraWorklogs(id: ID!, expectedVersion: Int!, data: Json!): JiraWorklogs
+  deleteJiraWorklogs(id: ID!, expectedVersion: Int!): JiraWorklogs
+  createJiraProjects(data: Json!): JiraProjects
+  updateJiraProjects(id: ID!, expectedVersion: Int!, data: Json!): JiraProjects
+  deleteJiraProjects(id: ID!, expectedVersion: Int!): JiraProjects
+  createJiraIssues(data: Json!): JiraIssues
+  updateJiraIssues(id: ID!, expectedVersion: Int!, data: Json!): JiraIssues
+  deleteJiraIssues(id: ID!, expectedVersion: Int!): JiraIssues
+  transitionJiraIssues(id: ID!, action: String!, expectedVersion: Int!, data: Json): JiraIssues
+  createJiraEpics(data: Json!): JiraEpics
+  updateJiraEpics(id: ID!, expectedVersion: Int!, data: Json!): JiraEpics
+  deleteJiraEpics(id: ID!, expectedVersion: Int!): JiraEpics
+  transitionJiraEpics(id: ID!, action: String!, expectedVersion: Int!, data: Json): JiraEpics
+}
+
+type Query {
+  jiraWatchers(id: ID!): JiraWatchers
+  jiraWatchersList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraWatchersConnection!
+  jiraSprints(id: ID!): JiraSprints
+  jiraSprintsList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraSprintsConnection!
+  jiraComments(id: ID!): JiraComments
+  jiraCommentsList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraCommentsConnection!
+  jiraIssueLinks(id: ID!): JiraIssueLinks
+  jiraIssueLinksList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraIssueLinksConnection!
+  jiraWorklogs(id: ID!): JiraWorklogs
+  jiraWorklogsList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraWorklogsConnection!
+  jiraProjects(id: ID!): JiraProjects
+  jiraProjectsList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraProjectsConnection!
+  jiraIssues(id: ID!): JiraIssues
+  jiraIssuesList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraIssuesConnection!
+  jiraEpics(id: ID!): JiraEpics
+  jiraEpicsList(
+    filter: Json
+    sort: String
+    cursor: String
+    limit: Int
+    listView: String
+  ): JiraEpicsConnection!
+  aggregate(entity: String!, spec: Json!): Json!
+}
+
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+schema {
+  query: Query
+  mutation: Mutation
+}
