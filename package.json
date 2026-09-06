@@ -10,8 +10,7 @@
     "lint": "oxlint",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "generate:types": "openapi-typescript http://localhost:3000/metadata/openapi.json -o src/metadata/generated-types.ts && prettier --write src/metadata/generated-types.ts",
-    "generate:graphql-schema": "curl -sf http://localhost:3100/graphql/schema.graphql -o src/graphql/schema.graphql && prettier --write src/graphql/schema.graphql"
+    "generate:types": "openapi-typescript http://localhost:3000/metadata/openapi.json -o src/metadata/generated-types.ts && prettier --write src/metadata/generated-types.ts"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.101.4",
