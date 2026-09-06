@@ -4,6 +4,157 @@
  */
 
 export interface paths {
+  "/admin/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List this tenant's config keys with their effective values
+     * @description Any authenticated caller. The tenant comes from the token, never from the request, so there is no way to read another tenant's values. `overridden` distinguishes a value this tenant set from one inherited from the fleet default. An entry with secret=true is a credential and carries set/secretRef instead of value — the credential itself is never returned by any endpoint.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Not authenticated */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/config/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Set one config key for the caller's own tenant
+     * @description Requires the admin role. Rejects a platform-global or operator-tier key with 403 and an out-of-range value with 422. For a secret key the value is the plaintext credential: it is written to the deployment's secret backend and only a server-derived reference is stored, so it is write-only — no endpoint returns it afterwards. DELETE on a secret key revokes the credential rather than merely unlinking it.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            value: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description Stored */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Key is not writable by a tenant admin */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description No such config key */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Value rejected by the key's validator */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description The secret backend refused or was unreachable (secret keys only) */
+        503: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    post?: never;
+    /** Clear this tenant's override so the key falls back to the fleet default */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Reset, returns the inherited value now in effect */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Key is not writable by a tenant admin */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description No such config key */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/admin/cron-jobs": {
     parameters: {
       query?: never;
@@ -1998,6 +2149,150 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/platform/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List every platform-writable config key with its effective value
+     * @description Requires the platform_admin role. Covers both the platformGlobal tier and the fleet default of each tenant tier key (level/tenantOverridable say which). Operator-tier keys are never listed.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Caller is not a platform admin */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/platform/config/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Set one platform-global config key, or a tenant key's fleet default
+     * @description Rejects an operator-tier key with 403 and an out-of-range value with 422. The response's appliesImmediately reports whether the change takes effect without a restart (false for the rate-limit keys, which are baked into a middleware layer at router-build time).
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": {
+            value: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description Stored */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Key is not writable at this tier */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description No such config key */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Value rejected by the key's validator */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    post?: never;
+    /** Clear an override so the key falls back to its declared default */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          key: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Reset, returns the default now in effect */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Key is not writable at this tier */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description No such config key */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/preferences": {
     parameters: {
       query?: never;
@@ -2063,6 +2358,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/public/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Branding for the tenant serving this hostname, before any login
+     * @description Unauthenticated. Returns only keys declared public in the config registry (theme colour, logo, display name) — never any other key, at any tier. The tenant is resolved from the Host header; an unrecognised hostname returns the fleet-wide values rather than a 404, so this endpoint cannot be used to discover which hostnames belong to a tenant.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/users": {
     parameters: {
       query?: never;
@@ -2110,10 +2442,17 @@ export interface components {
   schemas: {
     EntitySummary: {
       fieldDisplayHints?: {
+        enumTones?: {
+          [key: string]: string;
+        };
         field: string;
-        resolveVia: string;
+        resolveVia?: string;
       }[];
       fields: {
+        computed?: {
+          dependsOn: string[];
+          expression: string;
+        };
         enumValues?: string[];
         indexed?: boolean;
         /** @enum {string} */
@@ -2153,6 +2492,7 @@ export interface components {
         label: string;
         maxLimit: number;
         name: string;
+        requiredFields?: string[];
       }[];
       name: string;
       relatedViews?: {
@@ -2173,7 +2513,9 @@ export interface components {
           from: string;
           guard?: unknown;
           label: string;
+          setFields?: Record<string, never>;
           to: string;
+          validator?: unknown;
         }[];
       };
     };

@@ -9,6 +9,7 @@ import {
   Card,
   Checkbox,
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -75,7 +76,9 @@ function EyeIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4"
+      // Bumped from h-4 w-4 (found live 2026-09-06 — read as too small next to the row it sits
+      // in) to h-5 w-5, matching TrashIcon right beside it so the pair stays visually balanced.
+      className="h-5 w-5"
     >
       <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z" />
       <circle cx="12" cy="12" r="3" />
@@ -92,7 +95,8 @@ function TrashIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4"
+      // Matches EyeIcon right beside it — see that icon's doc comment.
+      className="h-5 w-5"
     >
       <path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z" />
     </svg>
@@ -113,6 +117,57 @@ function FilterIcon() {
       <path d="M4 4h16l-6 8v6l-4 2v-8z" />
     </svg>
   );
+}
+
+function ColumnsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <path d="M9 4v16M15 4v16" />
+    </svg>
+  );
+}
+
+/** Per-entity, per-list-view — a hidden set saved under one entity's `"default"` view would
+ *  otherwise leak into a different view sharing that same name on another entity. */
+function hiddenColumnsStorageKey(entityName: string, listViewName: string): string {
+  return `platform-ui.list.hiddenColumns.${entityName}.${listViewName}`;
+}
+
+/** Stores the *hidden* set, not the visible one — a field the entity's metadata adds to this list
+ *  view later (never seen by an old save) comes back as shown by default, same as if the toggle
+ *  had never been touched at all, rather than silently staying hidden. Swallows a blocked/private
+ *  `localStorage` (Safari private mode, `storage` disabled) — the toggle just doesn't persist. */
+function loadHiddenColumns(entityName: string, listViewName: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(hiddenColumnsStorageKey(entityName, listViewName));
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((v): v is string => typeof v === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveHiddenColumns(entityName: string, listViewName: string, hidden: Set<string>): void {
+  try {
+    localStorage.setItem(
+      hiddenColumnsStorageKey(entityName, listViewName),
+      JSON.stringify([...hidden]),
+    );
+  } catch {
+    // best-effort only, see loadHiddenColumns's doc comment
+  }
 }
 
 function SortIndicator({ direction }: { direction: "asc" | "desc" }) {
@@ -282,12 +337,47 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // boolean leaving it ambiguous which one is running.
   const [exportingAllFormat, setExportingAllFormat] = useState<"csv" | "json" | null>(null);
   const [exportedSoFar, setExportedSoFar] = useState(0);
+  // Column-visibility toggle (2026-09-06, `docs/features/32-generated-list-column-visibility.md`)
+  // — which of `listView.fields` the *user* has chosen to hide, persisted client-side only (never
+  // synced to the backend/`preferences`, unlike locale). `requiredFields` (entity metadata) always
+  // wins over this regardless of what's stored — see `visibleFields` below.
+  const [hiddenFields, setHiddenFields] = useState<Set<string>>(() => new Set());
 
   const listView = entity?.listViews[0];
   const fieldsByName = useMemo(
     () => new Map((entity?.fields ?? []).map((field) => [field.name, field])),
     [entity],
   );
+
+  // Re-loads whenever the entity/list-view changes — a fresh `Set` per entity, not the previous
+  // entity's hidden columns carried over by accident.
+  useEffect(() => {
+    if (!listView) return;
+    setHiddenFields(loadHiddenColumns(entityName, listView.name));
+  }, [entityName, listView]);
+
+  const requiredFieldNames = useMemo(() => new Set(listView?.requiredFields ?? []), [listView]);
+
+  // `requiredFieldNames.has(f)` overrides a stale/hand-edited `hiddenFields` entry — e.g. an
+  // entity that adds a field to `requiredFields` after a user already hid it client-side.
+  const visibleFields = useMemo(
+    () => (listView?.fields ?? []).filter((f) => requiredFieldNames.has(f) || !hiddenFields.has(f)),
+    [listView, requiredFieldNames, hiddenFields],
+  );
+
+  function toggleColumnVisibility(fieldName: string) {
+    if (requiredFieldNames.has(fieldName) || !listView) return;
+    setHiddenFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldName)) {
+        next.delete(fieldName);
+      } else {
+        next.add(fieldName);
+      }
+      saveHiddenColumns(entityName, listView.name, next);
+      return next;
+    });
+  }
 
   const activeFilters = useMemo(() => {
     const result: Record<string, string> = {};
@@ -582,7 +672,9 @@ export function GeneratedList({ entityName }: { entityName: string }) {
       toast(t("common.exportAllSuccess", { count: fetchedCount }));
     } catch (error) {
       const detail = error instanceof ApiError ? error.message : t("common.somethingWentWrong");
-      toast(t("common.exportAllError", { count: fetchedCount, detail }), { variant: "destructive" });
+      toast(t("common.exportAllError", { count: fetchedCount, detail }), {
+        variant: "destructive",
+      });
     } finally {
       setExportingAllFormat(null);
       setExportedSoFar(0);
@@ -602,7 +694,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // column comes from its parent's `grid-template-columns`, and unlike table layout, that isn't
   // disrupted by `position: absolute` on the child. `role="table"/"row"/"cell"` below replace the
   // semantic HTML `<table>` would otherwise have given for free.
-  const gridTemplateColumns = `${SELECTION_COLUMN_WIDTH}px repeat(${listView.fields.length}, minmax(0, 1fr)) ${ACTIONS_COLUMN_WIDTH}px`;
+  const gridTemplateColumns = `${SELECTION_COLUMN_WIDTH}px repeat(${visibleFields.length}, minmax(0, 1fr)) ${ACTIONS_COLUMN_WIDTH}px`;
   const allLoadedSelected = records.length > 0 && records.every((r) => selectedIds.has(r.id));
   const someLoadedSelected = records.some((r) => selectedIds.has(r.id));
 
@@ -641,6 +733,40 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               </svg>
             }
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                variant="ghost"
+                size="sm"
+                aria-label={t("common.columns")}
+                title={t("common.columns")}
+                icon={<ColumnsIcon />}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t("common.columns")}</DropdownMenuLabel>
+              {listView.fields.map((fieldName) => {
+                const field = fieldsByName.get(fieldName);
+                const required = requiredFieldNames.has(fieldName);
+                const label = field ? fieldLabel(field.name, field.label) : fieldName;
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={fieldName}
+                    checked={!hiddenFields.has(fieldName) || required}
+                    disabled={required}
+                    title={required ? t("common.columnsRequiredHint", { label }) : undefined}
+                    // Keeps the menu open across multiple toggles — a picker where checking one
+                    // column closes the whole menu would make hiding/showing several columns in a
+                    // row far more clicks than it needs to be.
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={() => toggleColumnVisibility(fieldName)}
+                  >
+                    {label}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               {/* `title` (not `aria-label` — the button has visible text) states the "loaded
@@ -759,7 +885,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                     onCheckedChange={toggleAllLoadedSelected}
                   />
                 </div>
-                {listView.fields.map((fieldName) => {
+                {visibleFields.map((fieldName) => {
                   const field = fieldsByName.get(fieldName);
 
                   if (!field) {
@@ -796,7 +922,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                   style={{ gridTemplateColumns }}
                 >
                   <div role="columnheader" className="h-10" />
-                  {listView.fields.map((fieldName) => {
+                  {visibleFields.map((fieldName) => {
                     if (!listView.filters.includes(fieldName)) {
                       return <div key={fieldName} role="columnheader" className="h-10" />;
                     }
@@ -891,7 +1017,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       // to scan row-to-row without one) — on top of `hover:bg-muted/30`, not
                       // instead of it, so a hovered row still reads clearly regardless of parity.
                       className={`absolute grid w-full border-b border-border transition-colors hover:bg-muted/30${virtualRow.index % 2 === 1 ? " bg-muted/10" : ""}`}
-                      style={{ transform: `translateY(${virtualRow.start}px)`, gridTemplateColumns }}
+                      style={{
+                        transform: `translateY(${virtualRow.start}px)`,
+                        gridTemplateColumns,
+                      }}
                     >
                       <div role="cell" className="flex items-center px-md py-md">
                         <Checkbox
@@ -900,7 +1029,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                           onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
                         />
                       </div>
-                      {listView.fields.map((fieldName) => {
+                      {visibleFields.map((fieldName) => {
                         const field = fieldsByName.get(fieldName);
 
                         return (
@@ -927,11 +1056,22 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                             navigation, just styled to match `IconButton`'s ghost/sm look via the
                             same `buttonVariants` this file already uses for the toolbar's "New"
                             link, since an anchor/router-Link can't itself be an `IconButton`
-                            (a `<button>`). */}
+                            (a `<button>`). `!h-9 !w-9 !p-0` (found live 2026-09-06 — the view icon
+                            rendered as a barely-visible dot, `EyeIcon` clipped down by leftover
+                            padding): plain string-concatenating extra classes after
+                            `buttonVariants({ variant: "ghost" })` (default size, `h-10 px-md
+                            py-sm`) skips the `cn()`/`tailwind-merge` step `IconButton` itself uses
+                            — exactly the class-conflict `@metap/ui`'s `cn()` doc comment warns
+                            about (`px-md py-sm` losing to a later `p-0` isn't guaranteed without
+                            it), so both ended up applied and the icon's actual box was
+                            `h-10 px-md py-sm` squeezed down to `w-9`, not the intended `36×36,
+                            no padding`. `cn()` isn't exported from `@metap/ui` to fix this the
+                            same way `IconButton` does, so `!`-important is the targeted fix here
+                            instead of pulling in a new public export for one call site. */}
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <navAdapter.Link
                             to={navAdapter.toRecordDetail(entityName, record.id)}
-                            className={`${buttonVariants({ variant: "ghost" })} h-9 w-9 p-0`}
+                            className={`${buttonVariants({ variant: "ghost" })} !h-9 !w-9 !p-0`}
                             aria-label={t("common.view")}
                             title={t("common.view")}
                           >

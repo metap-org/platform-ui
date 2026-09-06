@@ -63,6 +63,8 @@ const en = {
     exportAllSuccess: "Exported {{count}} rows.",
     exportAllError: "Export failed after fetching {{count}} rows: {{detail}}",
     toggleFilters: "Filters",
+    columns: "Columns",
+    columnsRequiredHint: "{{label}} is required by this list view and can't be hidden.",
   },
   form: {
     editTitle: "Edit {{label}}",
@@ -376,6 +378,8 @@ const vi = {
     exportAllSuccess: "Đã xuất {{count}} dòng.",
     exportAllError: "Xuất thất bại sau khi tải {{count}} dòng: {{detail}}",
     toggleFilters: "Bộ lọc",
+    columns: "Cột hiển thị",
+    columnsRequiredHint: "{{label}} là cột bắt buộc của list view này, không thể ẩn.",
   },
   form: {
     editTitle: "Sửa {{label}}",

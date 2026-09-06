@@ -1,9 +1,32 @@
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
+import type { BadgeProps } from "@metap/ui";
 import type { EntityField, FieldDisplayHint } from "../metadata/types";
 import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { formatFieldValue } from "./fieldKindConfig";
 import { ReferenceFieldValue } from "./ReferenceFieldValue";
 import { UserFieldValue } from "./UserFieldValue";
+
+type BadgeVariant = NonNullable<BadgeProps["variant"]>;
+
+// `FieldDisplayHint.enumTones`'s values are a plain `Record<string, string>` on the wire (see
+// that type's doc comment, `metap-metadata`) — an app's own metadata can't guarantee it only ever
+// names a variant this version of `@metap/ui` actually has, so an unrecognized string falls back
+// to the same `"secondary"` this renderer always used, rather than passing it through to `Badge`
+// unchecked.
+const BADGE_VARIANTS: readonly BadgeVariant[] = [
+  "default",
+  "secondary",
+  "destructive",
+  "outline",
+  "success",
+  "warning",
+];
+
+function asBadgeVariant(value: string | undefined): BadgeVariant {
+  return value && (BADGE_VARIANTS as readonly string[]).includes(value)
+    ? (value as BadgeVariant)
+    : "secondary";
+}
 
 /** Renders inside a `TooltipProvider` — the consuming app mounts one once near its root (see
  * `@metap/ui`'s `TooltipProvider`), same as every other `Tooltip` use in this package.
@@ -20,11 +43,13 @@ import { UserFieldValue } from "./UserFieldValue";
  * `entityLayout.ts` hint — omit it to always get the default hint (e.g. a caller that doesn't
  * have an entity context to declare against yet).
  *
- * `fieldDisplayHints` (the entity's own `EntitySummary.fieldDisplayHints`) resolves a plain
- * `string` field that holds an id from a platform-level collection this entity's metadata can't
- * see, e.g. a user id — see `FieldDisplayHint`'s doc comment (`metap-metadata`). Omit it to skip
- * this resolution and always show the raw value, same fallback shape as omitting
- * `relatedDisplay`. */
+ * `fieldDisplayHints` (the entity's own `EntitySummary.fieldDisplayHints`) carries two independent
+ * hints, matched by `field.name` — see `FieldDisplayHint`'s doc comment (`metap-metadata`) for
+ * both: `resolveVia` resolves a plain `string` field that holds an id from a platform-level
+ * collection this entity's metadata can't see (e.g. a user id), and `enumTones` maps an `enum`
+ * field's values onto a semantic `Badge` tone instead of the flat `variant="secondary"` every enum
+ * value gets by default. Omit it to skip both and get the pre-hint behavior (raw value / flat
+ * `"secondary"`), same fallback shape as omitting `relatedDisplay`. */
 export function FieldValue({
   field,
   value,
@@ -73,7 +98,8 @@ export function FieldValue({
   const formatted = formatFieldValue(field.kind, value) ?? "—";
 
   if (field.kind === "enum") {
-    return <Badge variant="secondary">{formatted}</Badge>;
+    const tone = displayHint?.enumTones?.[String(value)];
+    return <Badge variant={asBadgeVariant(tone)}>{formatted}</Badge>;
   }
 
   return <>{formatted}</>;
