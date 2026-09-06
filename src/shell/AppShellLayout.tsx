@@ -2,15 +2,79 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsFetching } from "@tanstack/react-query";
-import { Badge, Button, IconButton, ToastProvider } from "@metap/ui";
+import { Alert, Badge, Button, IconButton, Select, ToastProvider, toast } from "@metap/ui";
+import {
+  useImpersonationActions,
+  useImpersonationStatus,
+  usePlatformTenants,
+} from "../admin/impersonation";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { useCurrentUserEmail } from "../auth/useTenantUsers";
+import { ApiError } from "../api/client";
 import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppCommandPalette } from "./AppCommandPalette";
+
+/** Platform-admin-only — only ever rendered once `useHasRole("platform_admin")` is true, which
+ *  itself is only ever true while *not* impersonating (see `useImpersonationStatus`'s doc
+ *  comment), so this and the banner below are mutually exclusive in practice. */
+function TenantSwitcher() {
+  const { t } = useTranslation();
+  const { data: tenants } = usePlatformTenants(true);
+  const { startImpersonation } = useImpersonationActions();
+
+  async function handleSelect(tenantId: string | undefined) {
+    if (!tenantId) return;
+    try {
+      await startImpersonation(tenantId);
+    } catch (error) {
+      const detail = error instanceof ApiError ? error.message : String(error);
+      toast(t("shell.impersonationFailed", { detail }), { variant: "destructive" });
+    }
+  }
+
+  return (
+    <Select
+      className="h-9 w-40 text-sm"
+      placeholder={t("shell.viewAsTenant")}
+      options={(tenants ?? []).map((tenant) => ({ value: tenant.id, label: tenant.id }))}
+      onValueChange={(value) => void handleSelect(value)}
+    />
+  );
+}
+
+/** Persistent, impossible-to-miss reminder while impersonating — the whole reason `useHasRole`
+ *  can't be trusted to show this (roles reflect the *target* tenant during impersonation, not
+ *  `platform_admin`), see `useImpersonationStatus`'s doc comment. */
+function ImpersonationBanner() {
+  const { t } = useTranslation();
+  const { data: currentUser } = useCurrentUser();
+  const { exitImpersonation } = useImpersonationActions();
+  const [exiting, setExiting] = useState(false);
+
+  async function handleExit() {
+    setExiting(true);
+    try {
+      await exitImpersonation();
+    } finally {
+      setExiting(false);
+    }
+  }
+
+  return (
+    <Alert className="flex items-center justify-between gap-3 rounded-none border-x-0 border-t-0 border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200">
+      <span className="text-sm font-medium">
+        {t("shell.impersonatingBanner", { tenantId: currentUser?.tenantId ?? "" })}
+      </span>
+      <Button variant="outline" size="sm" loading={exiting} onClick={() => void handleExit()}>
+        {t("shell.exitImpersonation")}
+      </Button>
+    </Alert>
+  );
+}
 
 export type ShellNavItem = {
   to: string;
@@ -72,6 +136,9 @@ export function AppShellLayout({
   // `docs/features/23-ux-infrastructure-core.md`'s "global loading state", additive to (not a
   // replacement for) per-screen loading UI.
   const fetchingCount = useIsFetching();
+  const isPlatformAdmin = useHasRole("platform_admin");
+  const { data: impersonationStatus } = useImpersonationStatus();
+  const isImpersonating = impersonationStatus?.impersonating === true;
 
   async function handleLogout() {
     await logout();
@@ -108,6 +175,11 @@ export function AppShellLayout({
               </nav>
             </div>
             <div className="flex items-center gap-3">
+              {isPlatformAdmin && !isImpersonating ? (
+                <div className="hidden md:block">
+                  <TenantSwitcher />
+                </div>
+              ) : null}
               <div className="hidden w-32 md:block">
                 <LocaleSwitcher compact />
               </div>
@@ -174,6 +246,7 @@ export function AppShellLayout({
             </div>
           ) : null}
         </header>
+        {isImpersonating ? <ImpersonationBanner /> : null}
         <main className="p-4">
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>

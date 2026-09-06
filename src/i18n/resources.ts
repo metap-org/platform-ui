@@ -128,6 +128,11 @@ const en = {
     errorBoundaryRetry: "Retry",
     commandPalettePlaceholder: "Go to page… (⌘K)",
     commandPaletteEmpty: "No matching page.",
+    viewAsTenant: "View as tenant…",
+    impersonatingBanner:
+      "You're viewing tenant {{tenantId}} as an admin. This ends automatically in 30 minutes.",
+    exitImpersonation: "Exit",
+    impersonationFailed: "Couldn't start viewing that tenant: {{detail}}",
   },
   admin: {
     notAuthorized: "You don't have access to this page. It requires the admin role.",
@@ -443,6 +448,11 @@ const vi = {
     errorBoundaryRetry: "Thử lại",
     commandPalettePlaceholder: "Đi tới trang… (⌘K)",
     commandPaletteEmpty: "Không tìm thấy trang phù hợp.",
+    viewAsTenant: "Xem với tư cách tenant…",
+    impersonatingBanner:
+      "Bạn đang xem tenant {{tenantId}} với quyền admin. Tự động kết thúc sau 30 phút.",
+    exitImpersonation: "Thoát",
+    impersonationFailed: "Không xem được tenant này: {{detail}}",
   },
   admin: {
     notAuthorized: "Bạn không có quyền truy cập trang này. Trang này yêu cầu vai trò admin.",
