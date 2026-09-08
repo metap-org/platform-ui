@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
+import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
 import { useEntity } from "../metadata/useEntity";
 import { getFieldLayoutHint } from "../metadata/entityLayout";
@@ -93,7 +94,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
   const {
@@ -121,7 +122,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
       });
       navAdapter.navigate(navAdapter.toRecordList(entityName));
     } catch (error) {
-      setDeleteError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));
+      setDeleteError(error instanceof Error ? error : new Error(t("common.somethingWentWrong")));
       setDeleting(false);
     }
   }
@@ -280,8 +281,14 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
       ) : null}
 
       {deleteError ? (
-        <Alert variant="destructive" className="flex items-center justify-between gap-2">
-          <span>{deleteError}</span>
+        <Alert variant="destructive" className="flex items-start justify-between gap-2">
+          {deleteError instanceof ApiError &&
+          deleteError.code === "record_referenced" &&
+          deleteError.fieldErrors ? (
+            <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />
+          ) : (
+            <span>{deleteError.message}</span>
+          )}
           <IconButton
             variant="ghost"
             size="sm"

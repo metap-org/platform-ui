@@ -23,6 +23,7 @@ import {
 } from "@metap/ui";
 import { useApiInfiniteQuery } from "../api/useApiInfiniteQuery";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
+import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
 import { FieldValue } from "../field/FieldValue";
 import { useEntity } from "../metadata/useEntity";
@@ -318,7 +319,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // previous entity's filters over.
   const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const debouncedTextFilters = useDebouncedValue(filterInputs, 400);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   // Selection is scoped to *loaded* rows only, not "every record matching the current filter" —
   // there is no server-side "select all N across pages" concept, and silently expanding a
@@ -583,7 +584,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
       });
       await refetch();
     } catch (error) {
-      setDeleteError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));
+      setDeleteError(error instanceof Error ? error : new Error(t("common.somethingWentWrong")));
     } finally {
       setPendingDeleteId(null);
     }
@@ -638,7 +639,9 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         PromiseRejectedResult | undefined;
       const reason = firstError?.reason;
       const detail = reason instanceof ApiError ? reason.message : t("common.somethingWentWrong");
-      setDeleteError(t("common.bulkDeletePartialError", { failed, total: results.length, detail }));
+      setDeleteError(
+        new Error(t("common.bulkDeletePartialError", { failed, total: results.length, detail })),
+      );
     }
 
     // Clear regardless of partial failure — a failed row is still visible in the list (refetch
@@ -850,8 +853,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         </div>
       ) : null}
       {deleteError ? (
-        <Alert variant="destructive" className="flex items-center justify-between gap-2">
-          <span>{deleteError}</span>
+        <Alert variant="destructive" className="flex items-start justify-between gap-2">
+          {deleteError instanceof ApiError &&
+          deleteError.code === "record_referenced" &&
+          deleteError.fieldErrors ? (
+            <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />
+          ) : (
+            <span>{deleteError.message}</span>
+          )}
           <IconButton
             variant="ghost"
             size="sm"

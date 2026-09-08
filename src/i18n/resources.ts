@@ -77,6 +77,7 @@ const en = {
     sessionExpired: "Session expired.",
     signInAgain: "Sign in again",
     prefix: "Error: {{message}}",
+    recordReferencedIntro: "Cannot delete — still referenced by:",
   },
   workflow: {
     hide: "Hide workflow",
@@ -397,6 +398,7 @@ const vi = {
     sessionExpired: "Phiên đăng nhập đã hết hạn.",
     signInAgain: "Đăng nhập lại",
     prefix: "Lỗi: {{message}}",
+    recordReferencedIntro: "Không thể xoá — đang bị tham chiếu bởi:",
   },
   workflow: {
     hide: "Ẩn quy trình",
