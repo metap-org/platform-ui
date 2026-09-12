@@ -18,6 +18,10 @@ import {
   TableHeader,
   TableRow,
   TagsInput,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
@@ -33,6 +37,10 @@ import { AdminOnly } from "../auth/AdminOnly";
 import { ConditionBuilder } from "./policies/ConditionBuilder";
 import type { PolicyCondition } from "./policyCondition";
 import type { EntitySummary } from "../metadata/types";
+import { LowCodeAuditFeed } from "./LowCodeAuditFeed";
+import { LowCodeDeploymentStatusBadge } from "./LowCodeDeploymentStatusBadge";
+import { LowCodeExportImportPanel } from "./LowCodeExportImportPanel";
+import { LowCodeMigrateToDedicatedTableButton } from "./LowCodeMigrateToDedicatedTableButton";
 
 // Every FieldKind `metap_metadata::FieldKind` declares except "id" — the id column is
 // implicit/system-managed (`records.id`), never something an author picks for a new field.
@@ -921,7 +929,52 @@ function LowCodeVersionHistory({
   );
 }
 
-function LowCodeEntitiesAdminPageContent() {
+/** Expanded-row content for one entity. When `gatewayUrl`/`authTokenUrl` aren't provided this
+ *  renders exactly what it always did (`LowCodeVersionHistory` alone, no `Tabs` wrapper) — zero
+ *  behavior change for a consumer that hasn't opted into the new GraphQL control-plane surface.
+ *  When they are provided, a second "Audit" tab shows this entity's own audit feed
+ *  (`LowCodeAuditFeed`'s per-entity mode) alongside the existing version history, since both are
+ *  naturally scoped to the same expanded row. */
+function LowCodeVersionsAndAudit({
+  name,
+  onRollback,
+  gatewayUrl,
+  authTokenUrl,
+}: {
+  name: string;
+  onRollback: (versionNumber: number) => void;
+  gatewayUrl?: string;
+  authTokenUrl?: string;
+}) {
+  const { t } = useTranslation();
+
+  if (!gatewayUrl || !authTokenUrl) {
+    return <LowCodeVersionHistory name={name} onRollback={onRollback} />;
+  }
+
+  return (
+    <Tabs defaultValue="versions">
+      <TabsList>
+        <TabsTrigger value="versions">{t("admin.lowcode.versions.title")}</TabsTrigger>
+        <TabsTrigger value="audit">{t("admin.lowcode.audit.title")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="versions">
+        <LowCodeVersionHistory name={name} onRollback={onRollback} />
+      </TabsContent>
+      <TabsContent value="audit">
+        <LowCodeAuditFeed gatewayUrl={gatewayUrl} authTokenUrl={authTokenUrl} entityName={name} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function LowCodeEntitiesAdminPageContent({
+  gatewayUrl,
+  authTokenUrl,
+}: {
+  gatewayUrl?: string;
+  authTokenUrl?: string;
+}) {
   const { t } = useTranslation();
   const { data: entities, isLoading, error, refetch } = useLowCodeEntities();
   const { getDraft, saveDraft, publish, previewPublish, rollback, setEnabled } =
@@ -1136,6 +1189,14 @@ function LowCodeEntitiesAdminPageContent() {
   // by typing over the name field; "New" (resetForm) is the only way back to an editable name.
   const nameIsLocked = entityRows.some((e) => e.name === name.trim());
 
+  // Both new GraphQL-backed features on this page (the deployment-status column, the
+  // migrate-to-dedicated-table action) and the bottom "Control plane" section are gated on both
+  // props being present — `LowCodeEntitiesAdminPage`'s own doc comment on why these default to
+  // `undefined` and the new UI is entirely omitted otherwise (backward compatible for any
+  // existing consumer that doesn't pass them).
+  const hasControlPlane = Boolean(gatewayUrl && authTokenUrl);
+  const columnCount = hasControlPlane ? 5 : 4;
+
   async function handleToggleEnabled(entityName: string, enabled: boolean) {
     setRowError(null);
     try {
@@ -1230,13 +1291,16 @@ function LowCodeEntitiesAdminPageContent() {
               <TableHead>{t("admin.lowcode.entityName")}</TableHead>
               <TableHead>{t("admin.lowcode.status")}</TableHead>
               <TableHead>{t("admin.lowcode.enabled")}</TableHead>
+              {hasControlPlane ? (
+                <TableHead>{t("admin.lowcode.deployment.title")}</TableHead>
+              ) : null}
               <TableHead>{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entityRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4}>{t("common.noRecords")}</TableCell>
+                <TableCell colSpan={columnCount}>{t("common.noRecords")}</TableCell>
               </TableRow>
             ) : (
               entityRows.map((entityRow) => {
@@ -1261,6 +1325,15 @@ function LowCodeEntitiesAdminPageContent() {
                           }
                         />
                       </TableCell>
+                      {hasControlPlane ? (
+                        <TableCell>
+                          <LowCodeDeploymentStatusBadge
+                            name={entityName}
+                            gatewayUrl={gatewayUrl as string}
+                            authTokenUrl={authTokenUrl as string}
+                          />
+                        </TableCell>
+                      ) : null}
                       <TableCell>
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <Button
@@ -1300,17 +1373,26 @@ function LowCodeEntitiesAdminPageContent() {
                               ? t("workflow.hide")
                               : t("admin.lowcode.versions.title")}
                           </Button>
+                          {hasControlPlane ? (
+                            <LowCodeMigrateToDedicatedTableButton
+                              name={entityName}
+                              gatewayUrl={gatewayUrl as string}
+                              authTokenUrl={authTokenUrl as string}
+                            />
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
                     {expandedName === entityName ? (
                       <TableRow>
-                        <TableCell colSpan={4}>
-                          <LowCodeVersionHistory
+                        <TableCell colSpan={columnCount}>
+                          <LowCodeVersionsAndAudit
                             name={entityName}
                             onRollback={(versionNumber) =>
                               void handleRollback(entityName, versionNumber)
                             }
+                            gatewayUrl={gatewayUrl}
+                            authTokenUrl={authTokenUrl}
                           />
                         </TableCell>
                       </TableRow>
@@ -1322,6 +1404,34 @@ function LowCodeEntitiesAdminPageContent() {
           </TableBody>
         </Table>
       )}
+
+      {hasControlPlane ? (
+        <div className="mt-10 flex max-w-[860px] flex-col gap-3">
+          <h4 className="text-base font-medium text-foreground">
+            {t("admin.lowcode.controlPlane.title")}
+          </h4>
+          <Tabs defaultValue="audit">
+            <TabsList>
+              <TabsTrigger value="audit">{t("admin.lowcode.controlPlane.auditTab")}</TabsTrigger>
+              <TabsTrigger value="exportImport">
+                {t("admin.lowcode.controlPlane.exportImportTab")}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="audit">
+              <LowCodeAuditFeed
+                gatewayUrl={gatewayUrl as string}
+                authTokenUrl={authTokenUrl as string}
+              />
+            </TabsContent>
+            <TabsContent value="exportImport">
+              <LowCodeExportImportPanel
+                gatewayUrl={gatewayUrl as string}
+                authTokenUrl={authTokenUrl as string}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1330,11 +1440,25 @@ function LowCodeEntitiesAdminPageContent() {
  * `LowCodeEntitiesAdminPageContent` body below fires `/admin/*` requests from its very first render, so an
  * ungated non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
  * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
- * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
-export function LowCodeEntitiesAdminPage() {
+ * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6).
+ *
+ * `gatewayUrl`/`authTokenUrl` are optional and default to `undefined` — when omitted, every new
+ * GraphQL-backed control-plane feature added on top of the existing REST-based draft/publish/
+ * rollback UI (deployment-status column, migrate-to-dedicated-table action, recent-audit feed,
+ * export/import panel) is entirely omitted, so an existing consumer that doesn't pass them sees
+ * zero behavior change. Pass both to opt in — same "hook/component takes what it needs, caller's
+ * own page decides the actual URL" convention every other GraphQL-backed piece in this repo
+ * follows (see `useControlPlaneQuery`'s own doc comment). */
+export function LowCodeEntitiesAdminPage({
+  gatewayUrl,
+  authTokenUrl,
+}: {
+  gatewayUrl?: string;
+  authTokenUrl?: string;
+} = {}) {
   return (
     <AdminOnly>
-      <LowCodeEntitiesAdminPageContent />
+      <LowCodeEntitiesAdminPageContent gatewayUrl={gatewayUrl} authTokenUrl={authTokenUrl} />
     </AdminOnly>
   );
 }
