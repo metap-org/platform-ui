@@ -34,6 +34,8 @@ export * from "./auth/useTenantUsers";
 export * from "./detail/recordCapabilities";
 export * from "./detail/RecordDetail";
 export * from "./detail/useWorkflowEvents";
+export * from "./detail/AuditTrail";
+export * from "./detail/useAuditEvents";
 export * from "./field/fieldKindConfig";
 export * from "./field/FieldInput";
 export * from "./field/FieldValue";
