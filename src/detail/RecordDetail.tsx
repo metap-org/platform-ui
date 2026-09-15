@@ -16,6 +16,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useApiQuery } from "../api/useApiQuery";
+import { AuditTrail } from "./AuditTrail";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
 import { ApiError, apiFetch } from "../api/client";
@@ -142,6 +143,8 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
 
   const currentState = entity.workflow ? stateValue(record.data[entity.workflow.stateField]) : null;
   const visibleFields = entity.fields.filter((field) => field.kind !== "id");
+  const hasHistoryTab = Boolean(entity.workflow);
+  const hasAuditTab = Boolean(entity.audit?.enabled);
 
   // Shared between the plain layout (no workflow) and the "Details" tab (workflow entity) below
   // — kept as one JSX expression rather than duplicated so the 2 layouts can't drift apart.
@@ -303,20 +306,32 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
         </Alert>
       ) : null}
 
-      {entity.workflow ? (
+      {hasHistoryTab || hasAuditTab ? (
         <Tabs defaultValue="details">
           <TabsList>
             <TabsTrigger value="details">{t("detail.tabDetails")}</TabsTrigger>
-            <TabsTrigger value="history">{t("detail.tabHistory")}</TabsTrigger>
+            {hasHistoryTab ? (
+              <TabsTrigger value="history">{t("detail.tabHistory")}</TabsTrigger>
+            ) : null}
+            {hasAuditTab ? <TabsTrigger value="audit">{t("detail.tabAudit")}</TabsTrigger> : null}
           </TabsList>
           <TabsContent value="details" className="flex flex-col gap-4">
             {fieldsAndRelated}
           </TabsContent>
-          <TabsContent value="history">
-            <Card className="p-md">
-              <WorkflowHistoryTab entityName={entityName} recordId={id} />
-            </Card>
-          </TabsContent>
+          {hasHistoryTab ? (
+            <TabsContent value="history">
+              <Card className="p-md">
+                <WorkflowHistoryTab entityName={entityName} recordId={id} />
+              </Card>
+            </TabsContent>
+          ) : null}
+          {hasAuditTab ? (
+            <TabsContent value="audit">
+              <Card className="p-md">
+                <AuditTrail entityName={entityName} recordId={id} />
+              </Card>
+            </TabsContent>
+          ) : null}
         </Tabs>
       ) : (
         fieldsAndRelated
