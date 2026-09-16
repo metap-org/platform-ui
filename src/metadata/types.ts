@@ -13,3 +13,4 @@ export type WorkflowTransition = EntityWorkflow["transitions"][number];
 export type FieldKind = EntityField["kind"];
 export type RelatedView = NonNullable<EntitySummary["relatedViews"]>[number];
 export type FieldDisplayHint = NonNullable<EntitySummary["fieldDisplayHints"]>[number];
+export type EntityAuditConfig = NonNullable<EntitySummary["audit"]>;

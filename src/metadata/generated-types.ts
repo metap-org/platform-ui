@@ -5002,6 +5002,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/{entity}/{record_id}/audit-events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["list_record_audit_events"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/{entity}/{record_id}/workflow-events": {
     parameters: {
       query?: never;
@@ -5800,6 +5816,9 @@ export interface components {
       published: boolean;
     };
     EntitySummary: {
+      audit?: {
+        enabled: boolean;
+      };
       fieldDisplayHints?: {
         enumTones?: {
           [key: string]: string;
@@ -6390,6 +6409,39 @@ export interface components {
         };
     WaveRolloutResponse: {
       data: components["schemas"]["WaveRolloutDto"];
+    };
+    RecordAuditEventsResponse: {
+      data: components["schemas"]["AuditTrailEntryRow"][];
+    };
+    /**
+     * @description One row read back from `metadata.audit_trail_entries` — the read side of
+     *     `AuditTrailStore::record`'s write. Kept as its own type rather than reusing `AuditEntry`
+     *     itself: a write never needs the row's own `id` (Postgres assigns it via `DEFAULT
+     *     gen_random_uuid()`, see `postgres_store.rs`'s `INSERT`), so a caller building an `AuditEntry`
+     *     to write would have nothing to put there — same split `metap-workflow` already draws between
+     *     its own write path (plain function args) and `WorkflowEvent` (its dedicated read-side row
+     *     type). `action`/`diff` stay the same wire shape `PostgresAuditTrailStore::record` wrote
+     *     (`action` as its lowercase string, `diff` as a raw JSON object) rather than round-tripping
+     *     through `AuditAction`, since nothing here needs to branch on the action as a Rust enum.
+     */
+    AuditTrailEntryRow: {
+      action: string;
+      /** Format: uuid */
+      actorUserId?: string | null;
+      diff: Record<string, never>;
+      entity: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      occurredAt: string;
+      reason?: string | null;
+      /** Format: uuid */
+      recordId: string;
+      /** Format: uuid */
+      tenantId: string;
+      transitionAction?: string | null;
+      /** Format: int32 */
+      versionAfter?: number | null;
     };
     /**
      * @description One row of `workflow_events` — the read side of `record_event`'s append-only audit log.
@@ -7483,6 +7535,31 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  list_record_audit_events: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Entity name */
+        entity: string;
+        /** @description Record id */
+        record_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecordAuditEventsResponse"];
+        };
       };
     };
   };
