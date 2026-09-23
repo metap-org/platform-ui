@@ -130,6 +130,44 @@ builder — xem doc-comment trong file đó. `docs/architectures/04-strategy/00-
 store áp đặt lên app) vẫn đúng cho phần admin CRUD hiện có — store này tách biệt, chỉ phục vụ
 builder chưa tồn tại.
 
+## `GeneratedList`/`GeneratedForm`/`RecordDetail`/`WorkflowActionBar` chuyển hẳn sang GraphQL (2026-09-24)
+
+`metap` core đã xoá hẳn REST entity CRUD (`GET/POST/PATCH/DELETE /api/:entity*`,
+`../metap-docs/docs/roadmap/90-remove-rest-entity-crud.md`) — 4 component này (toàn bộ phần
+generated UI, không phải chỉ 1 màn hình lẻ) gọi thẳng route đó nên **đã hỏng thật trên mọi backend
+hiện tại** cho tới khi sửa (phát hiện sống: `curl /api/waf.zones` trên `metap-demo-waf`'s
+`zones-service` → `404`). `api/graphqlRecords.ts` (đã có sẵn từ trước, ban đầu chỉ dành cho màn
+hình tự viết muốn dùng GraphQL) giờ là data layer duy nhất cho entity record — không còn lựa chọn
+"REST hay GraphQL" nữa, `useApiQuery`/`useApiMutation`/`useApiInfiniteQuery` vẫn còn (dùng cho
+`/admin/*`/`/metadata/*`/`/auth/*`/workflow-events/audit-events — những route chưa bị xoá) nhưng
+không còn ai gọi chúng cho entity record.
+
+Mở rộng thêm để đủ thay REST: `recordSelection`/`reshapeRecord` giờ chọn thêm `capabilities`
+(field envelope có sẵn ở backend nhưng trước đó không được select) và, với field `reference` có
+khai `refDisplayField`, chọn kèm field hiển thị đó để dựng lại `relatedDisplay` (batch reference
+label REST từng trả) — verify sống: `project { id name }` trả đúng `{id, name}` từ `jira-server`
+thật. `useInfiniteGraphQLRecords`/`fetchAllGraphQLRecords` (mới) thay `useApiInfiniteQuery`/vòng
+lặp cursor REST cho `GeneratedList`'s infinite-scroll + "export all" — GraphQL list field
+(`{entity}List`) vốn đã nhận đủ `filter`/`sort`/`limit`/`cursor` từ trước, chỉ là chưa ai truyền
+`sort`/`cursor` qua.
+
+**Đánh đổi có chủ đích, không phải bỏ sót**: `GeneratedForm`'s update mutation mất optimistic
+update (UI phản ánh ngay khi đang chờ PATCH, rollback nếu lỗi) — cache của `useGraphQLQuery` giữ
+nguyên shape response thô (`select` chỉ reshape lúc đọc, không lúc ghi), sửa tay cache thô đó lúc
+optimistic sẽ dễ vỡ hơn giá trị UX nó mang lại; thay bằng invalidate-sau-khi-thành-công (cùng
+tradeoff "chấp nhận stale 1 nhịp còn hơn sửa cache thủ công dễ vỡ" mà `useInvalidateGraphQLRecords`
+đã chọn từ trước cho `GeneratedList`). `GraphQLError` (mới, `api/graphqlClient.ts`) mirror đúng
+shape `ApiError` (`code`/`status`/`fieldErrors`) từ `extensions` GraphQL server trả — mọi chỗ check
+`error.code === "record_referenced"`/`error.fieldErrors` chuyển sang check `instanceof
+GraphQLError` mà không đổi logic.
+
+Verify: `typecheck`/`lint`/`format:check` sạch (không đụng 8 file khác đang có drift format sẵn có
+từ trước, không liên quan). Verify sống qua `jira-server` thật (Postgres thật): query
+list/get/create/update/delete/transition qua đúng shape query các hook mới build, field lỗi
+validation trả đúng `extensions.fieldErrors`. Chưa test qua browser thật (chính sách repo: viết
+code + typecheck/lint, không tự verify FE bằng browser automation) — xem
+`../metap-docs/docs/roadmap/93-platform-ui-graphql-migration.md` cho chi tiết đầy đủ.
+
 ## Lệnh
 
 ```bash

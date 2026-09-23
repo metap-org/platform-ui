@@ -15,11 +15,15 @@ import {
   TooltipTrigger,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { useApiQuery } from "../api/useApiQuery";
+import {
+  deleteGraphQLRecord,
+  useGraphQLRecord,
+  useInvalidateGraphQLRecords,
+} from "../api/graphqlRecords";
+import { GraphQLError } from "../api/graphqlClient";
 import { AuditTrail } from "./AuditTrail";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
-import { ApiError, apiFetch } from "../api/client";
 import { useEntity } from "../metadata/useEntity";
 import { getFieldLayoutHint } from "../metadata/entityLayout";
 import { FieldValue } from "../field/FieldValue";
@@ -30,14 +34,6 @@ import { WorkflowActionBar } from "../workflow/WorkflowActionBar";
 import { WorkflowStepper } from "../workflow/WorkflowStepper";
 import { RelatedRecordsPanel } from "./RelatedRecordsPanel";
 import { useWorkflowEvents } from "./useWorkflowEvents";
-import type { RecordCapabilities } from "./recordCapabilities";
-
-type RecordDto = {
-  id: string;
-  version: number;
-  data: Record<string, unknown>;
-  capabilities: RecordCapabilities;
-};
 
 function stateValue(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -95,7 +91,8 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
-  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
+  const invalidateRecords = useInvalidateGraphQLRecords();
+  const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
   const {
@@ -103,11 +100,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
     isLoading: recordLoading,
     error: recordError,
     refetch,
-  } = useApiQuery<{ data: RecordDto }, RecordDto>(
-    ["record", entityName, id],
-    `/api/${entityName}/${id}`,
-    (response) => response.data,
-  );
+  } = useGraphQLRecord(entityName, id);
 
   async function handleDelete() {
     if (!record || !window.confirm(t("common.deleteConfirm"))) {
@@ -117,10 +110,8 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
     setDeleteError(null);
     setDeleting(true);
     try {
-      await apiFetch(`/api/${entityName}/${id}`, {
-        method: "DELETE",
-        body: JSON.stringify({ version: record.version }),
-      });
+      await deleteGraphQLRecord(entityName, id, record.version);
+      invalidateRecords();
       navAdapter.navigate(navAdapter.toRecordList(entityName));
     } catch (error) {
       setDeleteError(error instanceof Error ? error : new Error(t("common.somethingWentWrong")));
@@ -285,7 +276,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
 
       {deleteError ? (
         <Alert variant="destructive" className="flex items-start justify-between gap-2">
-          {deleteError instanceof ApiError &&
+          {deleteError instanceof GraphQLError &&
           deleteError.code === "record_referenced" &&
           deleteError.fieldErrors ? (
             <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />

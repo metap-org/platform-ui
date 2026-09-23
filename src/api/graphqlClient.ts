@@ -2,29 +2,53 @@ import { CSRF_HEADER_NAME, readCsrfCookie } from "./client";
 import { notifySessionExpired } from "./sessionEvents";
 
 /** GraphQL counterpart to `client.ts`'s `apiFetch`. POSTs a query/variables body and unwraps
- *  `{data, errors}` instead of a plain JSON body. For a BFF gateway that aggregates several
- *  backend services into 1 GraphQL schema (e.g. `metap`'s `graphql-gateway`) — not a general
- *  replacement for `apiFetch`: `GeneratedList`/`RecordDetail`'s flat per-entity CRUD screens stay
- *  on REST since they need no cross-service aggregation, this is for a page that genuinely needs 1
- *  round-trip across several services' data instead of a client-side entity-by-entity fetch.
+ *  `{data, errors}` instead of a plain JSON body. Since `metap` core removed REST entity CRUD
+ *  entirely (`../metap-docs/docs/roadmap/90-remove-rest-entity-crud.md` — `GET/POST/PATCH/DELETE
+ *  /api/:entity*` no longer exist on any current backend), this is now the *only* transport
+ *  `GeneratedList`/`GeneratedForm`/`RecordDetail`/`WorkflowActionBar` have for entity records —
+ *  not just the BFF-aggregation escape hatch this doc comment used to describe. `apiFetch` stays
+ *  in use for everything that's still REST (`/auth/*`, `/admin/*`, `/metadata/*`,
+ *  `/workflow-events`, `/audit-events`, attachments).
  *  Mutations work fine too (not query-only) — `metap`'s `graphql-gateway` forwards the caller's own
  *  bearer token to each upstream (see that crate's README's Auth section), so a mutation through
  *  here enforces the real caller's permissions same as a query does; `metap-demo-waf`'s
  *  `data-plane/web/src/api/waf.ts` is a full CRUD example (2026-09-04).
  */
 export class GraphQLError extends Error {
-  readonly errors: { message: string }[];
+  readonly errors: GraphQLErrorDetail[];
+  /** Mirrors `ApiError`'s shape (`client.ts`) so a caller that already branches on
+   *  `error.code`/`error.fieldErrors` for REST needs no separate GraphQL-specific handling —
+   *  taken from the *first* error's `extensions` (`metap-graphql`'s `service_result_to_gql`, the
+   *  same envelope REST's `{"error":{"code":...}}` body used to carry). `"unknown_error"`/
+   *  `undefined` when the server sent no `extensions` at all (a malformed-query/validation error
+   *  from `async-graphql` itself, not a `ServiceResult::Err`). */
+  readonly code: string;
+  readonly status?: number;
+  readonly fieldErrors?: Record<string, string[]>;
 
-  constructor(errors: { message: string }[]) {
+  constructor(errors: GraphQLErrorDetail[]) {
     super(errors.map((e) => e.message).join("; ") || "GraphQL request failed");
     this.name = "GraphQLError";
     this.errors = errors;
+    const extensions = errors[0]?.extensions;
+    this.code = extensions?.code ?? "unknown_error";
+    this.status = extensions?.status;
+    this.fieldErrors = extensions?.fieldErrors;
   }
 }
 
+type GraphQLErrorDetail = {
+  message: string;
+  extensions?: {
+    code?: string;
+    status?: number;
+    fieldErrors?: Record<string, string[]>;
+  };
+};
+
 type GraphQLResponseBody<T> = {
   data?: T;
-  errors?: { message: string }[];
+  errors?: GraphQLErrorDetail[];
 };
 
 type QueuedRequest = {

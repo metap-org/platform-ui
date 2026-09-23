@@ -1,24 +1,21 @@
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Spinner, toast } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { useApiQuery } from "../api/useApiQuery";
-import { useApiMutation } from "../api/useApiMutation";
-import { ApiError } from "../api/client";
+import {
+  createGraphQLRecord,
+  updateGraphQLRecord,
+  useGraphQLRecord,
+  useInvalidateGraphQLRecords,
+  type GraphQLRecord,
+} from "../api/graphqlRecords";
+import { GraphQLError } from "../api/graphqlClient";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useEntity } from "../metadata/useEntity";
 import { FieldInput } from "../field/FieldInput";
 import { useEntityLabels } from "../i18n/useEntityLabels";
-import type { RecordCapabilities } from "../detail/recordCapabilities";
 
-type RecordDto = {
-  id: string;
-  version: number;
-  data: Record<string, unknown>;
-  capabilities: RecordCapabilities;
-};
-
-type RecordQueryData = { data: RecordDto };
+type RecordDto = GraphQLRecord;
 
 /** Only the keys where `current` differs from `baseline` — powers both dirty-state (any diff at
  *  all means dirty) and the real partial-update payload (`docs/features/
@@ -52,19 +49,13 @@ export function GeneratedForm({
 }) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
-  const queryClient = useQueryClient();
+  const invalidateRecords = useInvalidateGraphQLRecords();
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
-  const recordQueryKey = ["record", entityName, recordId];
   const {
     data: existing,
     isLoading: existingLoading,
     error: existingError,
-  } = useApiQuery<RecordQueryData, RecordDto>(
-    recordQueryKey,
-    `/api/${entityName}/${recordId}`,
-    (response) => response.data,
-    Boolean(recordId),
-  );
+  } = useGraphQLRecord(entityName, recordId);
 
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -100,33 +91,20 @@ export function GeneratedForm({
   const writableFields =
     recordId && existing ? new Set(existing.capabilities.writableFields) : null;
 
-  const createMutation = useApiMutation<{ data: RecordDto }, { data: Record<string, unknown> }>(
-    "POST",
-    `/api/${entityName}`,
-  );
-  const updateMutation = useApiMutation<
-    { data: RecordDto },
-    { version: number; data: Record<string, unknown> },
-    { previous: RecordQueryData | undefined }
-  >("PATCH", `/api/${entityName}/${recordId}`, {
-    // Optimistic — UI reflects the patch immediately, rolls back on failure. Update only (not
-    // create/delete): scoped out in the feature brief, tempId/data-loss tradeoffs differ enough
-    // to need their own pass if ever done.
-    onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: recordQueryKey });
-      const previous = queryClient.getQueryData<RecordQueryData>(recordQueryKey);
-      if (previous) {
-        queryClient.setQueryData<RecordQueryData>(recordQueryKey, {
-          data: { ...previous.data, data: { ...previous.data.data, ...vars.data } },
-        });
-      }
-      return { previous };
-    },
-    onError: (_error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(recordQueryKey, context.previous);
-      }
-    },
+  // No optimistic update on the GraphQL path (there was one for the update mutation over REST) —
+  // `useGraphQLRecord`'s cache holds the *raw* GraphQL response shape (`useGraphQLQuery`'s
+  // `select` reshapes on read, not on write), so hand-editing it optimistically would mean
+  // re-flattening `formData` back into that raw per-field shape instead of the friendly
+  // `GraphQLRecord` one — fragile for a UX nicety. `invalidateRecords()` after success (below)
+  // refetches instead, same "a moment of staleness beats fragile cache surgery" tradeoff
+  // `useInvalidateGraphQLRecords`'s own doc comment already accepts for `GeneratedList`.
+  const createMutation = useMutation({
+    mutationFn: (vars: { data: Record<string, unknown> }) =>
+      createGraphQLRecord(entityName, vars.data),
+  });
+  const updateMutation = useMutation({
+    mutationFn: (vars: { version: number; data: Record<string, unknown> }) =>
+      updateGraphQLRecord(entityName, recordId!, vars.version, vars.data),
   });
 
   if (entityLoading || (recordId && existingLoading)) {
@@ -183,9 +161,10 @@ export function GeneratedForm({
           label: entityLabel(entity!.label),
         }),
       );
+      invalidateRecords();
       onSaved(response.data);
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof GraphQLError) {
         setFieldErrors(error.fieldErrors ?? {});
         if (!error.fieldErrors) {
           setFormError(error.message);

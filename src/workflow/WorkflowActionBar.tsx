@@ -9,7 +9,8 @@ import {
   DialogTrigger,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { apiFetch, ApiError } from "../api/client";
+import { transitionGraphQLRecord, useInvalidateGraphQLRecords } from "../api/graphqlRecords";
+import { GraphQLError } from "../api/graphqlClient";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import type { EntityWorkflow } from "../metadata/types";
 import type { RecordCapabilities } from "../detail/recordCapabilities";
@@ -43,6 +44,7 @@ export function WorkflowActionBar({
 }) {
   const { t } = useTranslation();
   const { transitionLabel } = useEntityLabels(entityName);
+  const invalidateRecords = useInvalidateGraphQLRecords();
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
@@ -59,16 +61,13 @@ export function WorkflowActionBar({
     setActionError(null);
     setPendingAction(action);
     try {
-      const response = await apiFetch<{ data: RecordDto }>(
-        `/api/${entityName}/${recordId}/transitions/${action}`,
-        {
-          method: "POST",
-          body: JSON.stringify({ version }),
-        },
-      );
+      const response = await transitionGraphQLRecord(entityName, recordId, action, version);
+      invalidateRecords();
       onTransitioned(response.data);
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));
+      setActionError(
+        error instanceof GraphQLError ? error.message : t("common.somethingWentWrong"),
+      );
     } finally {
       setPendingAction(null);
     }

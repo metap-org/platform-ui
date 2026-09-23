@@ -1,7 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import { useEntity } from "../metadata/useEntity";
 import type { EntityField, EntitySummary } from "../metadata/types";
+import type { RecordCapabilities } from "../detail/recordCapabilities";
 import { apiFetch } from "./client";
 import { graphqlFetch } from "./graphqlClient";
 import { useGraphQLQuery } from "./useGraphQLQuery";
@@ -16,19 +17,17 @@ import {
 
 /**
  * Generic CRUD over GraphQL — the same role `useApiQuery`/`useApiMutation`/`useApiInfiniteQuery`
- * play for REST, extracted from `metap-demo-waf/data-plane/web/src/api/waf.ts`
- * (`docs/features/30-graphql-generic-record-hooks.md` in `metap-docs`) once that file's own
- * `useRecords`/`useRecord`/`useAggregate`/CRUD mutations turned out to already be 100%
- * entity-agnostic — every one takes `entity: string` and builds its query from that entity's own
- * metadata, no WAF-specific field or business rule anywhere in them. They just hadn't been pulled
- * out of the one app that happened to need GraphQL first.
+ * used to play for REST before `metap` core removed REST entity CRUD entirely
+ * (`../metap-docs/docs/roadmap/90-remove-rest-entity-crud.md`) — extracted from
+ * `metap-demo-waf/data-plane/web/src/api/waf.ts` (`docs/features/30-graphql-generic-record-hooks.md`
+ * in `metap-docs`) once that file's own `useRecords`/`useRecord`/`useAggregate`/CRUD mutations
+ * turned out to already be 100% entity-agnostic.
  *
- * This is the piece that lets an app skip `GeneratedList`/`GeneratedForm`/`RecordDetail` (the
- * *generated UI*) and still avoid hand-writing its own data-fetching layer for a bespoke screen —
- * only the layout stays hand-written; list/get/create/update/delete/transition/aggregate for any
- * entity come from here, same as they would through the REST hooks. `GeneratedList` and friends
- * are unaffected — they stay on REST, this is a second, parallel data path for a custom-UI app
- * that has (or wants) a GraphQL gateway in front of its services instead.
+ * **`GeneratedList`/`GeneratedForm`/`RecordDetail`/`WorkflowActionBar` are built on this now**
+ * (2026-09-24, `../metap-docs/docs/roadmap/93-platform-ui-graphql-migration.md`) — the REST
+ * `/api/:entity*` routes they used to call no longer exist on any current backend. A bespoke
+ * screen that skips the generated UI can still use these hooks/functions directly the same way it
+ * always could; there's no longer a "REST vs GraphQL" choice to make, only one data path.
  */
 
 /** Mirrors `metap`'s `RecordDto` (camelCase over the wire) as it comes back through GraphQL,
@@ -42,6 +41,7 @@ export type GraphQLRecord<TData = Record<string, unknown>> = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  capabilities: RecordCapabilities;
   relatedDisplay?: Record<string, string>;
 };
 
@@ -59,27 +59,41 @@ const ENVELOPE_FIELDS = [
   "version",
   "createdAt",
   "updatedAt",
+  "capabilities",
 ] as const;
 
 /** Builds the GraphQL selection set for 1 record: the fixed envelope plus every field the entity
  *  declares. A `reference` field's GraphQL type is an object, not a scalar, so it needs its own
- *  sub-selection (`fieldName { id }`) rather than a bare field name — `reshapeRecord` below undoes
- *  that nesting back into the plain foreign-key-id string REST returns in `data.fieldName`. */
+ *  sub-selection rather than a bare field name — `id` always, plus the field's own
+ *  `refDisplayField` when set (e.g. `parentId { id name }`) so `reshapeRecord` below can rebuild
+ *  `relatedDisplay`, the same batch-resolved reference label REST's `RecordDto.related_display`
+ *  used to carry (`FieldValue`'s reference-column rendering depends on it being present, not
+ *  firing its own per-cell request). */
 function recordSelection(fields: EntityField[]): string {
-  const dataFields = fields.map((f) => (f.kind === "reference" ? `${f.name} { id }` : f.name));
+  const dataFields = fields.map((f) => {
+    if (f.kind !== "reference") return f.name;
+    return f.refDisplayField ? `${f.name} { id ${f.refDisplayField} }` : `${f.name} { id }`;
+  });
   return [...ENVELOPE_FIELDS, ...dataFields].join("\n        ");
 }
 
 /** Undoes `recordSelection`'s flat GraphQL shape back into `GraphQLRecord<T>`'s envelope + `data`
- *  bag. */
+ *  bag, rebuilding `relatedDisplay` from each reference field's nested display-field selection. */
 function reshapeRecord<T>(raw: Record<string, unknown>, fields: EntityField[]): GraphQLRecord<T> {
   const data: Record<string, unknown> = {};
+  const relatedDisplay: Record<string, string> = {};
   for (const field of fields) {
     const value = raw[field.name];
-    data[field.name] =
-      field.kind === "reference" && value !== null && typeof value === "object"
-        ? ((value as { id?: string }).id ?? null)
-        : value;
+    if (field.kind === "reference" && value !== null && typeof value === "object") {
+      const ref = value as Record<string, unknown>;
+      data[field.name] = (ref.id as string | undefined) ?? null;
+      const display = field.refDisplayField ? ref[field.refDisplayField] : undefined;
+      if (typeof display === "string") {
+        relatedDisplay[field.name] = display;
+      }
+    } else {
+      data[field.name] = value;
+    }
   }
   return {
     id: raw.id as string,
@@ -89,7 +103,9 @@ function reshapeRecord<T>(raw: Record<string, unknown>, fields: EntityField[]): 
     version: raw.version as number,
     createdAt: raw.createdAt as string,
     updatedAt: raw.updatedAt as string,
+    capabilities: raw.capabilities as RecordCapabilities,
     data: data as T,
+    ...(Object.keys(relatedDisplay).length > 0 ? { relatedDisplay } : {}),
   };
 }
 
@@ -153,6 +169,98 @@ export function useGraphQLRecords<T = Record<string, unknown>>(
     authed && Boolean(entityQuery.data),
   );
   return { ...result, isLoading: result.isLoading || (authed && !entityQuery.data) };
+}
+
+/** One page of a cursor-paginated list — the raw shape `{entity}List` returns
+ *  (`records`/`nextCursor`/`hasMore`, `metap-graphql`'s `ConnectionHandle`), reshaped. Shared by
+ *  `useInfiniteGraphQLRecords` (below) and `fetchAllGraphQLRecordPages` (the "export everything
+ *  matching the filter" loop, `GeneratedList`'s non-virtualized escape hatch). */
+async function fetchGraphQLRecordPage<T = Record<string, unknown>>(
+  entity: string,
+  fields: EntityField[],
+  filter: Record<string, string | number>,
+  sort: string | undefined,
+  limit: number,
+  cursor: string | null,
+  path: string,
+): Promise<{ records: GraphQLRecord<T>[]; nextCursor: string | null }> {
+  const query = `query List($filter: Json, $sort: String, $limit: Int, $cursor: String) {
+    result: ${listFieldName(entity)}(filter: $filter, sort: $sort, limit: $limit, cursor: $cursor) {
+      records {
+        ${recordSelection(fields)}
+      }
+      nextCursor
+      hasMore
+    }
+  }`;
+  const raw = await graphqlFetch<{
+    result: { records: Record<string, unknown>[]; nextCursor: string | null; hasMore: boolean };
+  }>(path, query, { filter, sort, limit, cursor });
+  return {
+    records: raw.result.records.map((record) => reshapeRecord<T>(record, fields)),
+    nextCursor: raw.result.nextCursor,
+  };
+}
+
+function nonEmptyFilters(
+  filters: Record<string, string | number | undefined>,
+): Record<string, string | number> {
+  return Object.fromEntries(
+    Object.entries(filters).filter(([, v]) => v !== undefined && v !== ""),
+  ) as Record<string, string | number>;
+}
+
+/** Cursor-paginated, infinite-scroll counterpart to `useGraphQLRecords` above — what
+ *  `GeneratedList` is built on (`useApiInfiniteQuery`'s REST-era replacement). `sort` is the same
+ *  `"field"`/`"-field"` string convention REST's `sort` query param used. */
+export function useInfiniteGraphQLRecords<T = Record<string, unknown>>(
+  entity: string,
+  filters: Record<string, string | number | undefined>,
+  sort: string | undefined,
+  limit: number,
+  enabled: boolean,
+  path: string = DEFAULT_GRAPHQL_PATH,
+) {
+  const { status } = useAuth();
+  const authed = enabled && status === "authenticated";
+  const entityQuery = useEntity(entity, authed);
+  const fields = entityQuery.data?.fields ?? [];
+  const filter = nonEmptyFilters(filters);
+
+  const result = useInfiniteQuery({
+    queryKey: ["graphql-records-infinite", entity, filters, sort, limit],
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      fetchGraphQLRecordPage<T>(entity, fields, filter, sort, limit, pageParam, path),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: authed && Boolean(entityQuery.data),
+  });
+  return { ...result, isLoading: result.isLoading || (authed && !entityQuery.data) };
+}
+
+/** Fetches *every* record matching `filter`/`sort` (not just what's scrolled into view) — the
+ *  GraphQL counterpart to the old REST "export all" loop, at the same page size REST used to cap
+ *  at (200). Sequential, not parallel — cursor pagination is inherently a chain. */
+export async function fetchAllGraphQLRecords<T = Record<string, unknown>>(
+  entity: string,
+  filters: Record<string, string | number | undefined>,
+  sort: string | undefined,
+  onProgress: (count: number) => void,
+  path: string = DEFAULT_GRAPHQL_PATH,
+): Promise<GraphQLRecord<T>[]> {
+  const fields = await fetchEntityFields(entity);
+  const filter = nonEmptyFilters(filters);
+  const all: GraphQLRecord<T>[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const page: { records: GraphQLRecord<T>[]; nextCursor: string | null } =
+      await fetchGraphQLRecordPage<T>(entity, fields, filter, sort, 200, cursor, path);
+    all.push(...page.records);
+    onProgress(all.length);
+    cursor = page.nextCursor;
+    if (!cursor) break;
+  }
+  return all;
 }
 
 export function useGraphQLRecord<T = Record<string, unknown>>(
@@ -311,16 +419,13 @@ export async function transitionGraphQLRecord<T = Record<string, unknown>>(
   return { data: reshapeRecord<T>(raw.result, fields) };
 }
 
-/** Invalidates every generic GraphQL record query at once. Coarse on purpose, same reasoning
- *  `GeneratedList`'s REST mutations use: a stale count on a dashboard is worse than one extra
- *  refetch after a mutation. Doesn't touch REST's `["records", ...]` cache
- *  (`useApiInfiniteQuery`) — the two transports' query keys are deliberately disjoint so an app
- *  using both (a custom GraphQL screen alongside `GeneratedList`'s REST-based `/records/*` escape
- *  hatch) never cross-invalidates by accident. */
+/** Invalidates every generic GraphQL record query at once. Coarse on purpose: a stale count on a
+ *  dashboard is worse than one extra refetch after a mutation. */
 export function useInvalidateGraphQLRecords() {
   const queryClient = useQueryClient();
   return () => {
     void queryClient.invalidateQueries({ queryKey: ["graphql-records"] });
+    void queryClient.invalidateQueries({ queryKey: ["graphql-records-infinite"] });
     void queryClient.invalidateQueries({ queryKey: ["graphql-record"] });
     void queryClient.invalidateQueries({ queryKey: ["graphql-aggregate"] });
   };
