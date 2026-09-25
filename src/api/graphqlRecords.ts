@@ -139,29 +139,30 @@ export function useGraphQLRecords<T = Record<string, unknown>>(
   limit = 30,
   enabled = true,
   path: string = DEFAULT_GRAPHQL_PATH,
+  options: { sort?: string; jql?: string } = {},
 ) {
   const { status } = useAuth();
   const authed = enabled && status === "authenticated";
   const entityQuery = useEntity(entity, authed);
   const fields = entityQuery.data?.fields ?? [];
-  const query = `query List($filter: Json, $limit: Int) {
-    result: ${listFieldName(entity)}(filter: $filter, limit: $limit) {
+  const query = `query List($filter: Json, $sort: String, $jql: String, $limit: Int) {
+    result: ${listFieldName(entity)}(filter: $filter, sort: $sort, jql: $jql, limit: $limit) {
       records {
         ${recordSelection(fields)}
       }
     }
   }`;
   const variables = {
-    filter: Object.fromEntries(
-      Object.entries(filters).filter(([, v]) => v !== undefined && v !== ""),
-    ),
+    filter: nonEmptyFilters(filters),
+    sort: options.sort,
+    jql: options.jql,
     limit,
   };
   const result = useGraphQLQuery<
     { result: { records: Record<string, unknown>[] } },
     GraphQLRecord<T>[]
   >(
-    ["graphql-records", entity, filters, limit],
+    ["graphql-records", entity, filters, limit, options.sort, options.jql],
     path,
     query,
     variables,
