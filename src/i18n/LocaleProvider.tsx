@@ -31,7 +31,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    graphqlFetch<{ myPreferences: { locale: string } }>("/graphql", "{ myPreferences }")
+    graphqlFetch<{ myPreferences: { locale: string } }>("/graphql", "{ myPreferences { locale } }")
       .then((response) => {
         if (!cancelled && isSupportedLocale(response.myPreferences.locale)) {
           setLocaleState(response.myPreferences.locale);
@@ -54,7 +54,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       if (status === "authenticated") {
         await graphqlFetch(
           "/graphql",
-          "mutation($locale: String!) { setMyPreferences(locale: $locale) }",
+          "mutation($locale: String!) { setMyPreferences(locale: $locale) { locale } }",
           { locale: next },
         );
       }

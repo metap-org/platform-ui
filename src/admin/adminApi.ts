@@ -7,6 +7,15 @@ import type { PolicyCondition } from "./policyCondition";
 
 const GRAPHQL_PATH = "/graphql";
 
+/** Shared selection set for `Policy` (`metap-graphql-http::platform_fields`, Phase 97 — real
+ *  GraphQL object type since 2026-09-26, not `Json`) — reused by `policies`/`createPolicy`/
+ *  `syncPolicyMatrix`, one field list to keep in sync with `AdminPolicy` instead of three. */
+const POLICY_SELECTION = "id tenantId entity action field subject roles condition createdBy effect";
+
+/** Shared selection set for `CronJob` — reused by `cronJobs`/`createCronJob`/`updateCronJob`. */
+const CRON_JOB_SELECTION =
+  "id tenantId name enabled cronExpr timezone targetType targetConfig dispatchMode nextRunAt lastRunAt createdAt updatedAt createdBy";
+
 export type AdminUser = { userId: string; roles: string[] };
 
 /** `condition` is a real `PolicyCondition` (see `./policyCondition.ts`), not `unknown` — the
@@ -96,7 +105,7 @@ export function useAdminUsers() {
   return useGraphQLQuery<{ adminUsers: AdminUser[] }, AdminUser[]>(
     ["admin", "users"],
     GRAPHQL_PATH,
-    "{ adminUsers }",
+    "{ adminUsers { userId roles } }",
     undefined,
     (response) => response.adminUsers,
   );
@@ -111,7 +120,7 @@ export function useCreateAdminUser() {
     mutationFn: (body) =>
       graphqlFetch<{ createAdminUser: { userId: string; email: string; roles: string[] } }>(
         GRAPHQL_PATH,
-        "mutation($email: String!, $password: String!, $roles: [String!]) { createAdminUser(email: $email, password: $password, roles: $roles) }",
+        "mutation($email: String!, $password: String!, $roles: [String!]) { createAdminUser(email: $email, password: $password, roles: $roles) { userId email roles } }",
         body,
       ).then((r) => r.createAdminUser),
   });
@@ -153,7 +162,7 @@ export function useAdminPolicies(entity?: string, enabled = true) {
   return useGraphQLQuery<{ policies: AdminPolicy[] }, AdminPolicy[]>(
     ["admin", "policies", entity ?? null],
     GRAPHQL_PATH,
-    "query($entity: String) { policies(entity: $entity) }",
+    `query($entity: String) { policies(entity: $entity) { ${POLICY_SELECTION} } }`,
     { entity: entity ?? null },
     (response) => response.policies,
     enabled,
@@ -177,7 +186,7 @@ export function useCreateAdminPolicy() {
     mutationFn: (body) =>
       graphqlFetch<{ createPolicy: AdminPolicy }>(
         GRAPHQL_PATH,
-        "mutation($entity: String!, $action: String!, $roles: [String!], $condition: Json, $field: String, $subject: String, $effect: String) { createPolicy(entity: $entity, action: $action, roles: $roles, condition: $condition, field: $field, subject: $subject, effect: $effect) }",
+        `mutation($entity: String!, $action: String!, $roles: [String!], $condition: Json, $field: String, $subject: String, $effect: String) { createPolicy(entity: $entity, action: $action, roles: $roles, condition: $condition, field: $field, subject: $subject, effect: $effect) { ${POLICY_SELECTION} } }`,
         body,
       ).then((r) => r.createPolicy),
   });
@@ -207,7 +216,7 @@ export function useSyncMatrixPolicies() {
     mutationFn: (body) =>
       graphqlFetch<{ syncPolicyMatrix: AdminPolicy[] }>(
         GRAPHQL_PATH,
-        "mutation($entity: String!, $grants: Json!) { syncPolicyMatrix(entity: $entity, grants: $grants) }",
+        `mutation($entity: String!, $grants: [MatrixGrantInput!]!) { syncPolicyMatrix(entity: $entity, grants: $grants) { ${POLICY_SELECTION} } }`,
         body,
       ).then((r) => r.syncPolicyMatrix),
   });
@@ -233,7 +242,7 @@ export function useAdminCronJobs() {
   return useGraphQLQuery<{ cronJobs: CronJob[] }, CronJob[]>(
     ["admin", "cronJobs"],
     GRAPHQL_PATH,
-    "{ cronJobs }",
+    `{ cronJobs { ${CRON_JOB_SELECTION} } }`,
     undefined,
     (response) => response.cronJobs,
   );
@@ -243,7 +252,7 @@ export function useCronJobRuns(jobId: string | null) {
   return useGraphQLQuery<{ cronJobRuns: CronJobRun[] }, CronJobRun[]>(
     ["admin", "cronJobs", jobId, "runs"],
     GRAPHQL_PATH,
-    "query($id: ID!) { cronJobRuns(id: $id) }",
+    "query($id: ID!) { cronJobRuns(id: $id) { id tenantId jobId status scheduledFor startedAt finishedAt error responseSummary createdAt } }",
     { id: jobId },
     (response) => response.cronJobRuns,
     jobId !== null,
@@ -267,7 +276,7 @@ export function useCreateAdminCronJob() {
     mutationFn: (body) =>
       graphqlFetch<{ createCronJob: CronJob }>(
         GRAPHQL_PATH,
-        "mutation($input: Json!) { createCronJob(input: $input) }",
+        `mutation($input: CronJobInput!) { createCronJob(input: $input) { ${CRON_JOB_SELECTION} } }`,
         { input: body },
       ).then((r) => r.createCronJob),
   });
@@ -281,7 +290,7 @@ export function useAdminCronJobActions() {
   async function toggleEnabled(job: CronJob) {
     await graphqlFetch(
       GRAPHQL_PATH,
-      "mutation($id: ID!, $input: Json!) { updateCronJob(id: $id, input: $input) }",
+      "mutation($id: ID!, $input: CronJobUpdateInput!) { updateCronJob(id: $id, input: $input) { id } }",
       { id: job.id, input: { enabled: !job.enabled } },
     );
     await queryClient.invalidateQueries({ queryKey: ["admin", "cronJobs"] });

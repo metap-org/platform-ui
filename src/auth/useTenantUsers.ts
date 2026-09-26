@@ -21,7 +21,7 @@ export function useTenantUsers(enabled: boolean = true): TenantUser[] {
   const { data } = useGraphQLQuery<TenantUsersResponse, TenantUser[]>(
     ["tenant-users"],
     "/graphql",
-    "{ tenantUsers }",
+    "{ tenantUsers { id email } }",
     undefined,
     (r) => r.tenantUsers,
     enabled,
