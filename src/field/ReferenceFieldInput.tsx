@@ -1,18 +1,10 @@
 import { useMemo, useState } from "react";
 import { Autocomplete } from "@metap/ui";
-import { useApiQuery } from "../api/useApiQuery";
+import { useGraphQLRecord, useGraphQLRecords, type GraphQLRecord } from "../api/graphqlRecords";
 import type { EntityField } from "../metadata/types";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
-type RecordDto = {
-  id: string;
-  code: string | null;
-  status: string | null;
-  version: number;
-  data: Record<string, unknown>;
-};
-
-function labelFor(record: RecordDto, refDisplayField: string | undefined): string {
+function labelFor(record: GraphQLRecord, refDisplayField: string | undefined): string {
   const raw = refDisplayField ? record.data[refDisplayField] : undefined;
   return typeof raw === "string" ? raw : record.id;
 }
@@ -38,27 +30,27 @@ export function ReferenceFieldInput({
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  const { data: currentRecord } = useApiQuery<{ data: RecordDto }, RecordDto>(
-    ["record", refEntity, currentValue],
-    `/api/${refEntity}/${currentValue}`,
-    (response) => response.data,
-    Boolean(refEntity && currentValue),
+  // `/api/${refEntity}/*` (REST) doesn't exist since Phase 90 removed REST entity CRUD — found
+  // live 2026-09-26, this component was never migrated in Phase 93.
+  const { data: currentRecord } = useGraphQLRecord(
+    refEntity ?? "",
+    refEntity ? currentValue : undefined,
   );
 
   // No search text yet -> just the first page, unfiltered, so a small reference set (a handful
   // of projects, say) shows options immediately on open instead of looking empty/broken until
   // the caller types something (found live: the combobox for `jira.sprints.project` looked like
-  // it wasn't loading anything at all). `?field=` (empty) would now mean "IS NULL" since
-  // `metap-query`'s empty-filter-value fix, so this branch omits the param entirely rather than
+  // it wasn't loading anything at all). An empty filter value would now mean "IS NULL" since
+  // `metap-query`'s empty-filter-value fix, so this branch omits the filter entirely rather than
   // sending it empty.
-  const searchPath =
-    debouncedSearch.length > 0
-      ? `/api/${refEntity}?${field.refDisplayField}=${encodeURIComponent(debouncedSearch)}&limit=10`
-      : `/api/${refEntity}?limit=10`;
-  const { data: searchResults } = useApiQuery<{ data: RecordDto[] }, RecordDto[]>(
-    ["reference-search", refEntity, field.refDisplayField, debouncedSearch],
-    searchPath,
-    (response) => response.data,
+  const searchFilters =
+    debouncedSearch.length > 0 && field.refDisplayField
+      ? { [field.refDisplayField]: debouncedSearch }
+      : {};
+  const { data: searchResults } = useGraphQLRecords(
+    refEntity ?? "",
+    searchFilters,
+    10,
     Boolean(refEntity && field.refDisplayField),
   );
 

@@ -1,14 +1,6 @@
-import { useApiQuery } from "../api/useApiQuery";
+import { useGraphQLRecord } from "../api/graphqlRecords";
 import type { EntityField } from "../metadata/types";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
-
-type RecordDto = {
-  id: string;
-  code: string | null;
-  status: string | null;
-  version: number;
-  data: Record<string, unknown>;
-};
 
 /**
  * `batchMode` (set by `FieldValue` whenever a caller passes any `relatedDisplay` map, i.e.
@@ -44,12 +36,13 @@ export function ReferenceFieldValue({
   const id = typeof value === "string" ? value : undefined;
   const navAdapter = useNavigationAdapter();
 
-  const { data: record } = useApiQuery<{ data: RecordDto }, RecordDto>(
-    ["record", refEntity, id],
-    `/api/${refEntity}/${id}`,
-    (response) => response.data,
-    Boolean(refEntity && id) && !batchMode,
-  );
+  // `/api/${refEntity}/${id}` (REST) doesn't exist since Phase 90 removed REST entity CRUD —
+  // found live 2026-09-26, this component was never migrated in Phase 93. `useGraphQLRecord`
+  // fetches the same full record GraphQL's `{entity}(id)` returns; more than this component
+  // strictly needs (just `refDisplayField`), but that's exactly what the REST call it replaces
+  // already fetched too, so no new cost.
+  const shouldFetch = Boolean(refEntity && id) && !batchMode;
+  const { data: record } = useGraphQLRecord(refEntity ?? "", shouldFetch ? id : undefined);
 
   if (!id) {
     return <>—</>;
