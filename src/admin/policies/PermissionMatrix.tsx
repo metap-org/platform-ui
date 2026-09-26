@@ -17,7 +17,7 @@ import {
   TooltipTrigger,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "../../api/client";
+import { GraphQLError } from "../../api/graphqlClient";
 import type { EntitySummary } from "../../metadata/types";
 import {
   type AdminUser,
@@ -73,7 +73,9 @@ function RoleUsersPanel({
       await onAssignUser(userId);
       setNewUserId("");
     } catch (err) {
-      setUserActionError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setUserActionError(
+        err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"),
+      );
     }
   }
 
@@ -82,7 +84,9 @@ function RoleUsersPanel({
     try {
       await onRevokeUser(userId);
     } catch (err) {
-      setUserActionError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setUserActionError(
+        err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"),
+      );
     }
   }
 
@@ -321,7 +325,7 @@ export function PermissionMatrix({ entity }: { entity: EntitySummary }) {
       setBaseline(desired);
       await queryClient.invalidateQueries({ queryKey: ["admin", "policies", entity.name] });
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setSaveError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
     }
   }
 

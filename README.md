@@ -168,6 +168,31 @@ validation trả đúng `extensions.fieldErrors`. Chưa test qua browser thật 
 code + typecheck/lint, không tự verify FE bằng browser automation) — xem
 `../metap-docs/docs/roadmap/93-platform-ui-graphql-migration.md` cho chi tiết đầy đủ.
 
+## `adminApi.ts`/preferences/user-picker chuyển sang GraphQL (2026-09-26)
+
+`metap` core migrate nốt backlog REST Phase 90 để lại sang GraphQL
+(`../metap-docs/docs/roadmap/95-platform-graphql-fields.md`) — `src/admin/adminApi.ts`'s hook cho
+users/roles (`useAdminUsers`/`useCreateAdminUser`/`useAdminRoleActions`), policies
+(`useAdminPolicies`/`useCreateAdminPolicy`/`useDeleteAdminPolicy`/`useSyncMatrixPolicies`), và cron
+jobs (`useAdminCronJobs`/`useCronJobRuns`/`useCreateAdminCronJob`/`useAdminCronJobActions`) chuyển
+từ `useApiQuery`/`useApiMutation`/`apiFetch` sang `useGraphQLQuery`/`graphqlFetch`, gọi
+`adminUsers`/`createAdminUser`/`assignUserRole`/`revokeUserRole`/`policies`/`createPolicy`/
+`deletePolicy`/`syncPolicyMatrix`/`cronJobs`/`cronJobRuns`/`createCronJob`/`updateCronJob`/
+`deleteCronJob` (`metap-graphql-http::platform_fields`, mới) thay vì `/admin/users*`/
+`/admin/policies*`/`/admin/cron-jobs*`. `src/i18n/LocaleProvider.tsx` (`/preferences` →
+`myPreferences`/`setMyPreferences`) và `src/auth/useTenantUsers.ts` (`/users` → `tenantUsers`)
+cũng chuyển. `useKnownActions` (`/metadata/actions`) và toàn bộ phần low-code entities ở cuối
+`adminApi.ts` **không đụng** — backend khác (`metap-lowcode-http`), ngoài phạm vi phase này.
+
+Mọi mutation trước dùng `useApiMutation` (một `useMutation` bọc sẵn `apiFetch`) giờ tự viết
+`useMutation({ mutationFn: () => graphqlFetch(...) })` — không có `useGraphQLMutation` dùng chung
+sẵn (khác `useGraphQLQuery`), vì mỗi mutation cần 1 câu GraphQL string riêng. `GraphQLError`
+(`api/graphqlClient.ts`, đã có từ Phase 93) thay `ApiError` trong mọi chỗ check lỗi
+(`UsersAdminPage.tsx`/`PermissionMatrix.tsx`/`AdvancedPoliciesPanel.tsx`/`CronJobsAdminPage.tsx`).
+
+Verify: `typecheck`/`lint`/`format:check` sạch (không đụng file khác đang có drift format sẵn có
+từ trước). Chưa test qua browser thật (đúng chính sách repo).
+
 ## Lệnh
 
 ```bash

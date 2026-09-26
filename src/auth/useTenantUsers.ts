@@ -1,14 +1,16 @@
-import { useApiQuery } from "../api/useApiQuery";
+import { useGraphQLQuery } from "../api/useGraphQLQuery";
 import { useCurrentUser } from "./useCurrentUser";
 
 export type TenantUser = { id: string; email: string };
-type UsersResponse = { data: TenantUser[] };
+type TenantUsersResponse = { tenantUsers: TenantUser[] };
 
-/** `GET /users` (`crates/metap-http/src/routes/users.rs`) — every user in the current tenant, the
- * "pick a user" primitive an assignee/reporter/watcher picker needs. Platform-level (every
- * `@metap/platform-ui` consumer's backend exposes this route, not specific to any one entity or
- * app) — moved here 2026-08-31 from `apps/jira-fe`'s `IssuePanels.tsx`, the first consumer to
- * need it, once it was clear the logic itself had nothing jira-specific in it.
+/** `tenantUsers` GraphQL field (`metap-graphql-http::platform_fields`) — `GET /users`'s
+ * replacement since 2026-09-26 (`../metap-docs/docs/roadmap/95-platform-graphql-fields.md`),
+ * every user in the current tenant, the "pick a user" primitive an assignee/reporter/watcher
+ * picker needs. Platform-level (every `@metap/platform-ui` consumer's backend exposes this field,
+ * not specific to any one entity or app) — moved here 2026-08-31 from `apps/jira-fe`'s
+ * `IssuePanels.tsx`, the first consumer to need it, once it was clear the logic itself had
+ * nothing jira-specific in it.
  *
  * `enabled` defaults to `true` (every existing call site is unaffected); pass `false` to skip the
  * request entirely for a caller that turns out not to need the list — see `useCurrentUserEmail`
@@ -16,10 +18,12 @@ type UsersResponse = { data: TenantUser[] };
  * `/auth/me`. `staleTime` is 5 minutes because this is a slow-moving list (a tenant gains users
  * rarely) that would otherwise re-fetch on every window focus under React Query's default of `0`. */
 export function useTenantUsers(enabled: boolean = true): TenantUser[] {
-  const { data } = useApiQuery<UsersResponse, TenantUser[]>(
+  const { data } = useGraphQLQuery<TenantUsersResponse, TenantUser[]>(
     ["tenant-users"],
-    "/users",
-    (r) => r.data,
+    "/graphql",
+    "{ tenantUsers }",
+    undefined,
+    (r) => r.tenantUsers,
     enabled,
     { staleTime: 5 * 60 * 1000 },
   );

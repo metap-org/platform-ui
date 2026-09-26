@@ -16,7 +16,7 @@ import {
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "../api/client";
+import { GraphQLError } from "../api/graphqlClient";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import {
   useAdminCronJobActions,
@@ -311,7 +311,7 @@ function CronJobsAdminPageContent() {
     try {
       await deleteJob(id);
     } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setRowError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
     }
   }
 
@@ -323,7 +323,7 @@ function CronJobsAdminPageContent() {
         <h4 className="text-base font-medium text-foreground">{t("admin.cronJobs.createTitle")}</h4>
         {createJob.error ? (
           <Alert variant="destructive">
-            {createJob.error instanceof ApiError
+            {createJob.error instanceof GraphQLError
               ? createJob.error.message
               : t("common.somethingWentWrong")}
           </Alert>

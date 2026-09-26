@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { ApiError } from "../api/client";
+import { GraphQLError } from "../api/graphqlClient";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useAdminRoleActions, useAdminUsers, useCreateAdminUser } from "./adminApi";
 import { AdminOnly } from "../auth/AdminOnly";
@@ -61,7 +61,7 @@ function UsersAdminPageContent() {
       await assignRole(userId, role);
       setRoleInputs((prev) => ({ ...prev, [userId]: "" }));
     } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setRowError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
     }
   }
 
@@ -70,7 +70,7 @@ function UsersAdminPageContent() {
     try {
       await revokeRole(userId, role);
     } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
+      setRowError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
     }
   }
 
@@ -82,7 +82,7 @@ function UsersAdminPageContent() {
         <h4 className="text-base font-medium text-foreground">{t("admin.users.createTitle")}</h4>
         {createUser.error ? (
           <Alert variant="destructive">
-            {createUser.error instanceof ApiError
+            {createUser.error instanceof GraphQLError
               ? createUser.error.message
               : t("common.somethingWentWrong")}
           </Alert>

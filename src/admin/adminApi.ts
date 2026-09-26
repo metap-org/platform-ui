@@ -1,8 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useApiMutation } from "../api/useApiMutation";
-import { useApiQuery } from "../api/useApiQuery";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "../api/client";
+import { graphqlFetch, GraphQLError } from "../api/graphqlClient";
+import { useApiQuery } from "../api/useApiQuery";
+import { useGraphQLQuery } from "../api/useGraphQLQuery";
 import type { PolicyCondition } from "./policyCondition";
+
+const GRAPHQL_PATH = "/graphql";
 
 export type AdminUser = { userId: string; roles: string[] };
 
@@ -85,38 +88,57 @@ export type LowCodeVersionSummary = {
 };
 
 // --- Users ---
+// Moved onto GraphQL 2026-09-26 (`adminUsers`/`createAdminUser`/`assignUserRole`/
+// `revokeUserRole`, `metap-graphql-http::platform_fields`) — `/admin/users*`'s replacement, see
+// `../metap-docs/docs/roadmap/95-platform-graphql-fields.md`.
 
 export function useAdminUsers() {
-  return useApiQuery<{ data: AdminUser[] }, AdminUser[]>(
+  return useGraphQLQuery<{ adminUsers: AdminUser[] }, AdminUser[]>(
     ["admin", "users"],
-    "/admin/users",
-    (response) => response.data,
+    GRAPHQL_PATH,
+    "{ adminUsers }",
+    undefined,
+    (response) => response.adminUsers,
   );
 }
 
 export function useCreateAdminUser() {
-  return useApiMutation<
-    { data: { userId: string; email: string; roles: string[] } },
+  return useMutation<
+    { userId: string; email: string; roles: string[] },
+    GraphQLError,
     { email: string; password: string; roles: string[] }
-  >("POST", "/admin/users");
+  >({
+    mutationFn: (body) =>
+      graphqlFetch<{ createAdminUser: { userId: string; email: string; roles: string[] } }>(
+        GRAPHQL_PATH,
+        "mutation($email: String!, $password: String!, $roles: [String!]) { createAdminUser(email: $email, password: $password, roles: $roles) }",
+        body,
+      ).then((r) => r.createAdminUser),
+  });
 }
 
-/** Row-level actions (assign/revoke role) need a per-user path, which `useApiMutation`'s
- * fixed-path shape can't express — same convention as `GeneratedList`'s per-row delete: a
- * plain `apiFetch` call plus manual invalidation instead of a bound mutation hook. */
+/** Row-level actions (assign/revoke role) need a per-user id, which a bound `useMutation` hook's
+ *  single fixed-variables shape makes awkward for the "several roles in a list" call pattern this
+ *  page actually uses — same convention as `GeneratedList`'s per-row delete: a plain `graphqlFetch`
+ *  call plus manual invalidation instead of a bound mutation hook. */
 export function useAdminRoleActions() {
   const queryClient = useQueryClient();
 
   async function assignRole(userId: string, role: string) {
-    await apiFetch(`/admin/users/${userId}/roles`, {
-      method: "POST",
-      body: JSON.stringify({ role }),
-    });
+    await graphqlFetch(
+      GRAPHQL_PATH,
+      "mutation($userId: ID!, $role: String!) { assignUserRole(userId: $userId, role: $role) }",
+      { userId, role },
+    );
     await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   }
 
   async function revokeRole(userId: string, role: string) {
-    await apiFetch(`/admin/users/${userId}/roles/${role}`, { method: "DELETE" });
+    await graphqlFetch(
+      GRAPHQL_PATH,
+      "mutation($userId: ID!, $role: String!) { revokeUserRole(userId: $userId, role: $role) }",
+      { userId, role },
+    );
     await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   }
 
@@ -124,20 +146,24 @@ export function useAdminRoleActions() {
 }
 
 // --- Policies ---
+// Moved onto GraphQL 2026-09-26 (`policies`/`createPolicy`/`deletePolicy`/`syncPolicyMatrix`) —
+// `/admin/policies*`'s replacement.
 
 export function useAdminPolicies(entity?: string, enabled = true) {
-  const path = entity ? `/admin/policies?entity=${encodeURIComponent(entity)}` : "/admin/policies";
-  return useApiQuery<{ data: AdminPolicy[] }, AdminPolicy[]>(
+  return useGraphQLQuery<{ policies: AdminPolicy[] }, AdminPolicy[]>(
     ["admin", "policies", entity ?? null],
-    path,
-    (response) => response.data,
+    GRAPHQL_PATH,
+    "query($entity: String) { policies(entity: $entity) }",
+    { entity: entity ?? null },
+    (response) => response.policies,
     enabled,
   );
 }
 
 export function useCreateAdminPolicy() {
-  return useApiMutation<
-    { data: AdminPolicy },
+  return useMutation<
+    AdminPolicy,
+    GraphQLError,
     {
       entity: string;
       action: string;
@@ -147,29 +173,44 @@ export function useCreateAdminPolicy() {
       subject?: string;
       effect?: string;
     }
-  >("POST", "/admin/policies");
+  >({
+    mutationFn: (body) =>
+      graphqlFetch<{ createPolicy: AdminPolicy }>(
+        GRAPHQL_PATH,
+        "mutation($entity: String!, $action: String!, $roles: [String!], $condition: Json, $field: String, $subject: String, $effect: String) { createPolicy(entity: $entity, action: $action, roles: $roles, condition: $condition, field: $field, subject: $subject, effect: $effect) }",
+        body,
+      ).then((r) => r.createPolicy),
+  });
 }
 
 export function useDeleteAdminPolicy() {
   const queryClient = useQueryClient();
 
   return async function deletePolicy(id: string) {
-    await apiFetch(`/admin/policies/${id}`, { method: "DELETE" });
+    await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { deletePolicy(id: $id) }", { id });
     await queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
   };
 }
 
 /** The RBAC permission matrix's single save call (`PermissionMatrix.tsx`) — replaces the entire
  *  basic-shaped policy set for `entity` with exactly `grants` in one atomic backend transaction
- *  (`PUT /admin/policies/matrix`, `PolicyStore::sync_basic_policies`), instead of firing one
- *  `POST`/`DELETE` per checkbox click. `role: null` means the matrix's pinned "Everyone" row (an
+ *  (`syncPolicyMatrix`, `PolicyStore::sync_basic_policies`), instead of firing one
+ *  create/delete per checkbox click. `role: null` means the matrix's pinned "Everyone" row (an
  *  open, `roles IS NULL` policy). Never touches an Advanced-tab policy — see that trait method's
  *  doc comment (`crates/metap-permission/src/policy_store.rs`) for the exact boundary. */
 export function useSyncMatrixPolicies() {
-  return useApiMutation<
-    { data: AdminPolicy[] },
+  return useMutation<
+    AdminPolicy[],
+    GraphQLError,
     { entity: string; grants: { role: string | null; action: string }[] }
-  >("PUT", "/admin/policies/matrix");
+  >({
+    mutationFn: (body) =>
+      graphqlFetch<{ syncPolicyMatrix: AdminPolicy[] }>(
+        GRAPHQL_PATH,
+        "mutation($entity: String!, $grants: Json!) { syncPolicyMatrix(entity: $entity, grants: $grants) }",
+        body,
+      ).then((r) => r.syncPolicyMatrix),
+  });
 }
 
 /** The fixed action set a policy can grant (`GET /metadata/actions`, backed by
@@ -185,27 +226,34 @@ export function useKnownActions() {
 }
 
 // --- Cron jobs ---
+// Moved onto GraphQL 2026-09-26 (`cronJobs`/`createCronJob`/`updateCronJob`/`deleteCronJob`/
+// `cronJobRuns`) — `/admin/cron-jobs*`'s replacement.
 
 export function useAdminCronJobs() {
-  return useApiQuery<{ data: CronJob[] }, CronJob[]>(
+  return useGraphQLQuery<{ cronJobs: CronJob[] }, CronJob[]>(
     ["admin", "cronJobs"],
-    "/admin/cron-jobs",
-    (response) => response.data,
+    GRAPHQL_PATH,
+    "{ cronJobs }",
+    undefined,
+    (response) => response.cronJobs,
   );
 }
 
 export function useCronJobRuns(jobId: string | null) {
-  return useApiQuery<{ data: CronJobRun[] }, CronJobRun[]>(
+  return useGraphQLQuery<{ cronJobRuns: CronJobRun[] }, CronJobRun[]>(
     ["admin", "cronJobs", jobId, "runs"],
-    `/admin/cron-jobs/${jobId}/runs`,
-    (response) => response.data,
+    GRAPHQL_PATH,
+    "query($id: ID!) { cronJobRuns(id: $id) }",
+    { id: jobId },
+    (response) => response.cronJobRuns,
     jobId !== null,
   );
 }
 
 export function useCreateAdminCronJob() {
-  return useApiMutation<
-    { data: CronJob },
+  return useMutation<
+    CronJob,
+    GraphQLError,
     {
       name: string;
       cronExpr: string;
@@ -215,24 +263,32 @@ export function useCreateAdminCronJob() {
       dispatchMode: string;
       enabled: boolean;
     }
-  >("POST", "/admin/cron-jobs");
+  >({
+    mutationFn: (body) =>
+      graphqlFetch<{ createCronJob: CronJob }>(
+        GRAPHQL_PATH,
+        "mutation($input: Json!) { createCronJob(input: $input) }",
+        { input: body },
+      ).then((r) => r.createCronJob),
+  });
 }
 
-/** Row-level actions (update/delete) need a per-job path — see `useAdminRoleActions`'s doc
- * comment for why this bypasses `useApiMutation`. */
+/** Row-level actions (update/delete) need a per-job id — see `useAdminRoleActions`'s doc comment
+ *  for why this bypasses a bound `useMutation` hook. */
 export function useAdminCronJobActions() {
   const queryClient = useQueryClient();
 
   async function toggleEnabled(job: CronJob) {
-    await apiFetch(`/admin/cron-jobs/${job.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ enabled: !job.enabled }),
-    });
+    await graphqlFetch(
+      GRAPHQL_PATH,
+      "mutation($id: ID!, $input: Json!) { updateCronJob(id: $id, input: $input) }",
+      { id: job.id, input: { enabled: !job.enabled } },
+    );
     await queryClient.invalidateQueries({ queryKey: ["admin", "cronJobs"] });
   }
 
   async function deleteJob(id: string) {
-    await apiFetch(`/admin/cron-jobs/${id}`, { method: "DELETE" });
+    await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { deleteCronJob(id: $id) }", { id });
     await queryClient.invalidateQueries({ queryKey: ["admin", "cronJobs"] });
   }
 

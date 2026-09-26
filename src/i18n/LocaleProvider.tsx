@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
-import { apiFetch } from "../api/client";
+import { graphqlFetch } from "../api/graphqlClient";
 import { useAuth } from "../auth/AuthContext";
 import { i18n } from "./i18n";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./resources";
@@ -18,9 +18,10 @@ function isSupportedLocale(value: string): value is (typeof SUPPORTED_LOCALES)[n
 }
 
 // Must be nested inside `AuthProvider` — reads `status` to gate loading/persisting the caller's
-// `GET/PUT /preferences` locale (`crates/metap-http/src/routes/preferences.rs`) until a session
-// (cookie-based since 2026-09-03) actually exists. Also wraps `I18nextProvider` so any consumer of
-// `platform-ui` gets a working `useTranslation()` without wiring i18next itself.
+// locale (`myPreferences`/`setMyPreferences` GraphQL fields, `/preferences`'s replacement since
+// 2026-09-26 — `metap-graphql-http::platform_fields`) until a session (cookie-based since
+// 2026-09-03) actually exists. Also wraps `I18nextProvider` so any consumer of `platform-ui` gets
+// a working `useTranslation()` without wiring i18next itself.
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const [locale, setLocaleState] = useState<string>(DEFAULT_LOCALE);
@@ -30,11 +31,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    apiFetch<{ data: { locale: string } }>("/preferences")
+    graphqlFetch<{ myPreferences: { locale: string } }>("/graphql", "{ myPreferences }")
       .then((response) => {
-        if (!cancelled && isSupportedLocale(response.data.locale)) {
-          setLocaleState(response.data.locale);
-          void i18n.changeLanguage(response.data.locale);
+        if (!cancelled && isSupportedLocale(response.myPreferences.locale)) {
+          setLocaleState(response.myPreferences.locale);
+          void i18n.changeLanguage(response.myPreferences.locale);
         }
       })
       .catch(() => {
@@ -51,10 +52,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLocaleState(next);
       await i18n.changeLanguage(next);
       if (status === "authenticated") {
-        await apiFetch("/preferences", {
-          method: "PUT",
-          body: JSON.stringify({ locale: next }),
-        });
+        await graphqlFetch(
+          "/graphql",
+          "mutation($locale: String!) { setMyPreferences(locale: $locale) }",
+          { locale: next },
+        );
       }
     },
     [status],
