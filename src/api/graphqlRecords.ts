@@ -11,6 +11,7 @@ import {
   deleteFieldName,
   getFieldName,
   listFieldName,
+  relationFieldName,
   transitionFieldName,
   updateFieldName,
 } from "./graphqlNaming";
@@ -62,37 +63,43 @@ const ENVELOPE_FIELDS = [
   "capabilities",
 ] as const;
 
+/** Names already used on an entity's GraphQL type — the envelope plus every declared field — so
+ *  `relationFieldName` never picks a relation name that collides with one of them. */
+function takenFieldNames(fields: EntityField[]): ReadonlySet<string> {
+  return new Set<string>([...ENVELOPE_FIELDS, ...fields.map((f) => f.name)]);
+}
+
 /** Builds the GraphQL selection set for 1 record: the fixed envelope plus every field the entity
- *  declares. A `reference` field's GraphQL type is an object, not a scalar, so it needs its own
- *  sub-selection rather than a bare field name — `id` always, plus the field's own
- *  `refDisplayField` when set (e.g. `parentId { id name }`) so `reshapeRecord` below can rebuild
- *  `relatedDisplay`, the same batch-resolved reference label REST's `RecordDto.related_display`
- *  used to carry (`FieldValue`'s reference-column rendering depends on it being present, not
- *  firing its own per-cell request). */
+ *  declares, each as a plain scalar — a `reference` field is just its id (`zoneId`), the same
+ *  value create/update take. When a reference field declares a `refDisplayField`, its relation
+ *  field (`zone { id hostname }`, see `relationFieldName`) is selected too, so `reshapeRecord`
+ *  below can fill `relatedDisplay` — the batch-resolved reference label `FieldValue`'s reference
+ *  column rendering depends on, instead of firing its own per-cell request. */
 function recordSelection(fields: EntityField[]): string {
-  const dataFields = fields.map((f) => {
-    if (f.kind !== "reference") return f.name;
-    return f.refDisplayField ? `${f.name} { id ${f.refDisplayField} }` : `${f.name} { id }`;
+  const taken = takenFieldNames(fields);
+  const dataFields = fields.flatMap((f) => {
+    if (f.kind !== "reference" || !f.refDisplayField) return [f.name];
+    return [f.name, `${relationFieldName(f.name, taken)} { id ${f.refDisplayField} }`];
   });
   return [...ENVELOPE_FIELDS, ...dataFields].join("\n        ");
 }
 
 /** Undoes `recordSelection`'s flat GraphQL shape back into `GraphQLRecord<T>`'s envelope + `data`
- *  bag, rebuilding `relatedDisplay` from each reference field's nested display-field selection. */
+ *  bag, rebuilding `relatedDisplay` from each reference field's relation-field selection. */
 function reshapeRecord<T>(raw: Record<string, unknown>, fields: EntityField[]): GraphQLRecord<T> {
+  const taken = takenFieldNames(fields);
   const data: Record<string, unknown> = {};
   const relatedDisplay: Record<string, string> = {};
   for (const field of fields) {
-    const value = raw[field.name];
-    if (field.kind === "reference" && value !== null && typeof value === "object") {
-      const ref = value as Record<string, unknown>;
-      data[field.name] = (ref.id as string | undefined) ?? null;
-      const display = field.refDisplayField ? ref[field.refDisplayField] : undefined;
-      if (typeof display === "string") {
-        relatedDisplay[field.name] = display;
+    data[field.name] = raw[field.name] ?? null;
+    if (field.kind === "reference" && field.refDisplayField) {
+      const related = raw[relationFieldName(field.name, taken)];
+      if (related !== null && typeof related === "object") {
+        const display = (related as Record<string, unknown>)[field.refDisplayField];
+        if (typeof display === "string") {
+          relatedDisplay[field.name] = display;
+        }
       }
-    } else {
-      data[field.name] = value;
     }
   }
   return {

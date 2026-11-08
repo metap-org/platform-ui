@@ -53,3 +53,19 @@ export function deleteFieldName(entityName: string): string {
 export function transitionFieldName(entityName: string): string {
   return `transition${typeName(entityName)}`;
 }
+
+/** The relation field carrying a reference field's target record — the reference field itself
+ *  is a plain id (`zoneId`), the record behind it is `zone { ... }`. Strips a trailing `Id`;
+ *  falls back to `<name>Ref` when there is no such suffix or the stripped name is already taken
+ *  (`taken` = the record envelope's field names plus every field the entity declares). Same
+ *  rule as the WAF gateway's `RelationFieldName` (`waap/data-plane/graphqlgateway/schema.go`) —
+ *  keep the two in step. */
+export function relationFieldName(fieldName: string, taken: ReadonlySet<string>): string {
+  if (fieldName.length > 2 && fieldName.endsWith("Id")) {
+    const base = fieldName.slice(0, -2);
+    if (!taken.has(base)) {
+      return base;
+    }
+  }
+  return `${fieldName}Ref`;
+}
