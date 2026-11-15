@@ -50,13 +50,10 @@ const DEFAULT_PAGE_SIZE = 25;
 const RESERVED_URL_PARAMS = new Set(["sort", "limit", "cursor", "q", "page", "size", "tab"]);
 
 /** Initial estimate only — `measureElement` (below) corrects this to each row's *real* rendered
- *  height once it mounts. A plain `40` here used to be treated as the row's actual height (rows
- *  positioned via `transform: translateY(index * 40px)`, never re-measured), but `TableCell`'s own
- *  `p-md` (1rem) top+bottom padding plus `text-sm` line-height renders closer to ~52px — every row
- *  was packed ~12px too close to the next, so each one's bottom edge sat under the row below it
- *  (found live 2026-09-05, reported as rows "overlapping"/"cut off"). Kept close to that real
- *  number so the very first paint (before any row has been measured) doesn't visibly jump. */
-const ROW_HEIGHT = 52;
+ *  height once it mounts, so the first paint (before any row is measured) just should not jump.
+ *  Compact rows since 2026-11-15: `py-1.5` cells with `text-sm` and 28px row actions render
+ *  close to 40px (the old `py-md` rows were ~52px and wasted most of a screen of rows). */
+const ROW_HEIGHT = 40;
 /** Fixed width for the trailing "actions" column — everything else divides the remaining space
  *  evenly. `table-fixed` layout (below) only reads *this* row's cell widths to size every
  *  column; body cells don't need matching widths. */
@@ -735,9 +732,9 @@ export function GeneratedList({
   const someLoadedSelected = records.some((r) => selectedIds.has(r.id));
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-4 py-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
           {title ?? entityLabel(entity.label)}
         </h2>
         {hasSearch ? (
@@ -924,7 +921,7 @@ export function GeneratedList({
         </Alert>
       ) : null}
       <Card className="overflow-hidden">
-        <div ref={scrollContainerRef} className="h-[calc(100vh-280px)] min-h-[420px] overflow-auto">
+        <div ref={scrollContainerRef} className="h-[calc(100vh-200px)] min-h-[320px] overflow-auto">
           {/* `min-w` forces horizontal scroll on a narrow viewport instead of every column
               squeezing unreadably thin — `docs/features/23-ux-infrastructure-core.md`'s
               responsive gap; the scroll container above already has `overflow-auto` (both axes). */}
@@ -935,7 +932,7 @@ export function GeneratedList({
                 className="grid border-b border-border"
                 style={{ gridTemplateColumns }}
               >
-                <div role="columnheader" className="flex h-10 items-center px-md">
+                <div role="columnheader" className="flex h-9 items-center px-md">
                   {canDelete ? (
                     <Checkbox
                       aria-label={t("common.selectAllLoaded")}
@@ -949,7 +946,7 @@ export function GeneratedList({
                   const field = fieldsByName.get(fieldName);
 
                   if (!field) {
-                    return <div key={fieldName} role="columnheader" className="h-10" />;
+                    return <div key={fieldName} role="columnheader" className="h-9" />;
                   }
 
                   const active = sort?.field === fieldName;
@@ -959,7 +956,7 @@ export function GeneratedList({
                       key={fieldName}
                       role="columnheader"
                       onClick={() => toggleSort(field)}
-                      className={`flex h-10 items-center truncate px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
+                      className={`flex h-9 items-center truncate px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
                     >
                       {fieldLabel(field.name, field.label)}
                       {active ? (
@@ -970,7 +967,7 @@ export function GeneratedList({
                 })}
                 <div
                   role="columnheader"
-                  className="flex h-10 items-center px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  className="flex h-9 items-center px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {t("common.actions")}
                 </div>
@@ -981,10 +978,10 @@ export function GeneratedList({
                   className="grid border-b border-border bg-muted/40"
                   style={{ gridTemplateColumns }}
                 >
-                  <div role="columnheader" className="h-10" />
+                  <div role="columnheader" className="h-9" />
                   {visibleFields.map((fieldName) => {
                     if (!listView.filters.includes(fieldName)) {
-                      return <div key={fieldName} role="columnheader" className="h-10" />;
+                      return <div key={fieldName} role="columnheader" className="h-9" />;
                     }
 
                     const field = fieldsByName.get(fieldName);
@@ -994,7 +991,7 @@ export function GeneratedList({
                         <div
                           key={fieldName}
                           role="columnheader"
-                          className="flex h-10 items-center px-md"
+                          className="flex h-9 items-center px-md"
                         >
                           <Select
                             className="h-8 px-2 text-xs"
@@ -1017,7 +1014,7 @@ export function GeneratedList({
                       <div
                         key={fieldName}
                         role="columnheader"
-                        className="flex h-10 items-center px-md"
+                        className="flex h-9 items-center px-md"
                       >
                         <Input
                           className="h-8 px-2 text-xs"
@@ -1032,7 +1029,7 @@ export function GeneratedList({
                       </div>
                     );
                   })}
-                  <div role="columnheader" className="h-10" />
+                  <div role="columnheader" className="h-9" />
                 </div>
               ) : null}
             </div>
@@ -1084,7 +1081,7 @@ export function GeneratedList({
                         gridTemplateColumns,
                       }}
                     >
-                      <div role="cell" className="flex items-center px-md py-md">
+                      <div role="cell" className="flex items-center px-md py-1.5">
                         {canDelete && record.capabilities?.canDelete !== false ? (
                           <Checkbox
                             aria-label={t("common.selectRow")}
@@ -1100,7 +1097,7 @@ export function GeneratedList({
                           <div
                             key={fieldName}
                             role="cell"
-                            className="flex items-center truncate px-md py-md text-sm"
+                            className="flex items-center truncate px-md py-1.5 text-sm"
                           >
                             {(() => {
                               const custom = cellRenderers?.[fieldName]?.(record);
@@ -1130,7 +1127,7 @@ export function GeneratedList({
                           </div>
                         );
                       })}
-                      <div role="cell" className="flex items-center px-md py-md">
+                      <div role="cell" className="flex items-center px-md py-1.5">
                         {/* Icon buttons (found live 2026-09-05 — plain "View"/"Delete" text read
                             as a bare link, not an action) — `navAdapter.Link` still does the real
                             navigation, just styled to match `IconButton`'s ghost/sm look via the
@@ -1151,7 +1148,7 @@ export function GeneratedList({
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <navAdapter.Link
                             to={navAdapter.toRecordDetail(entityName, record.id)}
-                            className={`${buttonVariants({ variant: "ghost" })} !h-9 !w-9 !p-0`}
+                            className={`${buttonVariants({ variant: "ghost" })} !h-7 !w-7 !p-0`}
                             aria-label={t("common.view")}
                             title={t("common.view")}
                           >
@@ -1161,7 +1158,7 @@ export function GeneratedList({
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              className="text-destructive hover:text-destructive"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
                               aria-label={t("common.delete")}
                               title={t("common.delete")}
                               disabled={pendingDeleteId !== null && !deleting}

@@ -17,6 +17,9 @@ export type NavigationAdapter = {
    * before — `react-router`'s `useNavigate` accepts the same shape, so
    * `ReactRouterNavigationProvider` gets it for free. */
   navigate: (path: string, options?: { replace?: boolean }) => void;
+  /** The current location's path, so the shell can mark the active nav entry. Optional: an adapter
+   *  without it still works, the nav just shows no active entry. */
+  pathname?: string;
   /** `className` (not part of `packages/platform-react`'s adapter shape) so a design-system-styled
    * caller can apply Tailwind utility classes directly — shadcn-style components have no Mantine
    * `component={Link}` polymorphism prop, so every nav-link site here renders `adapter.Link`

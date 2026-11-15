@@ -1,4 +1,4 @@
-import { useQueries } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import { useApiQuery } from "../api/useApiQuery";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch } from "../api/client";
@@ -20,6 +20,9 @@ export type AuditTrailEntryDto = {
   diff: Record<string, { before: unknown; after: unknown }>;
   versionAfter: number | null;
   occurredAt: string;
+  /** The owning record (the entity's `audit.parent`), when it declares one. */
+  parentEntity?: string | null;
+  parentId?: string | null;
 };
 
 type AuditEventsResponse = { data: AuditTrailEntryDto[] };
@@ -74,4 +77,43 @@ export function useAuditEventsForRecords(
     : undefined;
 
   return { data, isLoading, error };
+}
+
+export type AuditFeedFilters = {
+  /** Also the history of the record's children (entities whose `audit.parent` points here). */
+  includeChildren?: boolean;
+  actions?: AuditTrailEntryDto["action"][];
+  entities?: string[];
+  actorUserId?: string;
+};
+
+type AuditPageResponse = { data: AuditTrailEntryDto[]; page?: { nextCursor: string | null } };
+
+/** One record's history as server-side pages (`?cursor=&limit=`), newest first, with the
+ *  server's filters — what `AuditLog` renders. `fetchNextPage` loads the next page. */
+export function useAuditFeed(
+  entityName: string,
+  recordId: string,
+  filters: AuditFeedFilters,
+  enabled: boolean,
+  pageSize = 50,
+) {
+  const { status } = useAuth();
+  return useInfiniteQuery({
+    queryKey: ["audit-feed", entityName, recordId, filters, pageSize],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(pageSize) });
+      if (filters.includeChildren) params.set("includeChildren", "true");
+      if (filters.actions?.length) params.set("actions", filters.actions.join(","));
+      if (filters.entities?.length) params.set("entities", filters.entities.join(","));
+      if (filters.actorUserId) params.set("actor", filters.actorUserId);
+      if (pageParam) params.set("cursor", pageParam);
+      return apiFetch<AuditPageResponse>(
+        `/api/${entityName}/${recordId}/audit-events?${params.toString()}`,
+      );
+    },
+    getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
+    enabled: enabled && status === "authenticated",
+  });
 }
