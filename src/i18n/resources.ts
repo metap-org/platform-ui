@@ -15,6 +15,7 @@ const en = {
   common: {
     loading: "Loading...",
     loadingMore: "Loading more…",
+    overview: "Overview",
     search: "Search",
     searchPlaceholder: "Search…",
     rowsShown: "{{count}} rows",
@@ -447,6 +448,7 @@ const vi = {
   common: {
     loading: "Đang tải...",
     loadingMore: "Đang tải thêm…",
+    overview: "Tổng quan",
     search: "Tìm kiếm",
     searchPlaceholder: "Tìm kiếm…",
     rowsShown: "{{count}} dòng",

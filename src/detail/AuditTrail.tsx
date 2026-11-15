@@ -112,13 +112,7 @@ export function AuditTrailList({
  * just this one record's own), fetch with `useAuditEventsForRecords` instead and render the
  * result with `AuditTrailList` directly — this component only ever covers a single (entity, id).
  */
-export function AuditTrail({
-  entityName,
-  recordId,
-}: {
-  entityName: string;
-  recordId: string;
-}) {
+export function AuditTrail({ entityName, recordId }: { entityName: string; recordId: string }) {
   const { fieldLabel } = useEntityLabels(entityName);
   const { data: events, isLoading, error } = useAuditEvents(entityName, recordId, true);
 
@@ -129,7 +123,5 @@ export function AuditTrail({
     return <ApiErrorMessage error={error} />;
   }
 
-  return (
-    <AuditTrailList events={events ?? []} fieldLabel={(field) => fieldLabel(field, field)} />
-  );
+  return <AuditTrailList events={events ?? []} fieldLabel={(field) => fieldLabel(field, field)} />;
 }

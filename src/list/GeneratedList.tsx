@@ -47,7 +47,7 @@ type SortState = { field: string; descending: boolean } | null;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
 const DEFAULT_PAGE_SIZE = 25;
 /** URL params this list owns besides per-field filters, so hydration never mistakes them for one. */
-const RESERVED_URL_PARAMS = new Set(["sort", "limit", "cursor", "q", "page", "size"]);
+const RESERVED_URL_PARAMS = new Set(["sort", "limit", "cursor", "q", "page", "size", "tab"]);
 
 /** Initial estimate only — `measureElement` (below) corrects this to each row's *real* rendered
  *  height once it mounts. A plain `40` here used to be treated as the row's actual height (rows
@@ -477,6 +477,9 @@ export function GeneratedList({
   useEffect(() => {
     if (!hydratedFromUrl) return;
     const next = new URLSearchParams();
+    // `tab` belongs to a surrounding `RecordWorkspace`; rewriting the URL must not drop it.
+    const tab = searchParams.get("tab");
+    if (tab) next.set("tab", tab);
     if (sort) {
       next.set("sort", sort.descending ? `-${sort.field}` : sort.field);
     }

@@ -34,6 +34,7 @@ export * from "./auth/useEntityAccess";
 export * from "./auth/useTenantUsers";
 export * from "./detail/recordCapabilities";
 export * from "./detail/RecordDetail";
+export * from "./detail/RecordWorkspace";
 export * from "./detail/useWorkflowEvents";
 export * from "./detail/AuditTrail";
 export * from "./detail/useAuditEvents";
