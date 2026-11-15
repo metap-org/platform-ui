@@ -427,9 +427,13 @@ export function GeneratedList({
     [baseFiltersKey, activeFilters],
   );
 
+  // A different entity, or the same one under different base filters (another record's tab in a
+  // `RecordWorkspace`), starts on page 1. This runs before the URL hydration effect below, so a
+  // `?page=` in the URL still wins on first load.
   useEffect(() => {
     setHydratedFromUrl(false);
-  }, [entityName]);
+    setPage(1);
+  }, [entityName, baseFiltersKey]);
 
   // One-time restore of sort/filter from the URL for this entity — needs `entity.fields` to know
   // which filter keys are enum (routes into `enumFilters`, a `Select`) vs. text (`filterInputs`,
@@ -501,10 +505,9 @@ export function GeneratedList({
   const pageSizeOptions = PAGE_SIZE_OPTIONS.filter((n) => n <= maxLimit);
   const limit = Math.min(pageSize, maxLimit);
 
-  // A different search/filter/sort/size means a different row set: back to page 1.
-  useEffect(() => {
-    setPage(1);
-  }, [entityName, sort, queryFilters, debouncedSearch, pageSize]);
+  // A different search/filter/sort/size means a different row set, so each control that changes
+  // one goes back to page 1 in its own handler. Not an effect on those values: the URL hydration
+  // above sets them too, and an effect would then throw away the `?page=` it just restored.
 
   const {
     data: pageData,
@@ -532,11 +535,11 @@ export function GeneratedList({
     (f) => f.searchable && (f.kind === "string" || f.kind === "enum"),
   );
 
-  // A changed entity/sort/filter set means an entirely different set of rows is about to render
-  // — clear the selection rather than let it silently keep referencing rows no longer on screen.
+  // A changed entity/sort/filter/search, or another page, means a different set of rows is about to
+  // render — clear the selection rather than let a bulk delete reach rows no longer on screen.
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [entityName, sort, queryFilters]);
+  }, [entityName, sort, queryFilters, debouncedSearch, page, pageSize]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -580,6 +583,7 @@ export function GeneratedList({
       return;
     }
 
+    setPage(1);
     setSort((current) => {
       if (!current || current.field !== field.name) {
         return { field: field.name, descending: false };
@@ -743,7 +747,10 @@ export function GeneratedList({
             aria-label={t("common.search")}
             placeholder={t("common.searchPlaceholder")}
             value={searchInput}
-            onChange={(event) => setSearchInput(event.currentTarget.value)}
+            onChange={(event) => {
+              setSearchInput(event.currentTarget.value);
+              setPage(1);
+            }}
           />
         ) : null}
         <div className="flex items-center gap-2">
@@ -997,9 +1004,10 @@ export function GeneratedList({
                               label: value,
                             }))}
                             value={enumFilters[fieldName] || undefined}
-                            onValueChange={(value) =>
-                              setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }))
-                            }
+                            onValueChange={(value) => {
+                              setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }));
+                              setPage(1);
+                            }}
                           />
                         </div>
                       );
@@ -1018,6 +1026,7 @@ export function GeneratedList({
                           onChange={(event) => {
                             const value = event.currentTarget.value;
                             setFilterInputs((prev) => ({ ...prev, [fieldName]: value }));
+                            setPage(1);
                           }}
                         />
                       </div>
@@ -1189,7 +1198,10 @@ export function GeneratedList({
                   label: t("common.perPage", { count: n }),
                 }))}
                 value={String(limit)}
-                onValueChange={(value) => setPageSize(Number(value))}
+                onValueChange={(value) => {
+                  setPageSize(Number(value));
+                  setPage(1);
+                }}
               />
             ) : null}
             <Pagination

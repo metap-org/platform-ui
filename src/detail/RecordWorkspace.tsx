@@ -65,9 +65,10 @@ export function RecordWorkspace({
     <Tabs
       value={active}
       onValueChange={(next) => {
-        const params = new URLSearchParams(searchParams);
-        if (next === OVERVIEW_TAB) params.delete("tab");
-        else params.set("tab", next);
+        // Only `tab` carries over: the other params (q, page, sort, filters) belong to the list on
+        // the tab being left, and the next tab's list would otherwise read them as its own.
+        const params = new URLSearchParams();
+        if (next !== OVERVIEW_TAB) params.set("tab", next);
         setSearchParams(params);
       }}
     >

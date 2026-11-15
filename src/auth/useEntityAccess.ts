@@ -23,12 +23,7 @@ export function useEntityAccess() {
   );
 }
 
-/** True when the caller may `action` the entity. While the map is loading, or for an entity the
- *  backend did not list, answers `false` — nothing is offered before it is known to be allowed. */
-export function useCanAccessEntity(entity: string, action: EntityAccessAction = "read"): boolean {
-  const { data } = useEntityAccess();
-  const access = data?.[entity];
-  if (!access) return false;
+function allows(access: EntityAccess, action: EntityAccessAction): boolean {
   switch (action) {
     case "read":
       return access.canRead;
@@ -39,4 +34,24 @@ export function useCanAccessEntity(entity: string, action: EntityAccessAction = 
     case "delete":
       return access.canDelete;
   }
+}
+
+/** True when the caller may `action` the entity. While the map is loading, or for an entity the
+ *  backend did not list, answers `false` — nothing is offered before it is known to be allowed.
+ *  For a control that acts (a button). */
+export function useCanAccessEntity(entity: string, action: EntityAccessAction = "read"): boolean {
+  const { data } = useEntityAccess();
+  const access = data?.[entity];
+  return access ? allows(access, action) : false;
+}
+
+/** True only when the backend answered and said no. Unknown (still loading, the request failed,
+ *  or an entity the answering service does not hold, e.g. a product split over several services
+ *  behind one proxy) is not a denial. For navigation: hiding a menu entry on "unknown" would hide
+ *  the whole app whenever the access map is unreachable, and the server still checks every
+ *  request the screen makes. */
+export function useEntityDenied(entity: string, action: EntityAccessAction = "read"): boolean {
+  const { data } = useEntityAccess();
+  const access = data?.[entity];
+  return access ? !allows(access, action) : false;
 }
