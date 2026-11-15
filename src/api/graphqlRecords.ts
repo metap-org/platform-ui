@@ -47,6 +47,9 @@ export type GraphQLRecord<TData = Record<string, unknown>> = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** Per-record answers (transitions, writable fields, canDelete). Present on a single-record
+   *  read; the server sends `null` on list rows (they carry only the entity-level
+   *  `RecordPage.capabilities`), so list code must read it as optional. */
   capabilities: RecordCapabilities;
   relatedDisplay?: Record<string, string>;
 };

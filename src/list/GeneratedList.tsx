@@ -1085,7 +1085,7 @@ export function GeneratedList({
                       }}
                     >
                       <div role="cell" className="flex items-center px-md py-md">
-                        {canDelete && record.capabilities.canDelete !== false ? (
+                        {canDelete && record.capabilities?.canDelete !== false ? (
                           <Checkbox
                             aria-label={t("common.selectRow")}
                             checked={selectedIds.has(record.id)}
@@ -1157,7 +1157,7 @@ export function GeneratedList({
                           >
                             <EyeIcon />
                           </navAdapter.Link>
-                          {canDelete && record.capabilities.canDelete !== false ? (
+                          {canDelete && record.capabilities?.canDelete !== false ? (
                             <IconButton
                               variant="ghost"
                               size="sm"
