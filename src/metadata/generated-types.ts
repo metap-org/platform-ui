@@ -5861,6 +5861,20 @@ export interface components {
         /** @enum {string} */
         storage?: "native" | "column";
         unique?: boolean;
+        /**
+         * @description Input control a generic form renders for this field (presentation only).
+         * @enum {string}
+         */
+        widget?:
+          | "switch"
+          | "checkbox"
+          | "select"
+          | "radio"
+          | "combobox"
+          | "textarea"
+          | "multiselect"
+          | "checkboxGroup"
+          | "tags";
       }[];
       label: string;
       listViews: {

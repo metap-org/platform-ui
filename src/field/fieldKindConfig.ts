@@ -39,7 +39,12 @@ const FORMATTERS: Record<FieldKind, (value: unknown) => string> = {
     typeof value === "string" ? dateFormatter.format(new Date(value)) : safeString(value),
   datetime: (value) =>
     typeof value === "string" ? dateTimeFormatter.format(new Date(value)) : safeString(value),
-  json: (value) => JSON.stringify(value),
+  // A multi-value field (widget multiselect/checkboxGroup/tags) holds an array of strings: show it
+  // as a list, not as JSON.
+  json: (value) =>
+    Array.isArray(value) && value.every((v) => typeof v === "string")
+      ? value.join(", ")
+      : JSON.stringify(value),
   id: safeString,
   string: safeString,
   reference: safeString,

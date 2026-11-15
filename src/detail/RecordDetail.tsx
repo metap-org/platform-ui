@@ -87,7 +87,16 @@ function WorkflowHistoryTab({ entityName, recordId }: { entityName: string; reco
   );
 }
 
-export function RecordDetail({ entityName, id }: { entityName: string; id: string }) {
+export function RecordDetail({
+  entityName,
+  id,
+  showRelated = true,
+}: {
+  entityName: string;
+  id: string;
+  /** Set false when the related views are shown elsewhere (e.g. as tabs in `RecordWorkspace`). */
+  showRelated?: boolean;
+}) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
@@ -163,7 +172,7 @@ export function RecordDetail({ entityName, id }: { entityName: string; id: strin
           })}
         </dl>
       </Card>
-      {entity.relatedViews && entity.relatedViews.length > 0 ? (
+      {showRelated && entity.relatedViews && entity.relatedViews.length > 0 ? (
         <RelatedRecordsPanel id={id} relatedViews={entity.relatedViews} />
       ) : null}
     </>

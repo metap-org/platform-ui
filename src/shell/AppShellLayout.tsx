@@ -2,7 +2,30 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsFetching } from "@tanstack/react-query";
-import { Alert, Badge, Button, IconButton, Select, ToastProvider, toast } from "@metap/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  Select,
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarItem,
+  ToastProvider,
+  toast,
+} from "@metap/ui";
 import {
   useImpersonationActions,
   useImpersonationStatus,
@@ -10,6 +33,7 @@ import {
 } from "../admin/impersonation";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
+import { useEntityDenied, type EntityAccessAction } from "../auth/useEntityAccess";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { useCurrentUserEmail } from "../auth/useTenantUsers";
 import { ApiError } from "../api/client";
@@ -79,41 +103,181 @@ function ImpersonationBanner() {
 export type ShellNavItem = {
   to: string;
   label: string;
+  /** Sidebar section heading. Consecutive items with the same `group` render under one heading,
+   *  in the order given; items without one render first, under no heading. */
+  group?: string;
+  /** Shown before the label, and alone when the sidebar is collapsed (initials otherwise). */
+  icon?: ReactNode;
   /** Hidden unless the current user holds one of these roles; visible to everyone if omitted **or
    * empty**. An empty array reads as "no role requirement", not "no one may see this" — the latter
    * was the old behavior purely because `[]` is truthy in JS, which nothing intended
    * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B7). */
   roles?: string[];
+  /** Hidden when the access map says the caller may not `entityAction` (default `read`) this
+   * entity — entity-level policy, so an entry does not lead to a screen that would only answer 403.
+   * Needs no role list. Shown while the map loads or when it does not list the entity
+   * (`useEntityDenied`), so an unreachable map never empties the menu. */
+  entity?: string;
+  entityAction?: EntityAccessAction;
 };
 
-function NavLink({ item }: { item: ShellNavItem }) {
+/** `/` is active only on itself; any other entry also on its sub-paths (`/zones/:id`). */
+function isActivePath(pathname: string | undefined, to: string): boolean {
+  if (!pathname) return false;
+  if (to === "/") return pathname === "/";
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function NavItem({ item, onNavigate }: { item: ShellNavItem; onNavigate?: () => void }) {
   const navAdapter = useNavigationAdapter();
   const allowedByRole = useHasRole(item.roles ?? []);
+  const deniedByEntity = useEntityDenied(item.entity ?? "", item.entityAction ?? "read");
 
   if (item.roles?.length && !allowedByRole) {
     return null;
   }
+  if (item.entity && deniedByEntity) {
+    return null;
+  }
 
   return (
-    <navAdapter.Link
-      to={item.to}
-      className="text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
+    <SidebarItem
+      asChild
+      label={item.label}
+      icon={item.icon}
+      active={isActivePath(navAdapter.pathname, item.to)}
+      onClick={onNavigate}
     >
-      {item.label}
-    </navAdapter.Link>
+      <navAdapter.Link to={item.to}>{null}</navAdapter.Link>
+    </SidebarItem>
+  );
+}
+
+/** Splits nav items into consecutive runs by `group`, keeping the caller's order. */
+function groupNavItems(items: ShellNavItem[]): { label?: string; items: ShellNavItem[] }[] {
+  const groups: { label?: string; items: ShellNavItem[] }[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.label === item.group) last.items.push(item);
+    else groups.push({ label: item.group, items: [item] });
+  }
+  return groups;
+}
+
+function NavGroups({ items, onNavigate }: { items: ShellNavItem[]; onNavigate?: () => void }) {
+  return (
+    <>
+      {groupNavItems(items).map((group, index) => (
+        <SidebarGroup key={`${group.label ?? ""}-${index}`} label={group.label}>
+          {group.items.map((item) => (
+            <NavItem key={item.to} item={item} onNavigate={onNavigate} />
+          ))}
+        </SidebarGroup>
+      ))}
+    </>
+  );
+}
+
+const COLLAPSED_STORAGE_KEY = "metap.shell.sidebarCollapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    // Storage blocked (private mode, policy): the toggle still works for this page view.
+  }
+}
+
+function ChevronIcon({ left }: { left: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      className="h-4 w-4"
+    >
+      <path d={left ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      className="h-5 w-5"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+/** Email, roles and logout behind one button, instead of spreading them across the top bar. */
+function AccountMenu({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation();
+  const { data: user } = useCurrentUser();
+  const email = useCurrentUserEmail();
+  const name = email ?? user?.userId ?? "";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" aria-label={t("shell.userMenu")} className="gap-2">
+          <span
+            aria-hidden
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
+          >
+            {name.slice(0, 2).toUpperCase() || "?"}
+          </span>
+          <span className="hidden max-w-[12rem] truncate text-sm lg:inline">{name}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="flex flex-col gap-1">
+          <span className="truncate text-sm font-medium">{name}</span>
+          {user?.roles.length ? (
+            <span className="flex flex-wrap gap-1">
+              {user.roles.map((role) => (
+                <Badge key={role} variant="outline" className="font-normal">
+                  {role}
+                </Badge>
+              ))}
+            </span>
+          ) : null}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5">
+          <LocaleSwitcher compact />
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onLogout}>{t("shell.logout")}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 /** The shared page chrome every `@metap/platform-ui` consumer app assembles its authenticated
- * routes into, instead of hand-rolling header/nav per app (ported from `packages/platform-react`'s
- * Mantine `AppShell`-based version onto the `@metap/ui` design system). Also mounts `@metap/ui`'s
- * `ToastProvider` once here, so `GeneratedForm`/`GeneratedList`'s success toasts (and any future
- * `toast(...)` call anywhere under this shell) render without every consumer app wiring its own
- * provider — the same "the library provides it" shape as `AuthContext`/`LocaleProvider`. Also
- * renders `LocaleSwitcher` in the header (2026-09-05) — every `LocaleProvider`-wrapped app already
- * gets working `en`/`vi` translation via `useTranslation()`, but until now nothing actually
- * rendered a way to change it, in any consumer app (`../metap-demo-crm`/`../metap-demo-jira`/
- * `../metap-demo-waf` all wrap `LocaleProvider` yet none mounted `LocaleSwitcher` anywhere). */
+ * routes into, instead of hand-rolling header/nav per app. Layout (2026-11-15): a collapsible left
+ * sidebar holds the navigation, grouped by `ShellNavItem.group` (a top bar ran out of width once a
+ * product had more than a handful of sections); a slim top bar keeps only the tenant switcher and
+ * the account menu (email, roles, language, logout); on small screens the sidebar opens as a
+ * sheet from the left. Also mounts `@metap/ui`'s `ToastProvider` once here, so
+ * `GeneratedForm`/`GeneratedList`'s success toasts (and any `toast(...)` under this shell) render
+ * without every consumer app wiring its own provider. */
 export function AppShellLayout({
   brand,
   navItems,
@@ -125,13 +289,9 @@ export function AppShellLayout({
 }) {
   const { t } = useTranslation();
   const { logout } = useAuth();
-  const { data: user } = useCurrentUser();
-  // The JWT only carries a user id (`sub`), never email — see `useCurrentUserEmail`'s own doc
-  // comment. `useTenantUsers()` underneath fetches the whole tenant user list once (not
-  // per-render), so this costs nothing extra beyond what `useCurrentUser` already fetches.
-  const email = useCurrentUserEmail();
   const navAdapter = useNavigationAdapter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   // Any query in-flight anywhere under this shell, not just the current screen's own `Spinner` —
   // `docs/features/23-ux-infrastructure-core.md`'s "global loading state", additive to (not a
   // replacement for) per-screen loading UI.
@@ -145,9 +305,25 @@ export function AppShellLayout({
     navAdapter.navigate(navAdapter.toLogin());
   }
 
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      writeCollapsed(!current);
+      return !current;
+    });
+  }
+
+  const brandLink = (
+    <navAdapter.Link
+      to={navAdapter.toHome()}
+      className="truncate px-1 text-sm font-bold text-foreground no-underline"
+    >
+      {brand}
+    </navAdapter.Link>
+  );
+
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-background">
+      <div className="flex h-screen overflow-hidden bg-background">
         <AppCommandPalette navItems={navItems} />
         {fetchingCount > 0 ? (
           <div
@@ -156,100 +332,69 @@ export function AppShellLayout({
             className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary"
           />
         ) : null}
-        <header className="h-[60px] border-b border-border">
-          <div className="flex h-full items-center justify-between gap-4 px-4">
-            <div className="flex items-center gap-6">
-              <navAdapter.Link
-                to={navAdapter.toHome()}
-                className="font-bold text-foreground no-underline"
-              >
-                {brand}
-              </navAdapter.Link>
-              {/* Collapses below `md` — the hamburger toggle right after it takes over.
-                  `docs/features/23-ux-infrastructure-core.md`'s "responsive/mobile", previously
-                  0 handling here (`frontend-checklist.md`, "gần như chưa có"). */}
-              <nav className="hidden items-center gap-4 md:flex">
-                {navItems.map((item) => (
-                  <NavLink key={item.to} item={item} />
-                ))}
-              </nav>
-            </div>
-            <div className="flex items-center gap-3">
-              {isPlatformAdmin && !isImpersonating ? (
-                <div className="hidden md:block">
-                  <TenantSwitcher />
-                </div>
-              ) : null}
-              <div className="hidden w-32 md:block">
-                <LocaleSwitcher compact />
-              </div>
-              {email ? (
-                <span className="hidden text-sm text-foreground/70 md:inline">{email}</span>
-              ) : null}
-              {user ? (
-                <div className="hidden items-center gap-1 md:flex">
-                  {user.roles.map((role) => (
-                    <Badge key={role} variant="outline">
-                      {role}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden md:inline-flex"
-                onClick={() => void handleLogout()}
-              >
-                {t("shell.logout")}
-              </Button>
+
+        <Sidebar collapsed={collapsed} className="hidden md:flex">
+          <SidebarHeader className={collapsed ? "justify-center" : "justify-between"}>
+            {collapsed ? null : brandLink}
+            <IconButton
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8"
+              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              onClick={toggleCollapsed}
+              icon={<ChevronIcon left={!collapsed} />}
+            />
+          </SidebarHeader>
+          <SidebarContent>
+            <NavGroups items={navItems} />
+          </SidebarContent>
+        </Sidebar>
+
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetContent side="left" className="w-64 max-w-[80vw] gap-0 p-0">
+            <SheetTitle className="sr-only">{brand}</SheetTitle>
+            <Sidebar className="w-full border-r-0">
+              <SidebarHeader>{brandLink}</SidebarHeader>
+              <SidebarContent>
+                <NavGroups items={navItems} onNavigate={() => setMobileNavOpen(false)} />
+              </SidebarContent>
+              <SidebarFooter>
+                <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+                  {t("shell.logout")}
+                </Button>
+              </SidebarFooter>
+            </Sidebar>
+          </SheetContent>
+        </Sheet>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-3">
+            <div className="flex min-w-0 items-center gap-2">
               <IconButton
                 variant="ghost"
                 size="sm"
                 className="md:hidden"
                 aria-label={t("shell.toggleNav")}
                 aria-expanded={mobileNavOpen}
-                onClick={() => setMobileNavOpen((open) => !open)}
-                icon={
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    className="h-5 w-5"
-                  >
-                    {mobileNavOpen ? (
-                      <path d="M6 6l12 12M18 6L6 18" />
-                    ) : (
-                      <path d="M4 6h16M4 12h16M4 18h16" />
-                    )}
-                  </svg>
-                }
+                onClick={() => setMobileNavOpen(true)}
+                icon={<MenuIcon />}
               />
+              <div className="md:hidden">{brandLink}</div>
             </div>
-          </div>
-          {mobileNavOpen ? (
-            <div className="border-t border-border px-4 py-3 md:hidden">
-              <nav className="flex flex-col gap-3">
-                {navItems.map((item) => (
-                  <NavLink key={item.to} item={item} />
-                ))}
-              </nav>
-              <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
-                <LocaleSwitcher compact />
-                {email ? <span className="text-sm text-foreground/70">{email}</span> : null}
-                <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-                  {t("shell.logout")}
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              {isPlatformAdmin && !isImpersonating ? (
+                <div className="hidden md:block">
+                  <TenantSwitcher />
+                </div>
+              ) : null}
+              <AccountMenu onLogout={() => void handleLogout()} />
             </div>
-          ) : null}
-        </header>
-        {isImpersonating ? <ImpersonationBanner /> : null}
-        <main className="p-4">
-          <ErrorBoundary>{children}</ErrorBoundary>
-        </main>
+          </header>
+          {isImpersonating ? <ImpersonationBanner /> : null}
+          <main className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
+        </div>
       </div>
     </ToastProvider>
   );

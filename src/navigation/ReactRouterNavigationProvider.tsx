@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { NavigationContext } from "./NavigationContext";
 import type { NavigationAdapter } from "./NavigationContext";
 
@@ -10,6 +10,7 @@ import type { NavigationAdapter } from "./NavigationContext";
  * (byte-for-byte identical in both, found 2026-08-31) rather than share one. */
 function useReactRouterNavigationAdapter(): NavigationAdapter {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   return {
     toRecordList: (entityName) => `/records/${entityName}`,
@@ -19,6 +20,7 @@ function useReactRouterNavigationAdapter(): NavigationAdapter {
     toLogin: () => "/login",
     toHome: () => "/",
     navigate,
+    pathname,
     Link: RouterLink,
   };
 }

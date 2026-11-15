@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   Input,
+  Pagination,
   Select,
   Spinner,
   toast,
@@ -24,7 +25,7 @@ import {
 import {
   deleteGraphQLRecord,
   fetchAllGraphQLRecords,
-  useInfiniteGraphQLRecords,
+  useGraphQLRecordPage,
   useInvalidateGraphQLRecords,
   type GraphQLRecord,
 } from "../api/graphqlRecords";
@@ -42,14 +43,17 @@ type RecordDto = GraphQLRecord;
 
 type SortState = { field: string; descending: boolean } | null;
 
+/** Page sizes offered in the footer; only those the list view's `maxLimit` allows are shown. */
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+const DEFAULT_PAGE_SIZE = 25;
+/** URL params this list owns besides per-field filters, so hydration never mistakes them for one. */
+const RESERVED_URL_PARAMS = new Set(["sort", "limit", "cursor", "q", "page", "size", "tab"]);
+
 /** Initial estimate only — `measureElement` (below) corrects this to each row's *real* rendered
- *  height once it mounts. A plain `40` here used to be treated as the row's actual height (rows
- *  positioned via `transform: translateY(index * 40px)`, never re-measured), but `TableCell`'s own
- *  `p-md` (1rem) top+bottom padding plus `text-sm` line-height renders closer to ~52px — every row
- *  was packed ~12px too close to the next, so each one's bottom edge sat under the row below it
- *  (found live 2026-09-05, reported as rows "overlapping"/"cut off"). Kept close to that real
- *  number so the very first paint (before any row has been measured) doesn't visibly jump. */
-const ROW_HEIGHT = 52;
+ *  height once it mounts, so the first paint (before any row is measured) just should not jump.
+ *  Compact rows since 2026-11-15: `py-1.5` cells with `text-sm` and 28px row actions render
+ *  close to 40px (the old `py-md` rows were ~52px and wasted most of a screen of rows). */
+const ROW_HEIGHT = 40;
 /** Fixed width for the trailing "actions" column — everything else divides the remaining space
  *  evenly. `table-fixed` layout (below) only reads *this* row's cell widths to size every
  *  column; body cells don't need matching widths. */
@@ -277,7 +281,40 @@ function sortParamOf(sort: SortState): string | undefined {
   return sort.descending ? `-${sort.field}` : sort.field;
 }
 
-export function GeneratedList({ entityName }: { entityName: string }) {
+/** What an application may customize without hand-building a list. Everything is optional: with no
+ *  props the list is fully metadata-driven. Search, pagination, sorting, filters, permission-aware
+ *  buttons and bulk actions stay the list's own, so an app screen never reimplements them. */
+export type GeneratedListProps = {
+  entityName: string;
+  /** Replaces the entity label in the page heading. */
+  title?: string;
+  /** Extra controls in the toolbar, next to the built-in ones (e.g. an "Add zone" wizard link). */
+  actions?: ReactNode;
+  /** Where the row's primary cell links to; turns the first visible column into a link. */
+  rowHref?: (record: GraphQLRecord) => string;
+  /** Per-column cell renderers keyed by field name — a derived or styled cell without leaving the
+   *  generated list. Return `undefined` to fall back to the default rendering for that row. */
+  cellRenderers?: Record<string, (record: GraphQLRecord) => ReactNode | undefined>;
+  /** Filters always applied (e.g. a zone's own id on its detail tab); not shown as editable. */
+  baseFilters?: Record<string, string>;
+  /** Where "New" goes (default: the generic create form); `null` hides it, for an entity created
+   *  through its own flow (a wizard) rather than the plain form. Still permission-gated. */
+  newHref?: string | null;
+  /** Hides the New button and every delete control for a list that is read-only by design
+   *  (e.g. a read model), independent of permissions. */
+  readOnly?: boolean;
+};
+
+export function GeneratedList({
+  entityName,
+  title,
+  actions,
+  rowHref,
+  cellRenderers,
+  baseFilters,
+  newHref,
+  readOnly = false,
+}: GeneratedListProps) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
@@ -297,6 +334,12 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // previous entity's filters over.
   const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const debouncedTextFilters = useDebouncedValue(filterInputs, 400);
+  // Free-text search over the entity's searchable fields (server-side `search`), debounced like
+  // the per-column text filters; page/size drive numbered pagination.
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 400).trim();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   // Selection is scoped to *loaded* rows only, not "every record matching the current filter" —
@@ -373,9 +416,21 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     return result;
   }, [debouncedTextFilters, enumFilters]);
 
+  // Filters the caller always applies, merged under what the user typed. Keyed by content so an
+  // inline object literal from the caller does not look like a new filter set on every render.
+  const baseFiltersKey = JSON.stringify(baseFilters ?? {});
+  const queryFilters = useMemo(
+    () => ({ ...(JSON.parse(baseFiltersKey) as Record<string, string>), ...activeFilters }),
+    [baseFiltersKey, activeFilters],
+  );
+
+  // A different entity, or the same one under different base filters (another record's tab in a
+  // `RecordWorkspace`), starts on page 1. This runs before the URL hydration effect below, so a
+  // `?page=` in the URL still wins on first load.
   useEffect(() => {
     setHydratedFromUrl(false);
-  }, [entityName]);
+    setPage(1);
+  }, [entityName, baseFiltersKey]);
 
   // One-time restore of sort/filter from the URL for this entity — needs `entity.fields` to know
   // which filter keys are enum (routes into `enumFilters`, a `Select`) vs. text (`filterInputs`,
@@ -389,10 +444,16 @@ export function GeneratedList({ entityName }: { entityName: string }) {
       setSort(sortFromUrl);
     }
 
+    setSearchInput(searchParams.get("q") ?? "");
+    const pageFromUrl = Number(searchParams.get("page"));
+    if (Number.isInteger(pageFromUrl) && pageFromUrl > 1) setPage(pageFromUrl);
+    const sizeFromUrl = Number(searchParams.get("size"));
+    if (PAGE_SIZE_OPTIONS.includes(sizeFromUrl)) setPageSize(sizeFromUrl);
+
     const textFromUrl: Record<string, string> = {};
     const enumFromUrl: Record<string, string> = {};
     for (const [key, value] of searchParams.entries()) {
-      if (key === "sort" || key === "limit" || key === "cursor") continue;
+      if (RESERVED_URL_PARAMS.has(key)) continue;
       const field = entity.fields.find((f) => f.name === key);
       if (field?.kind === "enum") {
         enumFromUrl[key] = value;
@@ -417,46 +478,65 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   useEffect(() => {
     if (!hydratedFromUrl) return;
     const next = new URLSearchParams();
+    // `tab` belongs to a surrounding `RecordWorkspace`; rewriting the URL must not drop it.
+    const tab = searchParams.get("tab");
+    if (tab) next.set("tab", tab);
     if (sort) {
       next.set("sort", sort.descending ? `-${sort.field}` : sort.field);
     }
     for (const [key, value] of Object.entries(activeFilters)) {
       next.set(key, value);
     }
+    if (debouncedSearch) next.set("q", debouncedSearch);
+    if (page > 1) next.set("page", String(page));
+    if (pageSize !== DEFAULT_PAGE_SIZE) next.set("size", String(pageSize));
     setSearchParams(next);
     // `setSearchParams` intentionally excluded below: react-router hands back a new function
     // identity on every navigation, which would otherwise re-run this effect on the very write
     // it just performed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort, activeFilters, hydratedFromUrl]);
+  }, [sort, activeFilters, debouncedSearch, page, pageSize, hydratedFromUrl]);
 
   const sortParam = sortParamOf(sort);
-  const limit = listView?.maxLimit ?? 30;
+  const maxLimit = listView?.maxLimit ?? 30;
+  const pageSizeOptions = PAGE_SIZE_OPTIONS.filter((n) => n <= maxLimit);
+  const limit = Math.min(pageSize, maxLimit);
+
+  // A different search/filter/sort/size means a different row set, so each control that changes
+  // one goes back to page 1 in its own handler. Not an effect on those values: the URL hydration
+  // above sets them too, and an effect would then throw away the `?page=` it just restored.
 
   const {
-    data,
+    data: pageData,
     isLoading: recordsLoading,
     error: recordsError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
     isFetching,
     refetch,
-  } = useInfiniteGraphQLRecords<Record<string, unknown>>(
-    entityName,
-    activeFilters,
-    sortParam,
+  } = useGraphQLRecordPage<Record<string, unknown>>(entityName, {
+    filters: queryFilters,
+    search: debouncedSearch,
+    sort: sortParam,
     limit,
-    Boolean(entity && listView),
+    page,
+    enabled: Boolean(entity && listView),
+  });
+
+  const records = useMemo(() => pageData?.records ?? [], [pageData]);
+  const total = pageData?.total ?? null;
+  const totalPages = total === null ? 1 : Math.max(1, Math.ceil(total / limit));
+  // Entity-level permission from the list response: until it arrives nothing destructive is
+  // offered. UI-only gating — the server re-checks every write regardless.
+  const canCreate = !readOnly && newHref !== null && (pageData?.capabilities.canCreate ?? false);
+  const canDelete = !readOnly && (pageData?.capabilities.canDelete ?? false);
+  const hasSearch = (entity?.fields ?? []).some(
+    (f) => f.searchable && (f.kind === "string" || f.kind === "enum"),
   );
 
-  const records = useMemo(() => data?.pages.flatMap((page) => page.records) ?? [], [data]);
-
-  // A changed entity/sort/filter set means an entirely different set of rows is about to render
-  // — clear the selection rather than let it silently keep referencing rows no longer on screen.
+  // A changed entity/sort/filter/search, or another page, means a different set of rows is about to
+  // render — clear the selection rather than let a bulk delete reach rows no longer on screen.
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [entityName, sort, activeFilters]);
+  }, [entityName, sort, queryFilters, debouncedSearch, page, pageSize]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -474,16 +554,6 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
-  const lastVirtualIndex = virtualRows[virtualRows.length - 1]?.index;
-
-  useEffect(() => {
-    if (lastVirtualIndex === undefined) {
-      return;
-    }
-    if (lastVirtualIndex >= records.length - 10 && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
-    }
-  }, [lastVirtualIndex, records.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (entityLoading) {
     return <Spinner />;
@@ -510,6 +580,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
       return;
     }
 
+    setPage(1);
     setSort((current) => {
       if (!current || current.field !== field.name) {
         return { field: field.name, descending: false };
@@ -624,7 +695,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         format,
         entityName,
         listViewFields,
-        activeFilters,
+        queryFilters,
         sortParam,
         (count) => {
           fetchedCount = count;
@@ -661,11 +732,24 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   const someLoadedSelected = records.some((r) => selectedIds.has(r.id));
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-4 py-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-          {entityLabel(entity.label)}
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          {title ?? entityLabel(entity.label)}
         </h2>
+        {hasSearch ? (
+          <Input
+            type="search"
+            className="max-w-xs flex-1"
+            aria-label={t("common.search")}
+            placeholder={t("common.searchPlaceholder")}
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.currentTarget.value);
+              setPage(1);
+            }}
+          />
+        ) : null}
         <div className="flex items-center gap-2">
           <IconButton
             variant={showFilters || Object.keys(activeFilters).length > 0 ? "outline" : "ghost"}
@@ -782,12 +866,15 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <navAdapter.Link
-            to={navAdapter.toNewRecord(entityName)}
-            className={buttonVariants({ variant: "default" })}
-          >
-            {t("common.new")}
-          </navAdapter.Link>
+          {actions}
+          {canCreate ? (
+            <navAdapter.Link
+              to={newHref ?? navAdapter.toNewRecord(entityName)}
+              className={buttonVariants({ variant: "default" })}
+            >
+              {t("common.new")}
+            </navAdapter.Link>
+          ) : null}
         </div>
       </div>
       {selectedIds.size > 0 ? (
@@ -834,7 +921,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         </Alert>
       ) : null}
       <Card className="overflow-hidden">
-        <div ref={scrollContainerRef} className="h-[calc(100vh-280px)] min-h-[420px] overflow-auto">
+        <div ref={scrollContainerRef} className="h-[calc(100vh-200px)] min-h-[320px] overflow-auto">
           {/* `min-w` forces horizontal scroll on a narrow viewport instead of every column
               squeezing unreadably thin — `docs/features/23-ux-infrastructure-core.md`'s
               responsive gap; the scroll container above already has `overflow-auto` (both axes). */}
@@ -845,19 +932,21 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                 className="grid border-b border-border"
                 style={{ gridTemplateColumns }}
               >
-                <div role="columnheader" className="flex h-10 items-center px-md">
-                  <Checkbox
-                    aria-label={t("common.selectAllLoaded")}
-                    checked={allLoadedSelected}
-                    indeterminate={someLoadedSelected && !allLoadedSelected}
-                    onCheckedChange={toggleAllLoadedSelected}
-                  />
+                <div role="columnheader" className="flex h-9 items-center px-md">
+                  {canDelete ? (
+                    <Checkbox
+                      aria-label={t("common.selectAllLoaded")}
+                      checked={allLoadedSelected}
+                      indeterminate={someLoadedSelected && !allLoadedSelected}
+                      onCheckedChange={toggleAllLoadedSelected}
+                    />
+                  ) : null}
                 </div>
                 {visibleFields.map((fieldName) => {
                   const field = fieldsByName.get(fieldName);
 
                   if (!field) {
-                    return <div key={fieldName} role="columnheader" className="h-10" />;
+                    return <div key={fieldName} role="columnheader" className="h-9" />;
                   }
 
                   const active = sort?.field === fieldName;
@@ -867,7 +956,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       key={fieldName}
                       role="columnheader"
                       onClick={() => toggleSort(field)}
-                      className={`flex h-10 items-center truncate px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
+                      className={`flex h-9 items-center truncate px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground${field.sortable ? " cursor-pointer select-none hover:text-foreground" : ""}`}
                     >
                       {fieldLabel(field.name, field.label)}
                       {active ? (
@@ -878,7 +967,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                 })}
                 <div
                   role="columnheader"
-                  className="flex h-10 items-center px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  className="flex h-9 items-center px-md text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {t("common.actions")}
                 </div>
@@ -889,10 +978,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                   className="grid border-b border-border bg-muted/40"
                   style={{ gridTemplateColumns }}
                 >
-                  <div role="columnheader" className="h-10" />
+                  <div role="columnheader" className="h-9" />
                   {visibleFields.map((fieldName) => {
                     if (!listView.filters.includes(fieldName)) {
-                      return <div key={fieldName} role="columnheader" className="h-10" />;
+                      return <div key={fieldName} role="columnheader" className="h-9" />;
                     }
 
                     const field = fieldsByName.get(fieldName);
@@ -902,7 +991,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                         <div
                           key={fieldName}
                           role="columnheader"
-                          className="flex h-10 items-center px-md"
+                          className="flex h-9 items-center px-md"
                         >
                           <Select
                             className="h-8 px-2 text-xs"
@@ -912,9 +1001,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                               label: value,
                             }))}
                             value={enumFilters[fieldName] || undefined}
-                            onValueChange={(value) =>
-                              setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }))
-                            }
+                            onValueChange={(value) => {
+                              setEnumFilters((prev) => ({ ...prev, [fieldName]: value ?? "" }));
+                              setPage(1);
+                            }}
                           />
                         </div>
                       );
@@ -924,7 +1014,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       <div
                         key={fieldName}
                         role="columnheader"
-                        className="flex h-10 items-center px-md"
+                        className="flex h-9 items-center px-md"
                       >
                         <Input
                           className="h-8 px-2 text-xs"
@@ -933,12 +1023,13 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                           onChange={(event) => {
                             const value = event.currentTarget.value;
                             setFilterInputs((prev) => ({ ...prev, [fieldName]: value }));
+                            setPage(1);
                           }}
                         />
                       </div>
                     );
                   })}
-                  <div role="columnheader" className="h-10" />
+                  <div role="columnheader" className="h-9" />
                 </div>
               ) : null}
             </div>
@@ -990,12 +1081,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                         gridTemplateColumns,
                       }}
                     >
-                      <div role="cell" className="flex items-center px-md py-md">
-                        <Checkbox
-                          aria-label={t("common.selectRow")}
-                          checked={selectedIds.has(record.id)}
-                          onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
-                        />
+                      <div role="cell" className="flex items-center px-md py-1.5">
+                        {canDelete && record.capabilities?.canDelete !== false ? (
+                          <Checkbox
+                            aria-label={t("common.selectRow")}
+                            checked={selectedIds.has(record.id)}
+                            onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
+                          />
+                        ) : null}
                       </div>
                       {visibleFields.map((fieldName) => {
                         const field = fieldsByName.get(fieldName);
@@ -1004,21 +1097,37 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                           <div
                             key={fieldName}
                             role="cell"
-                            className="flex items-center truncate px-md py-md text-sm"
+                            className="flex items-center truncate px-md py-1.5 text-sm"
                           >
-                            {field ? (
-                              <FieldValue
-                                field={field}
-                                value={record.data[fieldName]}
-                                relatedDisplay={record.relatedDisplay}
-                                entityName={entityName}
-                                fieldDisplayHints={entity.fieldDisplayHints}
-                              />
-                            ) : null}
+                            {(() => {
+                              const custom = cellRenderers?.[fieldName]?.(record);
+                              const cell =
+                                custom !== undefined ? (
+                                  custom
+                                ) : field ? (
+                                  <FieldValue
+                                    field={field}
+                                    value={record.data[fieldName]}
+                                    relatedDisplay={record.relatedDisplay}
+                                    entityName={entityName}
+                                    fieldDisplayHints={entity.fieldDisplayHints}
+                                  />
+                                ) : null;
+                              return rowHref && fieldName === visibleFields[0] ? (
+                                <navAdapter.Link
+                                  to={rowHref(record)}
+                                  className="font-medium hover:underline"
+                                >
+                                  {cell}
+                                </navAdapter.Link>
+                              ) : (
+                                cell
+                              );
+                            })()}
                           </div>
                         );
                       })}
-                      <div role="cell" className="flex items-center px-md py-md">
+                      <div role="cell" className="flex items-center px-md py-1.5">
                         {/* Icon buttons (found live 2026-09-05 — plain "View"/"Delete" text read
                             as a bare link, not an action) — `navAdapter.Link` still does the real
                             navigation, just styled to match `IconButton`'s ghost/sm look via the
@@ -1039,22 +1148,24 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <navAdapter.Link
                             to={navAdapter.toRecordDetail(entityName, record.id)}
-                            className={`${buttonVariants({ variant: "ghost" })} !h-9 !w-9 !p-0`}
+                            className={`${buttonVariants({ variant: "ghost" })} !h-7 !w-7 !p-0`}
                             aria-label={t("common.view")}
                             title={t("common.view")}
                           >
                             <EyeIcon />
                           </navAdapter.Link>
-                          <IconButton
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            aria-label={t("common.delete")}
-                            title={t("common.delete")}
-                            disabled={pendingDeleteId !== null && !deleting}
-                            onClick={() => void handleDelete(record)}
-                            icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
-                          />
+                          {canDelete && record.capabilities?.canDelete !== false ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              aria-label={t("common.delete")}
+                              title={t("common.delete")}
+                              disabled={pendingDeleteId !== null && !deleting}
+                              onClick={() => void handleDelete(record)}
+                              icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -1064,11 +1175,41 @@ export function GeneratedList({ entityName }: { entityName: string }) {
             </div>
           </div>
         </div>
-        {isFetchingNextPage ? (
-          <div className="border-t border-border p-2 text-center text-sm text-muted-foreground">
-            {t("common.loadingMore")}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-3">
+          <span className="text-sm text-muted-foreground">
+            {total === null
+              ? t("common.rowsShown", { count: records.length })
+              : t("common.rowsTotal", {
+                  from: total === 0 ? 0 : (page - 1) * limit + 1,
+                  to: (page - 1) * limit + records.length,
+                  total,
+                })}
+          </span>
+          <div className="flex items-center gap-3">
+            {pageSizeOptions.length > 1 ? (
+              <Select
+                className="h-8 w-28 px-2 text-xs"
+                aria-label={t("common.pageSize")}
+                options={pageSizeOptions.map((n) => ({
+                  value: String(n),
+                  label: t("common.perPage", { count: n }),
+                }))}
+                value={String(limit)}
+                onValueChange={(value) => {
+                  setPageSize(Number(value));
+                  setPage(1);
+                }}
+              />
+            ) : null}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              previousLabel={t("common.previous")}
+              nextLabel={t("common.next")}
+            />
           </div>
-        ) : null}
+        </div>
       </Card>
     </div>
   );
