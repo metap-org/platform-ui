@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
@@ -284,7 +284,40 @@ function sortParamOf(sort: SortState): string | undefined {
   return sort.descending ? `-${sort.field}` : sort.field;
 }
 
-export function GeneratedList({ entityName }: { entityName: string }) {
+/** What an application may customize without hand-building a list. Everything is optional: with no
+ *  props the list is fully metadata-driven. Search, pagination, sorting, filters, permission-aware
+ *  buttons and bulk actions stay the list's own, so an app screen never reimplements them. */
+export type GeneratedListProps = {
+  entityName: string;
+  /** Replaces the entity label in the page heading. */
+  title?: string;
+  /** Extra controls in the toolbar, next to the built-in ones (e.g. an "Add zone" wizard link). */
+  actions?: ReactNode;
+  /** Where the row's primary cell links to; turns the first visible column into a link. */
+  rowHref?: (record: GraphQLRecord) => string;
+  /** Per-column cell renderers keyed by field name — a derived or styled cell without leaving the
+   *  generated list. Return `undefined` to fall back to the default rendering for that row. */
+  cellRenderers?: Record<string, (record: GraphQLRecord) => ReactNode | undefined>;
+  /** Filters always applied (e.g. a zone's own id on its detail tab); not shown as editable. */
+  baseFilters?: Record<string, string>;
+  /** Where "New" goes (default: the generic create form); `null` hides it, for an entity created
+   *  through its own flow (a wizard) rather than the plain form. Still permission-gated. */
+  newHref?: string | null;
+  /** Hides the New button and every delete control for a list that is read-only by design
+   *  (e.g. a read model), independent of permissions. */
+  readOnly?: boolean;
+};
+
+export function GeneratedList({
+  entityName,
+  title,
+  actions,
+  rowHref,
+  cellRenderers,
+  baseFilters,
+  newHref,
+  readOnly = false,
+}: GeneratedListProps) {
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
@@ -386,6 +419,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     return result;
   }, [debouncedTextFilters, enumFilters]);
 
+  // Filters the caller always applies, merged under what the user typed. Keyed by content so an
+  // inline object literal from the caller does not look like a new filter set on every render.
+  const baseFiltersKey = JSON.stringify(baseFilters ?? {});
+  const queryFilters = useMemo(
+    () => ({ ...(JSON.parse(baseFiltersKey) as Record<string, string>), ...activeFilters }),
+    [baseFiltersKey, activeFilters],
+  );
+
   useEffect(() => {
     setHydratedFromUrl(false);
   }, [entityName]);
@@ -460,7 +501,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // A different search/filter/sort/size means a different row set: back to page 1.
   useEffect(() => {
     setPage(1);
-  }, [entityName, sort, activeFilters, debouncedSearch, pageSize]);
+  }, [entityName, sort, queryFilters, debouncedSearch, pageSize]);
 
   const {
     data: pageData,
@@ -469,7 +510,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     isFetching,
     refetch,
   } = useGraphQLRecordPage<Record<string, unknown>>(entityName, {
-    filters: activeFilters,
+    filters: queryFilters,
     search: debouncedSearch,
     sort: sortParam,
     limit,
@@ -482,8 +523,8 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   const totalPages = total === null ? 1 : Math.max(1, Math.ceil(total / limit));
   // Entity-level permission from the list response: until it arrives nothing destructive is
   // offered. UI-only gating — the server re-checks every write regardless.
-  const canCreate = pageData?.capabilities.canCreate ?? false;
-  const canDelete = pageData?.capabilities.canDelete ?? false;
+  const canCreate = !readOnly && newHref !== null && (pageData?.capabilities.canCreate ?? false);
+  const canDelete = !readOnly && (pageData?.capabilities.canDelete ?? false);
   const hasSearch = (entity?.fields ?? []).some(
     (f) => f.searchable && (f.kind === "string" || f.kind === "enum"),
   );
@@ -492,7 +533,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // — clear the selection rather than let it silently keep referencing rows no longer on screen.
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [entityName, sort, activeFilters]);
+  }, [entityName, sort, queryFilters]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -650,7 +691,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         format,
         entityName,
         listViewFields,
-        activeFilters,
+        queryFilters,
         sortParam,
         (count) => {
           fetchedCount = count;
@@ -690,7 +731,7 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     <div className="mx-auto flex max-w-7xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-          {entityLabel(entity.label)}
+          {title ?? entityLabel(entity.label)}
         </h2>
         {hasSearch ? (
           <Input
@@ -818,9 +859,10 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {actions}
           {canCreate ? (
             <navAdapter.Link
-              to={navAdapter.toNewRecord(entityName)}
+              to={newHref ?? navAdapter.toNewRecord(entityName)}
               className={buttonVariants({ variant: "default" })}
             >
               {t("common.new")}
@@ -1048,15 +1090,31 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                             role="cell"
                             className="flex items-center truncate px-md py-md text-sm"
                           >
-                            {field ? (
-                              <FieldValue
-                                field={field}
-                                value={record.data[fieldName]}
-                                relatedDisplay={record.relatedDisplay}
-                                entityName={entityName}
-                                fieldDisplayHints={entity.fieldDisplayHints}
-                              />
-                            ) : null}
+                            {(() => {
+                              const custom = cellRenderers?.[fieldName]?.(record);
+                              const cell =
+                                custom !== undefined ? (
+                                  custom
+                                ) : field ? (
+                                  <FieldValue
+                                    field={field}
+                                    value={record.data[fieldName]}
+                                    relatedDisplay={record.relatedDisplay}
+                                    entityName={entityName}
+                                    fieldDisplayHints={entity.fieldDisplayHints}
+                                  />
+                                ) : null;
+                              return rowHref && fieldName === visibleFields[0] ? (
+                                <navAdapter.Link
+                                  to={rowHref(record)}
+                                  className="font-medium hover:underline"
+                                >
+                                  {cell}
+                                </navAdapter.Link>
+                              ) : (
+                                cell
+                              );
+                            })()}
                           </div>
                         );
                       })}
