@@ -1,4 +1,9 @@
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import { useEntity } from "../metadata/useEntity";
 import type { EntityField, EntitySummary } from "../metadata/types";
@@ -241,6 +246,99 @@ export function useInfiniteGraphQLRecords<T = Record<string, unknown>>(
       fetchGraphQLRecordPage<T>(entity, fields, filter, sort, limit, pageParam, path),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: authed && Boolean(entityQuery.data),
+  });
+  return { ...result, isLoading: result.isLoading || (authed && !entityQuery.data) };
+}
+
+/** What the caller may do with the entity as a whole (entity-level policy, from the list
+ *  response itself) — lets a list hide "New"/"Delete" before any row exists. */
+export type EntityCapabilities = { canCreate: boolean; canUpdate: boolean; canDelete: boolean };
+
+export type RecordPage<T = Record<string, unknown>> = {
+  records: GraphQLRecord<T>[];
+  /** Rows matching the filters across all pages; null when the server did not count. */
+  total: number | null;
+  capabilities: EntityCapabilities;
+};
+
+async function fetchNumberedRecordPage<T = Record<string, unknown>>(
+  entity: string,
+  fields: EntityField[],
+  filter: Record<string, string | number>,
+  sort: string | undefined,
+  search: string | undefined,
+  limit: number,
+  page: number,
+  path: string,
+): Promise<RecordPage<T>> {
+  const query = `query List($filter: Json, $sort: String, $search: String, $limit: Int, $offset: Int) {
+    result: ${listFieldName(entity)}(filter: $filter, sort: $sort, search: $search, limit: $limit, offset: $offset, withTotal: true) {
+      records {
+        ${recordSelection(fields)}
+      }
+      total
+      capabilities
+    }
+  }`;
+  const raw = await graphqlFetch<{
+    result: {
+      records: Record<string, unknown>[];
+      total: number | null;
+      capabilities: EntityCapabilities;
+    };
+  }>(path, query, { filter, sort, search, limit, offset: (page - 1) * limit });
+  return {
+    records: raw.result.records.map((record) => reshapeRecord<T>(record, fields)),
+    total: raw.result.total,
+    capabilities: raw.result.capabilities,
+  };
+}
+
+/** Numbered-page counterpart to `useInfiniteGraphQLRecords`: one page (1-based) plus the total,
+ *  so a list can draw `1 2 3 … last`. Keeps the previous page on screen while the next loads. */
+export function useGraphQLRecordPage<T = Record<string, unknown>>(
+  entity: string,
+  options: {
+    filters: Record<string, string | number | undefined>;
+    search?: string;
+    sort?: string;
+    limit: number;
+    page: number;
+    enabled: boolean;
+  },
+  path: string = DEFAULT_GRAPHQL_PATH,
+) {
+  const { status } = useAuth();
+  const authed = options.enabled && status === "authenticated";
+  const entityQuery = useEntity(entity, authed);
+  const fields = entityQuery.data?.fields ?? [];
+  const filter = nonEmptyFilters(options.filters);
+  const search = options.search?.trim() || undefined;
+
+  const result = useQuery({
+    queryKey: [
+      "graphql-records",
+      "page",
+      entity,
+      options.filters,
+      search,
+      options.sort,
+      options.limit,
+      options.page,
+    ],
+    queryFn: () =>
+      fetchNumberedRecordPage<T>(
+        entity,
+        fields,
+        filter,
+        options.sort,
+        search,
+        options.limit,
+        options.page,
+        path,
+      ),
+    placeholderData: keepPreviousData,
     enabled: authed && Boolean(entityQuery.data),
   });
   return { ...result, isLoading: result.isLoading || (authed && !entityQuery.data) };

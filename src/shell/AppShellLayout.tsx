@@ -10,6 +10,7 @@ import {
 } from "../admin/impersonation";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
+import { useCanAccessEntity, type EntityAccessAction } from "../auth/useEntityAccess";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { useCurrentUserEmail } from "../auth/useTenantUsers";
 import { ApiError } from "../api/client";
@@ -84,13 +85,21 @@ export type ShellNavItem = {
    * was the old behavior purely because `[]` is truthy in JS, which nothing intended
    * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B7). */
   roles?: string[];
+  /** Hidden unless the caller may `entityAction` (default `read`) this entity — entity-level
+   * policy, so an entry never leads to a screen that would only answer 403. Needs no role list. */
+  entity?: string;
+  entityAction?: EntityAccessAction;
 };
 
 function NavLink({ item }: { item: ShellNavItem }) {
   const navAdapter = useNavigationAdapter();
   const allowedByRole = useHasRole(item.roles ?? []);
+  const allowedByEntity = useCanAccessEntity(item.entity ?? "", item.entityAction ?? "read");
 
   if (item.roles?.length && !allowedByRole) {
+    return null;
+  }
+  if (item.entity && !allowedByEntity) {
     return null;
   }
 

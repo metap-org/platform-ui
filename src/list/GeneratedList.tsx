@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   Input,
+  Pagination,
   Select,
   Spinner,
   toast,
@@ -24,7 +25,7 @@ import {
 import {
   deleteGraphQLRecord,
   fetchAllGraphQLRecords,
-  useInfiniteGraphQLRecords,
+  useGraphQLRecordPage,
   useInvalidateGraphQLRecords,
   type GraphQLRecord,
 } from "../api/graphqlRecords";
@@ -41,6 +42,12 @@ import { useDebouncedValue } from "../hooks/useDebouncedValue";
 type RecordDto = GraphQLRecord;
 
 type SortState = { field: string; descending: boolean } | null;
+
+/** Page sizes offered in the footer; only those the list view's `maxLimit` allows are shown. */
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+const DEFAULT_PAGE_SIZE = 25;
+/** URL params this list owns besides per-field filters, so hydration never mistakes them for one. */
+const RESERVED_URL_PARAMS = new Set(["sort", "limit", "cursor", "q", "page", "size"]);
 
 /** Initial estimate only — `measureElement` (below) corrects this to each row's *real* rendered
  *  height once it mounts. A plain `40` here used to be treated as the row's actual height (rows
@@ -297,6 +304,12 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   // previous entity's filters over.
   const [hydratedFromUrl, setHydratedFromUrl] = useState(false);
   const debouncedTextFilters = useDebouncedValue(filterInputs, 400);
+  // Free-text search over the entity's searchable fields (server-side `search`), debounced like
+  // the per-column text filters; page/size drive numbered pagination.
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 400).trim();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   // Selection is scoped to *loaded* rows only, not "every record matching the current filter" —
@@ -389,10 +402,16 @@ export function GeneratedList({ entityName }: { entityName: string }) {
       setSort(sortFromUrl);
     }
 
+    setSearchInput(searchParams.get("q") ?? "");
+    const pageFromUrl = Number(searchParams.get("page"));
+    if (Number.isInteger(pageFromUrl) && pageFromUrl > 1) setPage(pageFromUrl);
+    const sizeFromUrl = Number(searchParams.get("size"));
+    if (PAGE_SIZE_OPTIONS.includes(sizeFromUrl)) setPageSize(sizeFromUrl);
+
     const textFromUrl: Record<string, string> = {};
     const enumFromUrl: Record<string, string> = {};
     for (const [key, value] of searchParams.entries()) {
-      if (key === "sort" || key === "limit" || key === "cursor") continue;
+      if (RESERVED_URL_PARAMS.has(key)) continue;
       const field = entity.fields.find((f) => f.name === key);
       if (field?.kind === "enum") {
         enumFromUrl[key] = value;
@@ -423,34 +442,51 @@ export function GeneratedList({ entityName }: { entityName: string }) {
     for (const [key, value] of Object.entries(activeFilters)) {
       next.set(key, value);
     }
+    if (debouncedSearch) next.set("q", debouncedSearch);
+    if (page > 1) next.set("page", String(page));
+    if (pageSize !== DEFAULT_PAGE_SIZE) next.set("size", String(pageSize));
     setSearchParams(next);
     // `setSearchParams` intentionally excluded below: react-router hands back a new function
     // identity on every navigation, which would otherwise re-run this effect on the very write
     // it just performed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort, activeFilters, hydratedFromUrl]);
+  }, [sort, activeFilters, debouncedSearch, page, pageSize, hydratedFromUrl]);
 
   const sortParam = sortParamOf(sort);
-  const limit = listView?.maxLimit ?? 30;
+  const maxLimit = listView?.maxLimit ?? 30;
+  const pageSizeOptions = PAGE_SIZE_OPTIONS.filter((n) => n <= maxLimit);
+  const limit = Math.min(pageSize, maxLimit);
+
+  // A different search/filter/sort/size means a different row set: back to page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [entityName, sort, activeFilters, debouncedSearch, pageSize]);
 
   const {
-    data,
+    data: pageData,
     isLoading: recordsLoading,
     error: recordsError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
     isFetching,
     refetch,
-  } = useInfiniteGraphQLRecords<Record<string, unknown>>(
-    entityName,
-    activeFilters,
-    sortParam,
+  } = useGraphQLRecordPage<Record<string, unknown>>(entityName, {
+    filters: activeFilters,
+    search: debouncedSearch,
+    sort: sortParam,
     limit,
-    Boolean(entity && listView),
-  );
+    page,
+    enabled: Boolean(entity && listView),
+  });
 
-  const records = useMemo(() => data?.pages.flatMap((page) => page.records) ?? [], [data]);
+  const records = useMemo(() => pageData?.records ?? [], [pageData]);
+  const total = pageData?.total ?? null;
+  const totalPages = total === null ? 1 : Math.max(1, Math.ceil(total / limit));
+  // Entity-level permission from the list response: until it arrives nothing destructive is
+  // offered. UI-only gating — the server re-checks every write regardless.
+  const canCreate = pageData?.capabilities.canCreate ?? false;
+  const canDelete = pageData?.capabilities.canDelete ?? false;
+  const hasSearch = (entity?.fields ?? []).some(
+    (f) => f.searchable && (f.kind === "string" || f.kind === "enum"),
+  );
 
   // A changed entity/sort/filter set means an entirely different set of rows is about to render
   // — clear the selection rather than let it silently keep referencing rows no longer on screen.
@@ -474,16 +510,6 @@ export function GeneratedList({ entityName }: { entityName: string }) {
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
-  const lastVirtualIndex = virtualRows[virtualRows.length - 1]?.index;
-
-  useEffect(() => {
-    if (lastVirtualIndex === undefined) {
-      return;
-    }
-    if (lastVirtualIndex >= records.length - 10 && hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
-    }
-  }, [lastVirtualIndex, records.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (entityLoading) {
     return <Spinner />;
@@ -666,6 +692,16 @@ export function GeneratedList({ entityName }: { entityName: string }) {
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
           {entityLabel(entity.label)}
         </h2>
+        {hasSearch ? (
+          <Input
+            type="search"
+            className="max-w-xs flex-1"
+            aria-label={t("common.search")}
+            placeholder={t("common.searchPlaceholder")}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.currentTarget.value)}
+          />
+        ) : null}
         <div className="flex items-center gap-2">
           <IconButton
             variant={showFilters || Object.keys(activeFilters).length > 0 ? "outline" : "ghost"}
@@ -782,12 +818,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <navAdapter.Link
-            to={navAdapter.toNewRecord(entityName)}
-            className={buttonVariants({ variant: "default" })}
-          >
-            {t("common.new")}
-          </navAdapter.Link>
+          {canCreate ? (
+            <navAdapter.Link
+              to={navAdapter.toNewRecord(entityName)}
+              className={buttonVariants({ variant: "default" })}
+            >
+              {t("common.new")}
+            </navAdapter.Link>
+          ) : null}
         </div>
       </div>
       {selectedIds.size > 0 ? (
@@ -846,12 +884,14 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                 style={{ gridTemplateColumns }}
               >
                 <div role="columnheader" className="flex h-10 items-center px-md">
-                  <Checkbox
-                    aria-label={t("common.selectAllLoaded")}
-                    checked={allLoadedSelected}
-                    indeterminate={someLoadedSelected && !allLoadedSelected}
-                    onCheckedChange={toggleAllLoadedSelected}
-                  />
+                  {canDelete ? (
+                    <Checkbox
+                      aria-label={t("common.selectAllLoaded")}
+                      checked={allLoadedSelected}
+                      indeterminate={someLoadedSelected && !allLoadedSelected}
+                      onCheckedChange={toggleAllLoadedSelected}
+                    />
+                  ) : null}
                 </div>
                 {visibleFields.map((fieldName) => {
                   const field = fieldsByName.get(fieldName);
@@ -991,11 +1031,13 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                       }}
                     >
                       <div role="cell" className="flex items-center px-md py-md">
-                        <Checkbox
-                          aria-label={t("common.selectRow")}
-                          checked={selectedIds.has(record.id)}
-                          onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
-                        />
+                        {canDelete && record.capabilities.canDelete !== false ? (
+                          <Checkbox
+                            aria-label={t("common.selectRow")}
+                            checked={selectedIds.has(record.id)}
+                            onCheckedChange={(checked) => toggleRowSelected(record.id, checked)}
+                          />
+                        ) : null}
                       </div>
                       {visibleFields.map((fieldName) => {
                         const field = fieldsByName.get(fieldName);
@@ -1045,16 +1087,18 @@ export function GeneratedList({ entityName }: { entityName: string }) {
                           >
                             <EyeIcon />
                           </navAdapter.Link>
-                          <IconButton
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            aria-label={t("common.delete")}
-                            title={t("common.delete")}
-                            disabled={pendingDeleteId !== null && !deleting}
-                            onClick={() => void handleDelete(record)}
-                            icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
-                          />
+                          {canDelete && record.capabilities.canDelete !== false ? (
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              aria-label={t("common.delete")}
+                              title={t("common.delete")}
+                              disabled={pendingDeleteId !== null && !deleting}
+                              onClick={() => void handleDelete(record)}
+                              icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -1064,11 +1108,38 @@ export function GeneratedList({ entityName }: { entityName: string }) {
             </div>
           </div>
         </div>
-        {isFetchingNextPage ? (
-          <div className="border-t border-border p-2 text-center text-sm text-muted-foreground">
-            {t("common.loadingMore")}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-3">
+          <span className="text-sm text-muted-foreground">
+            {total === null
+              ? t("common.rowsShown", { count: records.length })
+              : t("common.rowsTotal", {
+                  from: total === 0 ? 0 : (page - 1) * limit + 1,
+                  to: (page - 1) * limit + records.length,
+                  total,
+                })}
+          </span>
+          <div className="flex items-center gap-3">
+            {pageSizeOptions.length > 1 ? (
+              <Select
+                className="h-8 w-28 px-2 text-xs"
+                aria-label={t("common.pageSize")}
+                options={pageSizeOptions.map((n) => ({
+                  value: String(n),
+                  label: t("common.perPage", { count: n }),
+                }))}
+                value={String(limit)}
+                onValueChange={(value) => setPageSize(Number(value))}
+              />
+            ) : null}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              previousLabel={t("common.previous")}
+              nextLabel={t("common.next")}
+            />
           </div>
-        ) : null}
+        </div>
       </Card>
     </div>
   );
