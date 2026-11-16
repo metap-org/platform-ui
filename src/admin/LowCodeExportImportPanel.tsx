@@ -1,5 +1,16 @@
 import { useRef, useState } from "react";
-import { Alert, Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@metap/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useLowCodeControlPlaneActions } from "./lowCodeControlPlane";
 import type {
@@ -26,7 +37,10 @@ export function LowCodeExportImportPanel({
   authTokenUrl: string;
 }) {
   const { t } = useTranslation();
-  const { exportEntities, importEntities } = useLowCodeControlPlaneActions(gatewayUrl, authTokenUrl);
+  const { exportEntities, importEntities } = useLowCodeControlPlaneActions(
+    gatewayUrl,
+    authTokenUrl,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [exporting, setExporting] = useState(false);
@@ -102,15 +116,24 @@ export function LowCodeExportImportPanel({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h5 className="text-sm font-medium text-foreground">{t("admin.lowcode.exportImport.exportTitle")}</h5>
+        <h5 className="text-sm font-medium text-foreground">
+          {t("admin.lowcode.exportImport.exportTitle")}
+        </h5>
         {exportError ? <Alert variant="destructive">{exportError}</Alert> : null}
-        <Button variant="outline" onClick={() => void handleExportAll()} loading={exporting} className="self-start">
+        <Button
+          variant="outline"
+          onClick={() => void handleExportAll()}
+          loading={exporting}
+          className="self-start"
+        >
           {t("admin.lowcode.exportImport.exportAll")}
         </Button>
       </div>
 
       <div className="flex flex-col gap-2">
-        <h5 className="text-sm font-medium text-foreground">{t("admin.lowcode.exportImport.importTitle")}</h5>
+        <h5 className="text-sm font-medium text-foreground">
+          {t("admin.lowcode.exportImport.importTitle")}
+        </h5>
         {importError ? <Alert variant="destructive">{importError}</Alert> : null}
         <input
           ref={fileInputRef}
@@ -146,7 +169,9 @@ export function LowCodeExportImportPanel({
                 <TableRow key={name}>
                   <TableCell>{name}</TableCell>
                   <TableCell>
-                    <Badge variant="success">{t("admin.lowcode.exportImport.resultImported")}</Badge>
+                    <Badge variant="success">
+                      {t("admin.lowcode.exportImport.resultImported")}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}

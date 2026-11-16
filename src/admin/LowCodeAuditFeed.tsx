@@ -1,4 +1,13 @@
-import { Badge, Spinner, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@metap/ui";
+import {
+  Badge,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useLowCodeAuditEvents, useLowCodeRecentAudit } from "./lowCodeControlPlane";
@@ -35,7 +44,12 @@ export function LowCodeAuditFeed({
   limit?: number;
 }) {
   const { t } = useTranslation();
-  const perEntity = useLowCodeAuditEvents(entityName ?? null, gatewayUrl, authTokenUrl, !!entityName);
+  const perEntity = useLowCodeAuditEvents(
+    entityName ?? null,
+    gatewayUrl,
+    authTokenUrl,
+    !!entityName,
+  );
   const recent = useLowCodeRecentAudit(limit, gatewayUrl, authTokenUrl, !entityName);
   const { data: events, isLoading, error } = entityName ? perEntity : recent;
 
@@ -73,7 +87,9 @@ export function LowCodeAuditFeed({
             <TableRow key={`${event.occurredAt}-${index}`}>
               {entityName ? null : <TableCell>{event.entityName}</TableCell>}
               <TableCell>
-                <Badge variant={ACTION_BADGE_VARIANT[event.action as LowCodeAuditAction] ?? "secondary"}>
+                <Badge
+                  variant={ACTION_BADGE_VARIANT[event.action as LowCodeAuditAction] ?? "secondary"}
+                >
                   {t(`admin.lowcode.audit.actionLabel.${event.action}`, event.action)}
                 </Badge>
               </TableCell>

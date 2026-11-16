@@ -27,12 +27,7 @@ import { useControlPlaneMutate, useControlPlaneQuery } from "../api/useControlPl
  *  "render it verbatim" rather than a hard failure, since the backend could add a new action kind
  *  without this type being updated first. */
 export type LowCodeAuditAction =
-  | "draft_saved"
-  | "published"
-  | "rolled_back"
-  | "enabled"
-  | "disabled"
-  | "table_migrated";
+  "draft_saved" | "published" | "rolled_back" | "enabled" | "disabled" | "table_migrated";
 
 export type LowCodeAuditEvent = {
   entityName: string;
@@ -234,9 +229,7 @@ export function useLowCodeControlPlaneActions(gatewayUrl: string, authTokenUrl: 
     return result.lowCodeExport;
   }
 
-  async function importEntities(
-    entities: LowCodeExportedEntity[],
-  ): Promise<LowCodeImportResult> {
+  async function importEntities(entities: LowCodeExportedEntity[]): Promise<LowCodeImportResult> {
     const result = await mutate<{ importLowCodeEntities: LowCodeImportResult }>(IMPORT_MUTATION, {
       body: { entities },
     });

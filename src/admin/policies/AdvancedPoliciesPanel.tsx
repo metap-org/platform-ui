@@ -20,11 +20,11 @@ import { ApiErrorMessage } from "../../api/ApiErrorMessage";
 import type { EntitySummary } from "../../metadata/types";
 import {
   useAdminPolicies,
-  useAdminUsers,
   useCreateAdminPolicy,
   useDeleteAdminPolicy,
   useKnownActions,
 } from "../adminApi";
+import { useUserRoleAssignments } from "../userAdminApi";
 import { describeCondition, isBasicShapedRow, type PolicyCondition } from "../policyCondition";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { collectKnownRoles } from "./policyMatrixHelpers";
@@ -43,7 +43,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
   const { t } = useTranslation();
   const { data: policies, isLoading, error, refetch } = useAdminPolicies(entity.name);
   const { data: actions } = useKnownActions();
-  const { data: users } = useAdminUsers();
+  const { data: users } = useUserRoleAssignments();
   const createPolicy = useCreateAdminPolicy();
   const deletePolicy = useDeleteAdminPolicy();
 

@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
+import { relativeTime } from "../lib/dates";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useTenantUsers } from "../auth/useTenantUsers";
@@ -120,23 +121,6 @@ const ACTION_TONE: Record<
 };
 
 const ALL = "all";
-
-/** "5 minutes ago" in the UI locale; the absolute time goes in the cell's title. */
-function relativeTime(iso: string, locale: string): string {
-  const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["year", 31_536_000],
-    ["month", 2_592_000],
-    ["day", 86_400],
-    ["hour", 3_600],
-    ["minute", 60],
-  ];
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  for (const [unit, size] of units) {
-    if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
-  }
-  return format.format(seconds, "second");
-}
 
 /**
  * A record's audit history as a compact, filterable table — one ~36px row per entry (time,

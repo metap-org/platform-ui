@@ -101,9 +101,7 @@ function ProvisionTenantForm({ gatewayUrl, authTokenUrl }: TenantsAdminPageProps
 
   return (
     <div className="mb-8 flex max-w-[480px] flex-col gap-4">
-      <h4 className="text-base font-medium text-foreground">
-        {t("admin.tenants.provisionTitle")}
-      </h4>
+      <h4 className="text-base font-medium text-foreground">{t("admin.tenants.provisionTitle")}</h4>
       {error ? <Alert variant="destructive">{error}</Alert> : null}
       {successTenantId ? (
         <Alert variant="default">

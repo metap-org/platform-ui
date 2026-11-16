@@ -16,8 +16,6 @@ const POLICY_SELECTION = "id tenantId entity action field subject roles conditio
 const CRON_JOB_SELECTION =
   "id tenantId name enabled cronExpr timezone targetType targetConfig dispatchMode nextRunAt lastRunAt createdAt updatedAt createdBy";
 
-export type AdminUser = { userId: string; roles: string[] };
-
 /** `condition` is a real `PolicyCondition` (see `./policyCondition.ts`), not `unknown` — the
  *  single hand-typed mirror of `crates/metap-permission/src/policy_condition/types.rs`'s wire
  *  shape. `subject`/`effect` stay plain strings (`"context"|"record"`, `"allow"|"deny"`)
@@ -96,63 +94,7 @@ export type LowCodeVersionSummary = {
   restoredFromVersion: number | null;
 };
 
-// --- Users ---
-// Moved onto GraphQL 2026-09-26 (`adminUsers`/`createAdminUser`/`assignUserRole`/
-// `revokeUserRole`, `metap-graphql-http::platform_fields`) — `/admin/users*`'s replacement, see
-// `../metap-docs/docs/roadmap/95-platform-graphql-fields.md`.
-
-export function useAdminUsers() {
-  return useGraphQLQuery<{ adminUsers: AdminUser[] }, AdminUser[]>(
-    ["admin", "users"],
-    GRAPHQL_PATH,
-    "{ adminUsers { userId roles } }",
-    undefined,
-    (response) => response.adminUsers,
-  );
-}
-
-export function useCreateAdminUser() {
-  return useMutation<
-    { userId: string; email: string; roles: string[] },
-    GraphQLError,
-    { email: string; password: string; roles: string[] }
-  >({
-    mutationFn: (body) =>
-      graphqlFetch<{ createAdminUser: { userId: string; email: string; roles: string[] } }>(
-        GRAPHQL_PATH,
-        "mutation($email: String!, $password: String!, $roles: [String!]) { createAdminUser(email: $email, password: $password, roles: $roles) { userId email roles } }",
-        body,
-      ).then((r) => r.createAdminUser),
-  });
-}
-
-/** Row-level actions (assign/revoke role) need a per-user id, which a bound `useMutation` hook's
- *  single fixed-variables shape makes awkward for the "several roles in a list" call pattern this
- *  page actually uses — same convention as `GeneratedList`'s per-row delete: a plain `graphqlFetch`
- *  call plus manual invalidation instead of a bound mutation hook. */
-export function useAdminRoleActions() {
-  const queryClient = useQueryClient();
-
-  async function assignRole(userId: string, role: string) {
-    await graphqlFetch(
-      GRAPHQL_PATH,
-      "mutation($userId: ID!, $role: String!) { assignUserRole(userId: $userId, role: $role) }",
-      { userId, role },
-    );
-    await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-  }
-
-  async function revokeRole(userId: string, role: string) {
-    await graphqlFetch(
-      GRAPHQL_PATH,
-      "mutation($userId: ID!, $role: String!) { revokeUserRole(userId: $userId, role: $role) }",
-      { userId, role },
-    );
-    await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-  }
-
-  return { assignRole, revokeRole };
-}
+// --- Users --- moved to ./userAdminApi.ts (gRPC-backed GraphQL fields, roadmap 113).
 
 // --- Policies ---
 // Moved onto GraphQL 2026-09-26 (`policies`/`createPolicy`/`deletePolicy`/`syncPolicyMatrix`) —
