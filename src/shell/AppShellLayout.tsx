@@ -6,6 +6,11 @@ import {
   Alert,
   Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -13,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
+  Input,
   Select,
   Sheet,
   SheetContent,
@@ -26,11 +32,7 @@ import {
   ToastProvider,
   toast,
 } from "@metap/ui";
-import {
-  useImpersonationActions,
-  useImpersonationStatus,
-  usePlatformTenants,
-} from "../admin/impersonation";
+import { changePassword, switchTenant, tenantLabel, useMyTenants } from "../auth/accountApi";
 import { useAuth } from "../auth/AuthContext";
 import { useHasRole } from "../auth/Can";
 import { useEntityDenied, type EntityAccessAction } from "../auth/useEntityAccess";
@@ -42,61 +44,133 @@ import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppCommandPalette } from "./AppCommandPalette";
 
-/** Platform-admin-only — only ever rendered once `useHasRole("platform_admin")` is true, which
- *  itself is only ever true while *not* impersonating (see `useImpersonationStatus`'s doc
- *  comment), so this and the banner below are mutually exclusive in practice. */
+/** Moves the session to another tenant of the signed-in person (roadmap 113). Rendered only for
+ *  a person in more than one tenant. */
 function TenantSwitcher() {
   const { t } = useTranslation();
-  const { data: tenants } = usePlatformTenants(true);
-  const { startImpersonation } = useImpersonationActions();
+  const { data: tenants } = useMyTenants();
+  const current = tenants?.find((tenant) => tenant.current);
 
-  async function handleSelect(tenantId: string | undefined) {
-    if (!tenantId) return;
+  if (!tenants || tenants.length < 2) return null;
+
+  async function handleSelect(tenantId: string) {
+    if (tenantId === current?.tenantId) return;
     try {
-      await startImpersonation(tenantId);
+      await switchTenant(tenantId);
     } catch (error) {
       const detail = error instanceof ApiError ? error.message : String(error);
-      toast(t("shell.impersonationFailed", { detail }), { variant: "destructive" });
+      toast(t("shell.switchFailed", { detail }), { variant: "destructive" });
     }
   }
 
   return (
     <Select
-      className="h-9 w-40 text-sm"
-      placeholder={t("shell.viewAsTenant")}
-      options={(tenants ?? []).map((tenant) => ({ value: tenant.id, label: tenant.id }))}
+      className="h-8 w-44 text-sm"
+      aria-label={t("shell.switchTenant")}
+      value={current?.tenantId}
+      options={tenants.map((tenant) => ({
+        value: tenant.tenantId,
+        label: tenantLabel(tenant, (id) => t("shell.unnamedTenant", { id })),
+      }))}
       onValueChange={(value) => void handleSelect(value)}
     />
   );
 }
 
-/** Persistent, impossible-to-miss reminder while impersonating — the whole reason `useHasRole`
- *  can't be trusted to show this (roles reflect the *target* tenant during impersonation, not
- *  `platform_admin`), see `useImpersonationStatus`'s doc comment. */
-function ImpersonationBanner() {
-  const { t } = useTranslation();
-  const { data: currentUser } = useCurrentUser();
-  const { exitImpersonation } = useImpersonationActions();
-  const [exiting, setExiting] = useState(false);
+const PASSWORD_ERROR_KEYS: Record<string, string> = {
+  wrong_password: "shell.wrongPassword",
+  weak_password: "shell.weakPassword",
+};
 
-  async function handleExit() {
-    setExiting(true);
+function ChangePasswordDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function reset(nextOpen: boolean) {
+    if (!nextOpen) {
+      setCurrent("");
+      setNext("");
+      setRepeat("");
+      setError(null);
+    }
+    onOpenChange(nextOpen);
+  }
+
+  async function handleSave() {
+    if (next !== repeat) {
+      setError(t("shell.passwordMismatch"));
+      return;
+    }
+    setSaving(true);
+    setError(null);
     try {
-      await exitImpersonation();
+      await changePassword(current, next);
+      toast(t("shell.passwordChanged"));
+      reset(false);
+    } catch (err) {
+      const key = err instanceof ApiError ? PASSWORD_ERROR_KEYS[err.code] : undefined;
+      setError(
+        key ? t(key) : err instanceof ApiError ? err.message : t("common.somethingWentWrong"),
+      );
     } finally {
-      setExiting(false);
+      setSaving(false);
     }
   }
 
   return (
-    <Alert className="flex items-center justify-between gap-3 rounded-none border-x-0 border-t-0 border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200">
-      <span className="text-sm font-medium">
-        {t("shell.impersonatingBanner", { tenantId: currentUser?.tenantId ?? "" })}
-      </span>
-      <Button variant="outline" size="sm" loading={exiting} onClick={() => void handleExit()}>
-        {t("shell.exitImpersonation")}
-      </Button>
-    </Alert>
+    <Dialog open={open} onOpenChange={reset}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t("shell.changePassword")}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          {error ? <Alert variant="destructive">{error}</Alert> : null}
+          <Input
+            label={t("shell.currentPassword")}
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(event) => setCurrent(event.currentTarget.value)}
+          />
+          <Input
+            label={t("shell.newPassword")}
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(event) => setNext(event.currentTarget.value)}
+          />
+          <Input
+            label={t("shell.confirmPassword")}
+            type="password"
+            autoComplete="new-password"
+            value={repeat}
+            onChange={(event) => setRepeat(event.currentTarget.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => reset(false)}>
+            {t("shell.cancel")}
+          </Button>
+          <Button
+            loading={saving}
+            disabled={!current || !next || !repeat}
+            onClick={() => void handleSave()}
+          >
+            {t("shell.changePassword")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -232,6 +306,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
   const { data: user } = useCurrentUser();
   const email = useCurrentUserEmail();
   const name = email ?? user?.userId ?? "";
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   return (
     <DropdownMenu>
@@ -264,8 +339,12 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
           <LocaleSwitcher compact />
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
+          {t("shell.changePassword")}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={onLogout}>{t("shell.logout")}</DropdownMenuItem>
       </DropdownMenuContent>
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </DropdownMenu>
   );
 }
@@ -296,9 +375,6 @@ export function AppShellLayout({
   // `docs/features/23-ux-infrastructure-core.md`'s "global loading state", additive to (not a
   // replacement for) per-screen loading UI.
   const fetchingCount = useIsFetching();
-  const isPlatformAdmin = useHasRole("platform_admin");
-  const { data: impersonationStatus } = useImpersonationStatus();
-  const isImpersonating = impersonationStatus?.impersonating === true;
 
   async function handleLogout() {
     await logout();
@@ -382,15 +458,12 @@ export function AppShellLayout({
               <div className="md:hidden">{brandLink}</div>
             </div>
             <div className="flex items-center gap-2">
-              {isPlatformAdmin && !isImpersonating ? (
-                <div className="hidden md:block">
-                  <TenantSwitcher />
-                </div>
-              ) : null}
+              <div className="hidden md:block">
+                <TenantSwitcher />
+              </div>
               <AccountMenu onLogout={() => void handleLogout()} />
             </div>
           </header>
-          {isImpersonating ? <ImpersonationBanner /> : null}
           <main className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>

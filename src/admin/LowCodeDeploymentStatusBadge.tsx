@@ -3,7 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useLowCodeDeploymentStatus } from "./lowCodeControlPlane";
 import type { LowCodeDeploymentStatus } from "./lowCodeControlPlane";
 
-const STATUS_BADGE_VARIANT: Record<LowCodeDeploymentStatus["status"], "secondary" | "warning" | "success" | "destructive"> = {
+const STATUS_BADGE_VARIANT: Record<
+  LowCodeDeploymentStatus["status"],
+  "secondary" | "warning" | "success" | "destructive"
+> = {
   not_queued: "secondary",
   pending: "warning",
   running: "warning",
