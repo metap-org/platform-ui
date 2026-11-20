@@ -42,6 +42,8 @@ export * from "./auth/OidcCallbackPage";
 export * from "./auth/AccountSecurityPage";
 export * from "./auth/MfaEnrollment";
 export * from "./auth/securityApi";
+export * from "./admin/WorkspaceAdminPage";
+export * from "./admin/workspaceAdminApi";
 export * from "./auth/useCurrentUser";
 export * from "./auth/useEntityAccess";
 export * from "./auth/useTenantUsers";

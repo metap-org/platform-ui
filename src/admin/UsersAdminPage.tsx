@@ -1,15 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
   Badge,
   Button,
   Checkbox,
@@ -38,6 +29,7 @@ import { relativeTime } from "../lib/dates";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { DataList, type DataListColumn } from "../list/DataList";
 import { AdminHistory } from "./AdminHistory";
+import { ConfirmButton } from "./ConfirmButton";
 import {
   useRoles,
   useUser,
@@ -263,42 +255,6 @@ function CreateUserDialog({
   );
 }
 
-/** Asks before an action that signs someone out or takes their access away. */
-function ConfirmButton({
-  label,
-  description,
-  destructive,
-  busy,
-  onConfirm,
-}: {
-  label: string;
-  description: string;
-  destructive?: boolean;
-  busy: boolean;
-  onConfirm: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant={destructive ? "destructive" : "outline"} size="sm" loading={busy}>
-          {label}
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{label}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("shell.cancel")}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>{label}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
 function UserHistory({ userId }: { userId: string }) {
   return <AdminHistory audit={useUserAudit(userId)} />;
 }
@@ -518,6 +474,22 @@ function UserDetail({
         ) : current.sharedIdentity ? (
           <p className="text-xs text-muted-foreground">{t("admin.users.sharedIdentityHint")}</p>
         ) : null}
+        {!isSelf && !current.isOwner && current.status !== "invited" ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{t("admin.users.resetMfaHint")}</p>
+            <ConfirmButton
+              label={t("admin.users.resetMfa")}
+              description={t("admin.users.resetMfaConfirm", { email: current.email })}
+              busy={busy === "mfa"}
+              onConfirm={() =>
+                void run("mfa", () => actions.resetMfa(current.id), t("admin.users.mfaReset"))
+              }
+            />
+          </div>
+        ) : null}
+        {current.isOwner && !isSelf ? (
+          <p className="text-xs text-muted-foreground">{t("admin.users.ownerProtectedHint")}</p>
+        ) : null}
       </section>
 
       <Separator />
@@ -542,6 +514,11 @@ function UserCell({ user, selfId }: { user: AdminUserRow; selfId: string | null 
             <span className="text-xs font-normal text-muted-foreground">
               ({t("admin.users.you")})
             </span>
+          ) : null}
+          {user.isOwner ? (
+            <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+              {t("admin.users.owner")}
+            </Badge>
           ) : null}
           {user.authProvider !== "local" ? (
             <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
