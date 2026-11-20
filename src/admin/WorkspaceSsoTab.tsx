@@ -4,9 +4,11 @@ import {
   Badge,
   Button,
   Input,
-  SectionCard,
   Select,
+  SettingsRow,
+  SettingsSection,
   Skeleton,
+  StickyActionBar,
   TagsInput,
   Toggle,
   toast,
@@ -97,57 +99,114 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
     }
   }
 
+  const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(saved));
+  const canSave = !!draft.issuerUrl.trim() && !!draft.clientId.trim() && !needsSecret;
+
   return (
-    <div className="flex max-w-3xl flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       {error ? <Alert variant="destructive">{error}</Alert> : null}
-      <SectionCard
-        title={t("workspace.ssoTitle")}
+      <SettingsSection
+        title={t("workspace.ssoConnection")}
         description={t("workspace.ssoDescription")}
         actions={
-          <Badge variant={saved.configured && saved.enabled ? "success" : "outline"}>
-            {!saved.configured
-              ? t("workspace.ssoNotConfigured")
-              : saved.enabled
-                ? t("workspace.ssoOn")
-                : t("workspace.ssoOff")}
-          </Badge>
+          <>
+            <Badge variant={saved.configured && saved.enabled ? "success" : "outline"}>
+              {!saved.configured
+                ? t("workspace.ssoNotConfigured")
+                : saved.enabled
+                  ? t("workspace.ssoOn")
+                  : t("workspace.ssoOff")}
+            </Badge>
+            {saved.configured ? (
+              <ConfirmButton
+                label={t("workspace.ssoRemove")}
+                description={t("workspace.ssoRemoveConfirm")}
+                destructive
+                busy={busy === "remove"}
+                onConfirm={() => void remove()}
+              />
+            ) : null}
+          </>
         }
       >
-        <div className="flex flex-col gap-4">
-          <div className="rounded-md border border-border bg-muted/40 p-3 text-xs">
-            <div className="mb-1 font-medium text-foreground">{t("workspace.ssoRedirectUri")}</div>
-            <code className="select-all break-all">{saved.redirectUri || "—"}</code>
-            <div className="mt-1 text-muted-foreground">{t("workspace.ssoRedirectUriHint")}</div>
-          </div>
+        <SettingsRow
+          label={t("workspace.ssoRedirectUri")}
+          description={t("workspace.ssoRedirectUriHint")}
+          controlWidth="wide"
+        >
+          <code className="min-w-0 flex-1 select-all truncate rounded-md border border-border bg-muted/40 px-2 py-2 text-xs">
+            {saved.redirectUri || "—"}
+          </code>
+          {saved.redirectUri ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                void navigator.clipboard
+                  .writeText(saved.redirectUri)
+                  .then(() => toast(t("workspace.ssoRedirectCopied")))
+              }
+            >
+              {t("admin.users.copy")}
+            </Button>
+          ) : null}
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoIssuer")}
+          description={t("workspace.ssoIssuerHint")}
+          controlWidth="wide"
+        >
           <Input
-            label={t("workspace.ssoIssuer")}
+            className="w-full"
+            aria-label={t("workspace.ssoIssuer")}
             placeholder="https://login.example.com/realms/acme"
-            helperText={t("workspace.ssoIssuerHint")}
             error={fieldErrors.issuerUrl?.[0]}
             value={draft.issuerUrl}
             onChange={(e) => set({ issuerUrl: e.currentTarget.value })}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+        </SettingsRow>
+        <SettingsRow label={t("workspace.ssoClient")} controlWidth="wide">
+          <div className="grid w-full gap-2 sm:grid-cols-2">
             <Input
-              label={t("workspace.ssoClientId")}
+              aria-label={t("workspace.ssoClientId")}
+              placeholder={t("workspace.ssoClientId")}
               error={fieldErrors.clientId?.[0]}
               value={draft.clientId}
               onChange={(e) => set({ clientId: e.currentTarget.value })}
             />
             <Input
-              label={t("workspace.ssoClientSecret")}
+              aria-label={t("workspace.ssoClientSecret")}
               type="password"
               autoComplete="new-password"
-              placeholder={saved.hasClientSecret ? t("workspace.ssoSecretKept") : ""}
-              helperText={saved.hasClientSecret ? t("workspace.ssoSecretHint") : undefined}
+              placeholder={
+                saved.hasClientSecret
+                  ? t("workspace.ssoSecretKept")
+                  : t("workspace.ssoClientSecret")
+              }
               error={fieldErrors.clientSecret?.[0]}
               value={draft.clientSecret ?? ""}
               onChange={(e) => set({ clientSecret: e.currentTarget.value })}
             />
           </div>
+        </SettingsRow>
+        <SettingsRow label={t("workspace.ssoScopes")} controlWidth="wide">
           <TagsInput
-            label={t("workspace.ssoDomains")}
-            helperText={t("workspace.ssoDomainsHint")}
+            className="w-full"
+            value={draft.scopes}
+            onChange={(scopes) => set({ scopes })}
+            suggestions={DEFAULT_SCOPES}
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title={t("workspace.ssoRules")}>
+        <SettingsRow
+          label={t("workspace.ssoDomains")}
+          description={t("workspace.ssoDomainsHint")}
+          controlWidth="wide"
+        >
+          <TagsInput
+            className="w-full"
             placeholder="example.com"
             error={fieldErrors.emailDomains?.[0]}
             value={draft.emailDomains}
@@ -157,10 +216,14 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
               })
             }
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoDefaultRole")}
+          description={t("workspace.ssoDefaultRoleHint")}
+        >
+          <div className="w-56">
             <Select
-              label={t("workspace.ssoDefaultRole")}
-              helperText={t("workspace.ssoDefaultRoleHint")}
+              aria-label={t("workspace.ssoDefaultRole")}
               placeholder={t("workspace.ssoNoRole")}
               options={(roles ?? [])
                 .filter((r) => r.name !== "admin" && r.name !== "platform_admin")
@@ -168,68 +231,59 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
               value={draft.defaultRole || undefined}
               onValueChange={(defaultRole) => set({ defaultRole })}
             />
-            <TagsInput
-              label={t("workspace.ssoScopes")}
-              value={draft.scopes}
-              onChange={(scopes) => set({ scopes })}
-              suggestions={DEFAULT_SCOPES}
-            />
           </div>
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoPostLogin")}
+          description={t("workspace.ssoPostLoginHint")}
+          controlWidth="wide"
+        >
           <Input
-            label={t("workspace.ssoPostLogin")}
-            helperText={t("workspace.ssoPostLoginHint")}
+            className="w-full"
+            aria-label={t("workspace.ssoPostLogin")}
             error={fieldErrors.postLoginRedirect?.[0]}
             value={draft.postLoginRedirect ?? ""}
             onChange={(e) => set({ postLoginRedirect: e.currentTarget.value })}
           />
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium">{t("workspace.ssoEnabled")}</div>
-              <p className="text-xs text-muted-foreground">{t("workspace.ssoEnabledHint")}</p>
-            </div>
-            <Toggle
-              checked={draft.enabled}
-              onCheckedChange={(enabled) => set({ enabled, enforced: enabled && draft.enforced })}
-              aria-label={t("workspace.ssoEnabled")}
-            />
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium">{t("workspace.ssoEnforced")}</div>
-              <p className="text-xs text-muted-foreground">
-                {isOwner ? t("workspace.ssoEnforcedHint") : t("workspace.ssoEnforcedOwnerOnly")}
-              </p>
-            </div>
-            <Toggle
-              checked={draft.enforced}
-              disabled={!draft.enabled || (!isOwner && !saved.enforced)}
-              onCheckedChange={(enforced) => set({ enforced })}
-              aria-label={t("workspace.ssoEnforced")}
-            />
-          </div>
-          {draft.enforced && !saved.enforced ? (
-            <Alert>{t("workspace.ssoEnforcedWarning")}</Alert>
-          ) : null}
-        </div>
-      </SectionCard>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => void save()}
-          loading={busy === "save"}
-          disabled={!draft.issuerUrl.trim() || !draft.clientId.trim() || needsSecret}
+        </SettingsRow>
+        <SettingsRow label={t("workspace.ssoEnabled")} description={t("workspace.ssoEnabledHint")}>
+          <Toggle
+            checked={draft.enabled}
+            onCheckedChange={(enabled) => set({ enabled, enforced: enabled && draft.enforced })}
+            aria-label={t("workspace.ssoEnabled")}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoEnforced")}
+          description={
+            isOwner ? t("workspace.ssoEnforcedHint") : t("workspace.ssoEnforcedOwnerOnly")
+          }
+          meta={
+            draft.enforced && !saved.enforced ? (
+              <span className="text-destructive">{t("workspace.ssoEnforcedWarning")}</span>
+            ) : null
+          }
         >
+          <Toggle
+            checked={draft.enforced}
+            disabled={!draft.enabled || (!isOwner && !saved.enforced)}
+            onCheckedChange={(enforced) => set({ enforced })}
+            aria-label={t("workspace.ssoEnforced")}
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      <StickyActionBar
+        visible={dirty}
+        message={canSave ? t("workspace.ssoUnsaved") : t("workspace.ssoIncomplete")}
+      >
+        <Button size="sm" variant="ghost" onClick={() => setDraft(draftFrom(saved))}>
+          {t("workspace.discard")}
+        </Button>
+        <Button size="sm" onClick={() => void save()} loading={busy === "save"} disabled={!canSave}>
           {saved.configured ? t("workspace.save") : t("workspace.ssoConnect")}
         </Button>
-        {saved.configured ? (
-          <ConfirmButton
-            label={t("workspace.ssoRemove")}
-            description={t("workspace.ssoRemoveConfirm")}
-            destructive
-            busy={busy === "remove"}
-            onConfirm={() => void remove()}
-          />
-        ) : null}
-      </div>
+      </StickyActionBar>
     </div>
   );
 }

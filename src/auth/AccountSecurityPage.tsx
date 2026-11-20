@@ -8,7 +8,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  SectionCard,
+  SettingsRow,
+  SettingsSection,
   Skeleton,
   toast,
 } from "@metap/ui";
@@ -35,9 +36,11 @@ import {
 export function AccountSecurityPage() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">{t("security.title")}</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">
+          {t("security.title")}
+        </h1>
         <p className="text-sm text-muted-foreground">{t("security.subtitle")}</p>
       </div>
       <TwoFactorSection />
@@ -57,7 +60,7 @@ function TwoFactorSection() {
   const left = status.data?.recoveryCodesLeft ?? 0;
 
   return (
-    <SectionCard
+    <SettingsSection
       title={t("security.mfaTitle")}
       description={t("security.mfaDescription")}
       actions={
@@ -69,31 +72,43 @@ function TwoFactorSection() {
       }
     >
       {status.isLoading ? (
-        <Skeleton className="h-10 w-full" />
+        <div className="px-4 py-3">
+          <Skeleton className="h-8 w-full" />
+        </div>
       ) : status.error ? (
-        <ApiErrorMessage error={status.error} />
+        <div className="px-4 py-3">
+          <ApiErrorMessage error={status.error} />
+        </div>
       ) : enabled ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            {t("security.recoveryLeft", { count: left })}
-          </p>
-          {left <= 2 ? <Alert>{t("security.recoveryLow")}</Alert> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setDialog("regenerate")}>
-              {t("security.regenerate")}
-            </Button>
-            <Button variant="outline" onClick={() => setDialog("disable")}>
+        <>
+          <SettingsRow
+            label={t("security.authenticatorApp")}
+            description={t("security.authenticatorOnHint")}
+          >
+            <Button size="sm" variant="outline" onClick={() => setDialog("disable")}>
               {t("security.disable")}
             </Button>
-          </div>
-        </div>
+          </SettingsRow>
+          <SettingsRow
+            label={t("security.recoveryCodes")}
+            description={t("security.recoveryLeft", { count: left })}
+            meta={
+              left <= 2 ? (
+                <span className="text-destructive">{t("security.recoveryLow")}</span>
+              ) : null
+            }
+          >
+            <Button size="sm" variant="outline" onClick={() => setDialog("regenerate")}>
+              {t("security.regenerate")}
+            </Button>
+          </SettingsRow>
+        </>
       ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">{t("security.mfaOffHint")}</p>
-          <div>
-            <Button onClick={() => setDialog("enable")}>{t("security.enable")}</Button>
-          </div>
-        </div>
+        <SettingsRow label={t("security.authenticatorApp")} description={t("security.mfaOffHint")}>
+          <Button size="sm" onClick={() => setDialog("enable")}>
+            {t("security.enable")}
+          </Button>
+        </SettingsRow>
       )}
 
       <Dialog open={dialog === "enable"} onOpenChange={(open) => !open && setDialog(null)}>
@@ -138,7 +153,7 @@ function TwoFactorSection() {
         onClose={() => setDialog(null)}
         onSubmit={(code) => actions.regenerateRecoveryCodes(code)}
       />
-    </SectionCard>
+    </SettingsSection>
   );
 }
 
@@ -293,7 +308,7 @@ function SessionsSection() {
       emptyText={t("security.noSessions")}
       onRefresh={() => void sessions.refetch()}
       refreshing={sessions.isFetching}
-      bodyClassName="max-h-[420px]"
+      bodyClassName="max-h-[60vh]"
       banner={error ? <ApiErrorMessage error={error} /> : null}
       toolbar={
         <Button

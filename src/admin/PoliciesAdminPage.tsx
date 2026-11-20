@@ -25,6 +25,13 @@ export type PoliciesAdminPageProps = {
 
 type View = "roles" | "entity";
 
+const ALWAYS_ALL_ROLES = new Set(["admin", "platform_admin"]);
+
+/** The first role whose permissions are the tenant's to set; the first role if there is none. */
+function defaultRole(roles: { name: string }[]): string | null {
+  return (roles.find((r) => !ALWAYS_ALL_ROLES.has(r.name)) ?? roles[0])?.name ?? null;
+}
+
 /** "By role" (roadmap 114): the role list on the left, the selected role's permissions on every
  *  entity on the right — the same editor as a role's Permissions tab. */
 function RolesView({
@@ -40,7 +47,10 @@ function RolesView({
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search.trim(), 250);
   const { data: roles, isLoading, error } = useRoles(debounced);
-  const selected = (roles ?? []).find((r) => r.name === role) ?? null;
+  // With none picked, open on the first role there is something to decide about: `admin` (and
+  // `platform_admin`) always hold every permission, in every tenant, and can't be edited here.
+  const current = role ?? defaultRole(roles ?? []);
+  const selected = (roles ?? []).find((r) => r.name === current) ?? null;
 
   return (
     <div className="grid gap-4 pt-2 md:grid-cols-[16rem_minmax(0,1fr)]">
@@ -63,9 +73,9 @@ function RolesView({
               <li key={r.name} className="border-b border-border last:border-b-0">
                 <button
                   type="button"
-                  aria-current={r.name === role ? "true" : undefined}
+                  aria-current={r.name === current ? "true" : undefined}
                   onClick={() => onSelect(r.name)}
-                  className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/40${r.name === role ? " bg-primary/10" : ""}`}
+                  className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/40${r.name === current ? " bg-primary/10" : ""}`}
                 >
                   <span className="flex w-full items-center gap-1.5">
                     <span className="truncate font-medium">{roleDisplayName(r)}</span>

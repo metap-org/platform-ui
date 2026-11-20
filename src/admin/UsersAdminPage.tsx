@@ -3,6 +3,7 @@ import {
   Alert,
   Badge,
   Button,
+  buttonVariants,
   Checkbox,
   Dialog,
   DialogContent,
@@ -12,12 +13,17 @@ import {
   Input,
   MultiSelect,
   Select,
-  Separator,
+  SettingsRow,
+  SettingsSection,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   toast,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
@@ -27,6 +33,7 @@ import { AdminOnly } from "../auth/AdminOnly";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { relativeTime } from "../lib/dates";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { DataList, type DataListColumn } from "../list/DataList";
 import { AdminHistory } from "./AdminHistory";
 import { ConfirmButton } from "./ConfirmButton";
@@ -64,11 +71,11 @@ function statusVariant(status: UserStatus): "success" | "secondary" | "warning" 
   return "secondary";
 }
 
-function Initials({ text }: { text: string }) {
+function Initials({ text, size = "sm" }: { text: string; size?: "sm" | "lg" }) {
   return (
     <span
       aria-hidden
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
+      className={`flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary ${size === "lg" ? "h-11 w-11 text-sm" : "h-7 w-7 text-[11px]"}`}
     >
       {text.slice(0, 2).toUpperCase() || "?"}
     </span>
@@ -263,18 +270,23 @@ function UserDetail({
   userId,
   selfId,
   onClose,
+  accountSecurityHref,
 }: {
   userId: string;
   selfId: string | null;
   onClose: () => void;
+  accountSecurityHref: string | null;
 }) {
   const { t, i18n } = useTranslation();
+  const nav = useNavigationAdapter();
   const { data: user, isLoading, error } = useUser(userId);
   const { data: roles } = useRoles();
   const actions = useUserAdminActions();
   const describe = useActionError();
   // Unsaved edit of the display name; null shows the saved value.
   const [draftName, setDraftName] = useState<string | null>(null);
+  // Unsaved role picks; null shows the saved roles. Applied only on "Save".
+  const [draftRoles, setDraftRoles] = useState<string[] | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [resentLink, setResentLink] = useState<string | null>(null);
@@ -297,206 +309,322 @@ function UserDetail({
     }
   }
 
-  function changeRoles(next: string[]) {
-    const added = next.filter((r) => !current.roles.includes(r));
-    const removed = current.roles.filter((r) => !next.includes(r));
-    void run("roles", async () => {
-      for (const role of added) await actions.assignRole(current.id, role);
-      for (const role of removed) await actions.revokeRole(current.id, role);
-    });
+  function saveName() {
+    void run(
+      "profile",
+      async () => {
+        await actions.updateUser(current.id, displayName.trim());
+        setDraftName(null);
+      },
+      t("admin.users.saved"),
+    );
+  }
+
+  const pickedRoles = draftRoles ?? current.roles;
+  const rolesChanged =
+    pickedRoles.length !== current.roles.length ||
+    pickedRoles.some((r) => !current.roles.includes(r));
+
+  function saveRoles() {
+    const added = pickedRoles.filter((r) => !current.roles.includes(r));
+    const removed = current.roles.filter((r) => !pickedRoles.includes(r));
+    void run(
+      "roles",
+      async () => {
+        for (const role of added) await actions.assignRole(current.id, role);
+        for (const role of removed) await actions.revokeRole(current.id, role);
+        setDraftRoles(null);
+      },
+      t("admin.users.rolesSaved"),
+    );
   }
 
   const isSelf = current.id === selfId;
   const canResetPassword = current.authProvider === "local" && !current.sharedIdentity && !isSelf;
+  const nameChanged = displayName.trim() !== current.displayName;
+  const invited = current.status === "invited";
 
   return (
-    <div className="flex flex-col gap-5 pt-2">
-      <div className="flex items-center gap-3">
-        <Initials text={current.displayName || current.email} />
-        <div className="min-w-0">
-          <div className="truncate font-medium">{current.displayName || current.email}</div>
-          <div className="truncate text-sm text-muted-foreground">{current.email}</div>
+    <div className="flex flex-col gap-4">
+      {/* Who: identity, what marks them out, and when they were added and last signed in. */}
+      <div className="flex items-start gap-3">
+        <Initials text={current.displayName || current.email} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-base font-semibold text-foreground">
+              {current.displayName || current.email}
+            </span>
+            {isSelf ? <Badge variant="outline">{t("admin.users.you")}</Badge> : null}
+            {current.isOwner ? <Badge variant="secondary">{t("admin.users.owner")}</Badge> : null}
+            {current.authProvider !== "local" ? (
+              <Badge variant="outline">{t("admin.users.sso")}</Badge>
+            ) : null}
+          </div>
+          {current.displayName ? (
+            <div className="truncate text-sm text-muted-foreground">{current.email}</div>
+          ) : null}
+          <div className="mt-1 text-xs text-muted-foreground">
+            {t("admin.users.createdAt", { when: relativeTime(current.createdAt, i18n.language) })}
+            {" · "}
+            {current.lastLoginAt
+              ? t("admin.users.lastSignIn", {
+                  when: relativeTime(current.lastLoginAt, i18n.language),
+                })
+              : t("admin.users.neverSignedIn")}
+          </div>
         </div>
-        <Badge variant={statusVariant(current.status)} className="ml-auto">
+        <Badge variant={statusVariant(current.status)} className="shrink-0">
           {t(`admin.users.status_${current.status}`)}
         </Badge>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {t("admin.users.createdAt", { when: relativeTime(current.createdAt, i18n.language) })}
-        {current.sharedIdentity ? ` · ${t("admin.users.sharedIdentity")}` : ""}
-      </p>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{t("admin.users.profile")}</h3>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Input
-              label={t("admin.users.displayName")}
-              value={displayName}
-              onChange={(event) => setDraftName(event.currentTarget.value)}
-            />
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={busy === "profile"}
-            disabled={displayName.trim() === current.displayName}
-            onClick={() =>
-              void run(
-                "profile",
-                async () => {
-                  await actions.updateUser(current.id, displayName);
-                  setDraftName(null);
-                },
-                t("admin.users.saved"),
-              )
-            }
-          >
-            {t("admin.users.save")}
-          </Button>
-        </div>
-      </section>
+      <Tabs defaultValue="info">
+        <TabsList>
+          <TabsTrigger value="info">{t("admin.users.tabInfo")}</TabsTrigger>
+          <TabsTrigger value="history">{t("admin.users.history")}</TabsTrigger>
+        </TabsList>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{t("admin.users.rolesLabel")}</h3>
-        <MultiSelect
-          placeholder={t("admin.users.rolesPlaceholder")}
-          options={roleOptions(roles)}
-          value={current.roles}
-          onChange={changeRoles}
-        />
-      </section>
-
-      {current.status === "invited" ? (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">{t("admin.users.invitation")}</h3>
-          <p className="text-sm text-muted-foreground">
-            {current.invitationExpiresAt
-              ? t("admin.users.invitationExpires", {
-                  when: relativeTime(current.invitationExpiresAt, i18n.language),
-                })
-              : t("admin.users.invitationExpired")}
-          </p>
-          <div>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={busy === "invite"}
-              onClick={() =>
-                void run("invite", async () => {
-                  const result = await actions.resendInvitation(current.id);
-                  setResentLink(result.emailSent ? null : result.acceptUrl);
-                  if (result.emailSent) toast(t("admin.users.invited", { email: current.email }));
-                })
-              }
-            >
-              {t("admin.users.resendInvite")}
-            </Button>
-          </div>
-          {resentLink ? <InviteLinkNotice url={resentLink} /> : null}
-        </section>
-      ) : null}
-
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{t("admin.users.access")}</h3>
-        {!isSelf ? (
-          <div className="flex flex-wrap gap-2">
-            {current.status === "invited" ? null : current.status === "disabled" ? (
-              <Button
-                size="sm"
-                variant="outline"
-                loading={busy === "status"}
-                onClick={() => void run("status", () => actions.enableUser(current.id))}
-              >
-                {t("admin.users.enable")}
-              </Button>
-            ) : (
-              <ConfirmButton
-                label={t("admin.users.disable")}
-                description={t("admin.users.disableConfirm", { email: current.email })}
-                busy={busy === "status"}
-                onConfirm={() => void run("status", () => actions.disableUser(current.id))}
-              />
-            )}
-            <ConfirmButton
-              destructive
-              label={
-                current.status === "invited"
-                  ? t("admin.users.withdrawInvite")
-                  : t("admin.users.remove")
-              }
-              description={
-                current.status === "invited"
-                  ? t("admin.users.withdrawInviteConfirm", { email: current.email })
-                  : t("admin.users.removeConfirm", { email: current.email })
-              }
-              busy={busy === "remove"}
-              onConfirm={() =>
-                void run("remove", async () => {
-                  await actions.removeUser(current.id);
-                  onClose();
-                })
-              }
-            />
-          </div>
-        ) : null}
-        {canResetPassword ? (
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+        <TabsContent value="info" className="flex flex-col gap-4">
+          <SettingsSection title={t("admin.users.profile")}>
+            <SettingsRow label={t("admin.users.displayName")} controlWidth="wide">
               <Input
-                label={t("admin.users.newPassword")}
-                type="password"
-                autoComplete="new-password"
-                helperText={t("admin.users.resetPasswordHint")}
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.currentTarget.value)}
+                className="w-full"
+                aria-label={t("admin.users.displayName")}
+                placeholder={current.email}
+                value={displayName}
+                onChange={(event) => setDraftName(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && nameChanged) saveName();
+                  if (event.key === "Escape") setDraftName(null);
+                }}
               />
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={busy === "password"}
-              disabled={newPassword.length === 0}
-              onClick={() =>
-                void run(
-                  "password",
-                  async () => {
-                    await actions.resetPassword(current.id, newPassword);
-                    setNewPassword("");
-                  },
-                  t("admin.users.passwordReset"),
-                )
-              }
+              {nameChanged ? (
+                <>
+                  <Button size="sm" variant="ghost" onClick={() => setDraftName(null)}>
+                    {t("admin.users.cancelEdit")}
+                  </Button>
+                  <Button size="sm" loading={busy === "profile"} onClick={saveName}>
+                    {t("admin.users.save")}
+                  </Button>
+                </>
+              ) : null}
+            </SettingsRow>
+            <SettingsRow label={t("admin.users.email")}>
+              <span className="truncate text-sm">{current.email}</span>
+            </SettingsRow>
+            <SettingsRow
+              label={t("admin.users.signInMethod")}
+              description={current.sharedIdentity ? t("admin.users.sharedIdentity") : undefined}
             >
-              {t("admin.users.resetPassword")}
-            </Button>
-          </div>
-        ) : current.sharedIdentity ? (
-          <p className="text-xs text-muted-foreground">{t("admin.users.sharedIdentityHint")}</p>
-        ) : null}
-        {!isSelf && !current.isOwner && current.status !== "invited" ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">{t("admin.users.resetMfaHint")}</p>
-            <ConfirmButton
-              label={t("admin.users.resetMfa")}
-              description={t("admin.users.resetMfaConfirm", { email: current.email })}
-              busy={busy === "mfa"}
-              onConfirm={() =>
-                void run("mfa", () => actions.resetMfa(current.id), t("admin.users.mfaReset"))
-              }
-            />
-          </div>
-        ) : null}
-        {current.isOwner && !isSelf ? (
-          <p className="text-xs text-muted-foreground">{t("admin.users.ownerProtectedHint")}</p>
-        ) : null}
-      </section>
+              <span className="text-sm">
+                {current.authProvider === "local"
+                  ? current.hasPassword
+                    ? t("admin.users.signInPassword")
+                    : t("admin.users.signInNoPassword")
+                  : t("admin.users.signInSso", { provider: current.authProvider })}
+              </span>
+            </SettingsRow>
+          </SettingsSection>
 
-      <Separator />
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{t("admin.users.history")}</h3>
-        <UserHistory userId={current.id} />
-      </section>
+          <SettingsSection
+            title={t("admin.users.rolesLabel")}
+            description={t("admin.users.rolesHint")}
+          >
+            <SettingsRow label={t("admin.users.rolesInWorkspace")} controlWidth="wide">
+              <div>
+                <MultiSelect
+                  placeholder={t("admin.users.rolesPlaceholder")}
+                  options={roleOptions(roles)}
+                  value={pickedRoles}
+                  onChange={setDraftRoles}
+                />
+              </div>
+              {rolesChanged ? (
+                <>
+                  <Button size="sm" variant="ghost" onClick={() => setDraftRoles(null)}>
+                    {t("admin.users.cancelEdit")}
+                  </Button>
+                  <Button size="sm" loading={busy === "roles"} onClick={saveRoles}>
+                    {t("admin.users.save")}
+                  </Button>
+                </>
+              ) : null}
+            </SettingsRow>
+          </SettingsSection>
+
+          {invited ? (
+            <SettingsSection title={t("admin.users.invitation")}>
+              <SettingsRow
+                label={t("admin.users.invitationStatus")}
+                description={
+                  current.invitationExpiresAt
+                    ? t("admin.users.invitationExpires", {
+                        when: relativeTime(current.invitationExpiresAt, i18n.language),
+                      })
+                    : t("admin.users.invitationExpired")
+                }
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={busy === "invite"}
+                  onClick={() =>
+                    void run("invite", async () => {
+                      const result = await actions.resendInvitation(current.id);
+                      setResentLink(result.emailSent ? null : result.acceptUrl);
+                      if (result.emailSent)
+                        toast(t("admin.users.invited", { email: current.email }));
+                    })
+                  }
+                >
+                  {t("admin.users.resendInvite")}
+                </Button>
+              </SettingsRow>
+              {resentLink ? (
+                <div className="px-4 py-3">
+                  <InviteLinkNotice url={resentLink} />
+                </div>
+              ) : null}
+            </SettingsSection>
+          ) : null}
+
+          {isSelf ? (
+            <SettingsSection title={t("admin.users.access")}>
+              <SettingsRow
+                label={t("admin.users.ownSecurity")}
+                description={t("admin.users.ownSecurityHint")}
+              >
+                {accountSecurityHref ? (
+                  <nav.Link
+                    to={accountSecurityHref}
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    {t("admin.users.openAccountSecurity")}
+                  </nav.Link>
+                ) : null}
+              </SettingsRow>
+            </SettingsSection>
+          ) : (
+            <SettingsSection
+              title={t("admin.users.access")}
+              description={current.isOwner ? t("admin.users.ownerProtectedHint") : undefined}
+            >
+              {canResetPassword ? (
+                <SettingsRow
+                  label={t("admin.users.resetPassword")}
+                  description={t("admin.users.resetPasswordHint")}
+                  controlWidth="wide"
+                >
+                  <Input
+                    className="w-full"
+                    type="password"
+                    autoComplete="new-password"
+                    aria-label={t("admin.users.newPassword")}
+                    placeholder={t("admin.users.newPassword")}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.currentTarget.value)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={busy === "password"}
+                    disabled={newPassword.length === 0}
+                    onClick={() =>
+                      void run(
+                        "password",
+                        async () => {
+                          await actions.resetPassword(current.id, newPassword);
+                          setNewPassword("");
+                        },
+                        t("admin.users.passwordReset"),
+                      )
+                    }
+                  >
+                    {t("admin.users.resetPasswordShort")}
+                  </Button>
+                </SettingsRow>
+              ) : current.sharedIdentity ? (
+                <SettingsRow
+                  label={t("admin.users.resetPassword")}
+                  description={t("admin.users.sharedIdentityHint")}
+                />
+              ) : null}
+              {!current.isOwner && !invited ? (
+                <SettingsRow
+                  label={t("admin.users.resetMfa")}
+                  description={t("admin.users.resetMfaHint")}
+                >
+                  <ConfirmButton
+                    label={t("admin.users.resetMfaShort")}
+                    description={t("admin.users.resetMfaConfirm", { email: current.email })}
+                    busy={busy === "mfa"}
+                    onConfirm={() =>
+                      void run("mfa", () => actions.resetMfa(current.id), t("admin.users.mfaReset"))
+                    }
+                  />
+                </SettingsRow>
+              ) : null}
+              {!invited ? (
+                <SettingsRow
+                  label={
+                    current.status === "disabled"
+                      ? t("admin.users.enableTitle")
+                      : t("admin.users.disableTitle")
+                  }
+                  description={
+                    current.status === "disabled"
+                      ? t("admin.users.enableHint")
+                      : t("admin.users.disableHint")
+                  }
+                >
+                  {current.status === "disabled" ? (
+                    <ConfirmButton
+                      label={t("admin.users.enable")}
+                      description={t("admin.users.enableConfirm", { email: current.email })}
+                      busy={busy === "status"}
+                      onConfirm={() => void run("status", () => actions.enableUser(current.id))}
+                    />
+                  ) : (
+                    <ConfirmButton
+                      label={t("admin.users.disable")}
+                      description={t("admin.users.disableConfirm", { email: current.email })}
+                      busy={busy === "status"}
+                      disabled={current.isOwner}
+                      onConfirm={() => void run("status", () => actions.disableUser(current.id))}
+                    />
+                  )}
+                </SettingsRow>
+              ) : null}
+              <SettingsRow
+                label={invited ? t("admin.users.withdrawInvite") : t("admin.users.removeTitle")}
+                description={invited ? t("admin.users.withdrawHint") : t("admin.users.removeHint")}
+              >
+                <ConfirmButton
+                  destructive
+                  label={invited ? t("admin.users.withdrawInvite") : t("admin.users.remove")}
+                  description={
+                    invited
+                      ? t("admin.users.withdrawInviteConfirm", { email: current.email })
+                      : t("admin.users.removeConfirm", { email: current.email })
+                  }
+                  busy={busy === "remove"}
+                  disabled={current.isOwner}
+                  onConfirm={() =>
+                    void run("remove", async () => {
+                      await actions.removeUser(current.id);
+                      onClose();
+                    })
+                  }
+                />
+              </SettingsRow>
+            </SettingsSection>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history">
+          <UserHistory userId={current.id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -534,7 +662,7 @@ function UserCell({ user, selfId }: { user: AdminUserRow; selfId: string | null 
   );
 }
 
-function UsersAdminPageContent() {
+function UsersAdminPageContent({ accountSecurityHref }: { accountSecurityHref: string | null }) {
   const { t, i18n } = useTranslation();
   const { data: me } = useCurrentUser();
   const { data: roles } = useRoles();
@@ -675,12 +803,17 @@ function UsersAdminPageContent() {
 
       <CreateUserDialog open={creating} onOpenChange={setCreating} />
       <Sheet open={openUser !== null} onOpenChange={(open) => !open && setOpenUser(null)}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader className="sr-only">
             <SheetTitle>{t("admin.users.detailTitle")}</SheetTitle>
           </SheetHeader>
           {openUser ? (
-            <UserDetail userId={openUser} selfId={selfId} onClose={() => setOpenUser(null)} />
+            <UserDetail
+              userId={openUser}
+              selfId={selfId}
+              onClose={() => setOpenUser(null)}
+              accountSecurityHref={accountSecurityHref}
+            />
           ) : null}
         </SheetContent>
       </Sheet>
@@ -693,10 +826,16 @@ function UsersAdminPageContent() {
  * non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
  * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
  * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */
-export function UsersAdminPage() {
+export function UsersAdminPage({
+  accountSecurityHref = "/account/security",
+}: {
+  /** Where "your own security" points from your own row (the shell's account security page);
+   *  `null` hides the link. */
+  accountSecurityHref?: string | null;
+} = {}) {
   return (
     <AdminOnly>
-      <UsersAdminPageContent />
+      <UsersAdminPageContent accountSecurityHref={accountSecurityHref} />
     </AdminOnly>
   );
 }

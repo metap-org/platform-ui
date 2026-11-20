@@ -94,74 +94,94 @@ export function WorkspaceAuditTab() {
   }
 
   return (
-    <div className="flex flex-col gap-4 pt-2">
-      <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Select
-          label={t("workspace.auditActor")}
-          options={[
-            { value: ALL, label: t("workspace.auditAnyone") },
-            ...people.map((p) => ({ value: p.id, label: p.email || p.id })),
-          ]}
-          value={actor}
-          onValueChange={setActor}
-        />
+    <div className="flex flex-col gap-3">
+      {/* One toolbar: export and integrity on the heading line, filters in a single wrapping row. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          {t("workspace.tabAudit")}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            loading={busy === "csv"}
+            onClick={() => void run("csv", () => downloadAuditExport(applied, "csv"))}
+          >
+            {t("workspace.auditExportCsv")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={busy === "json"}
+            onClick={() => void run("json", () => downloadAuditExport(applied, "json"))}
+          >
+            {t("workspace.auditExportJson")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={busy === "verify"}
+            onClick={() => void run("verify", async () => setReport(await verifyAuditChain()))}
+          >
+            {t("workspace.auditVerify")}
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2">
+        <div className="w-48">
+          <Select
+            aria-label={t("workspace.auditActor")}
+            options={[
+              { value: ALL, label: t("workspace.auditAnyone") },
+              ...people.map((p) => ({ value: p.id, label: p.email || p.id })),
+            ]}
+            value={actor}
+            onValueChange={setActor}
+          />
+        </div>
+        <div className="w-40">
+          <Select
+            aria-label={t("workspace.auditAction")}
+            options={[
+              { value: ALL, label: t("workspace.auditAnyAction") },
+              ...ACTIONS.map((a) => ({ value: a, label: t(`workspace.auditAction_${a}`) })),
+            ]}
+            value={action}
+            onValueChange={setAction}
+          />
+        </div>
         <Input
-          label={t("workspace.auditEntity")}
-          placeholder="waf.zones"
+          className="w-40"
+          aria-label={t("workspace.auditEntity")}
+          placeholder={t("workspace.auditEntityPlaceholder")}
           value={entity}
           onChange={(e) => setEntity(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
         />
         <Input
-          label={t("workspace.auditRecord")}
+          className="w-56"
+          aria-label={t("workspace.auditRecord")}
           placeholder={t("workspace.auditRecordPlaceholder")}
           value={recordId}
           onChange={(e) => setRecordId(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
         />
-        <Select
-          label={t("workspace.auditAction")}
-          options={[
-            { value: ALL, label: t("workspace.auditAnyAction") },
-            ...ACTIONS.map((a) => ({ value: a, label: t(`workspace.auditAction_${a}`) })),
-          ]}
-          value={action}
-          onValueChange={setAction}
-        />
-        <DateTimePicker label={t("workspace.auditFrom")} value={from} onValueChange={setFrom} />
-        <DateTimePicker label={t("workspace.auditTo")} value={to} onValueChange={setTo} />
-        <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-3">
-          <Button size="sm" onClick={apply}>
-            {t("workspace.auditApply")}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clear}>
-            {t("workspace.auditClear")}
-          </Button>
-          <span className="ml-auto flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              loading={busy === "csv"}
-              onClick={() => void run("csv", () => downloadAuditExport(applied, "csv"))}
-            >
-              {t("workspace.auditExportCsv")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={busy === "json"}
-              onClick={() => void run("json", () => downloadAuditExport(applied, "json"))}
-            >
-              {t("workspace.auditExportJson")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={busy === "verify"}
-              onClick={() => void run("verify", async () => setReport(await verifyAuditChain()))}
-            >
-              {t("workspace.auditVerify")}
-            </Button>
-          </span>
+        <div className="w-48">
+          <DateTimePicker
+            placeholder={t("workspace.auditFrom")}
+            value={from}
+            onValueChange={setFrom}
+          />
         </div>
+        <div className="w-48">
+          <DateTimePicker placeholder={t("workspace.auditTo")} value={to} onValueChange={setTo} />
+        </div>
+        <Button size="sm" onClick={apply}>
+          {t("workspace.auditApply")}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={clear}>
+          {t("workspace.auditClear")}
+        </Button>
       </div>
 
       {error ? <ApiErrorMessage error={error} /> : null}
@@ -221,7 +241,7 @@ function AuditRow({
     ? t(`workspace.auditAction_${entry.action}`)
     : entry.action;
   return (
-    <li className="flex flex-col gap-1 px-3 py-2 text-sm">
+    <li className="flex flex-col gap-0.5 px-3 py-1.5 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="font-normal">
           {entry.transitionAction ? `${actionKey}: ${entry.transitionAction}` : actionKey}
