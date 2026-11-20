@@ -25,6 +25,10 @@ export class GraphQLError extends Error {
   readonly code: string;
   readonly status?: number;
   readonly fieldErrors?: Record<string, string[]>;
+  /** Structured data about the failure, when the server sends it — for a failed workflow guard
+   *  or validator: `{ field, label, op, expected, actual }` of the check that failed, so a screen
+   *  can say it in its own words. `message` is already human-readable either way. */
+  readonly details?: Record<string, unknown>;
 
   constructor(errors: GraphQLErrorDetail[]) {
     super(errors.map((e) => e.message).join("; ") || "GraphQL request failed");
@@ -34,6 +38,7 @@ export class GraphQLError extends Error {
     this.code = extensions?.code ?? "unknown_error";
     this.status = extensions?.status;
     this.fieldErrors = extensions?.fieldErrors;
+    this.details = extensions?.details;
   }
 }
 
@@ -43,6 +48,7 @@ type GraphQLErrorDetail = {
     code?: string;
     status?: number;
     fieldErrors?: Record<string, string[]>;
+    details?: Record<string, unknown>;
   };
 };
 
