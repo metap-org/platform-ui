@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
-import { graphqlFetch } from "../api/graphqlClient";
+import { apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { i18n } from "./i18n";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./resources";
@@ -18,8 +18,7 @@ function isSupportedLocale(value: string): value is (typeof SUPPORTED_LOCALES)[n
 }
 
 // Must be nested inside `AuthProvider` — reads `status` to gate loading/persisting the caller's
-// locale (`myPreferences`/`setMyPreferences` GraphQL fields, `/preferences`'s replacement since
-// 2026-09-26 — `metap-graphql-http::platform_fields`) until a session (cookie-based since
+// locale (`GET`/`PUT /preferences`) until a session (cookie-based since
 // 2026-09-03) actually exists. Also wraps `I18nextProvider` so any consumer of `platform-ui` gets
 // a working `useTranslation()` without wiring i18next itself.
 export function LocaleProvider({ children }: { children: ReactNode }) {
@@ -31,11 +30,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    graphqlFetch<{ myPreferences: { locale: string } }>("/graphql", "{ myPreferences { locale } }")
+    apiFetch<{ data: { locale: string } }>("/preferences")
       .then((response) => {
-        if (!cancelled && isSupportedLocale(response.myPreferences.locale)) {
-          setLocaleState(response.myPreferences.locale);
-          void i18n.changeLanguage(response.myPreferences.locale);
+        if (!cancelled && isSupportedLocale(response.data.locale)) {
+          setLocaleState(response.data.locale);
+          void i18n.changeLanguage(response.data.locale);
         }
       })
       .catch(() => {
@@ -52,11 +51,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLocaleState(next);
       await i18n.changeLanguage(next);
       if (status === "authenticated") {
-        await graphqlFetch(
-          "/graphql",
-          "mutation($locale: String!) { setMyPreferences(locale: $locale) { locale } }",
-          { locale: next },
-        );
+        await apiFetch("/preferences", { method: "PUT", body: JSON.stringify({ locale: next }) });
       }
     },
     [status],

@@ -15,7 +15,7 @@ const PLATFORM_ADMIN_ROLE = "platform_admin";
  * `AdminOnly`'s platform-level counterpart — wraps a cross-tenant admin screen (tenant
  * provisioning, wave rollout, ...) so a caller who only holds the per-tenant `"admin"` role sees a
  * plain "you don't have access" message instead of the page rendering in full and firing
- * `platform_admin`-gated GraphQL/REST calls that would come back 403. Purely presentational — the
+ * `platform_admin`-gated calls that would come back 403. Purely presentational — the
  * server enforces the real boundary either way (`PlatformAdminContext`); this exists so a new
  * platform-admin page doesn't depend on every consumer remembering to gate the route themselves,
  * same reasoning as `AdminOnly`'s own doc comment.

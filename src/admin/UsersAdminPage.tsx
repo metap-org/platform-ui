@@ -27,7 +27,7 @@ import {
   toast,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { GraphQLError } from "../api/graphqlClient";
+import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { AdminOnly } from "../auth/AdminOnly";
 import { useCurrentUser } from "../auth/useCurrentUser";
@@ -59,7 +59,7 @@ const KNOWN_ERRORS = ["last_admin", "self_modification", "already_member", "weak
 function useActionError() {
   const { t } = useTranslation();
   return (err: unknown) => {
-    const code = err instanceof GraphQLError ? err.code : "";
+    const code = err instanceof ApiError ? err.code : "";
     if (KNOWN_ERRORS.includes(code)) return t(`admin.users.error_${code}`);
     return err instanceof Error ? err.message : t("common.somethingWentWrong");
   };
@@ -183,7 +183,7 @@ function CreateUserDialog({
       }
     } catch (err) {
       setError(describe(err));
-      if (err instanceof GraphQLError && err.fieldErrors) setFieldErrors(err.fieldErrors);
+      if (err instanceof ApiError && err.fieldErrors) setFieldErrors(err.fieldErrors);
     } finally {
       setSaving(false);
     }
@@ -822,7 +822,7 @@ function UsersAdminPageContent({ accountSecurityHref }: { accountSecurityHref: s
 }
 
 /** Self-gated on the `admin` role rather than trusting every consumer to gate the route: the
- * content below calls admin-only GraphQL fields from its very first render, so an ungated
+ * content below calls admin-only routes from its very first render, so an ungated
  * non-admin would otherwise watch the page assemble itself and then fill with 403 alerts.
  * `AdminOnly` keeps that body unmounted entirely until roles resolve and pass
  * (`docs/audits/02-auth-permission-workflow-diagram-audit.md` finding B6). */

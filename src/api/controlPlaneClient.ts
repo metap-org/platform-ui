@@ -1,25 +1,21 @@
 import { apiFetch } from "./client";
-import { graphqlFetch } from "./graphqlClient";
 
 /**
+ * metap itself speaks REST only (roadmap 116); this module is the one GraphQL client left in
+ * platform-ui, for an outside system: metap-lowcode's control plane (tenant provisioning, low-code
+ * audit), which still exposes GraphQL.
+ *
  * Bearer-token bridge to the `control-plane-graphql` gateway (`../../../metap-lowcode/services/
  * control-plane-graphql`) — that gateway is deliberately Bearer-only, no cookie-auth mode (see
  * its own `src/auth.rs` doc comment: it runs on its own separate origin from `control-api`/
  * `lowcode-admin-api`, the 2 services whose session cookie it would otherwise need to ride the
- * same way `graphqlClient.ts`'s cookie-auth path does for a same-origin `metap-demo-waf`-style
- * gateway). So every call here mints a short-lived Bearer via `GET /auth/token` against
- * `authTokenUrl` first — the same 2-round-trip tradeoff `useGraphQLQuery`'s own doc comment
- * describes as the *pre-2026-09-04* default, before cookie-auth existed at all. Once a future
- * deployment fronts the gateway behind the same origin as `control-api` (this repo's own FE-1/
- * FE-4 plan), this whole module becomes unnecessary and callers can switch to plain
- * `useGraphQLQuery` instead — deliberately not attempted now, since that reverse-proxy doesn't
- * exist yet.
+ * same way a same-origin cookie session would). So every call here mints a short-lived Bearer via `GET /auth/token` against
+ * `authTokenUrl` first (2 round trips per call).
  *
  * No hardcoded URL/port and no environment-variable convention here on purpose — `platform-ui`
  * has zero backend-topology knowledge of its own (every existing REST/GraphQL call in this repo
  * takes its target as an explicit parameter, resolved by whichever consuming app's own dev
- * proxy/build config decides); `gatewayUrl`/`authTokenUrl` follow that same convention, mirroring
- * `useGraphQLQuery`'s own `path` parameter.
+ * proxy/build config decides); `gatewayUrl`/`authTokenUrl` follow that same convention.
  */
 
 /** Mints a fresh short-lived Bearer token, scoped to whatever session/tenant `authTokenUrl`'s
@@ -33,8 +29,8 @@ export async function fetchControlPlaneToken(authTokenUrl: string): Promise<stri
 }
 
 /** Mints a token then makes the actual GraphQL call — the 2-request unit every control-plane
- *  query/mutation needs. Not batched with `graphqlClient.ts`'s microtask queue (each call mints
- *  its own token first), a real but accepted cost for a Bearer-only gateway on its own origin. */
+ *  query/mutation needs (each call mints its own token first), a real but accepted cost for a
+ *  Bearer-only gateway on its own origin. */
 export async function controlPlaneGraphqlFetch<T>(
   gatewayUrl: string,
   authTokenUrl: string,
@@ -42,5 +38,37 @@ export async function controlPlaneGraphqlFetch<T>(
   variables?: Record<string, unknown>,
 ): Promise<T> {
   const token = await fetchControlPlaneToken(authTokenUrl);
-  return graphqlFetch<T>(gatewayUrl, query, variables, token);
+  const response = await fetch(gatewayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!response.ok) {
+    throw new Error(`Control-plane request failed with status ${response.status}`);
+  }
+  const body = (await response.json()) as {
+    data?: T;
+    errors?: { message: string; extensions?: { code?: string } }[];
+  };
+  if (body.errors && body.errors.length > 0) {
+    throw new ControlPlaneError(
+      body.errors.map((e) => e.message).join("; "),
+      body.errors[0]?.extensions?.code ?? "unknown_error",
+    );
+  }
+  if (body.data === undefined) {
+    throw new Error("Control-plane request returned no data and no errors");
+  }
+  return body.data;
+}
+
+/** A GraphQL error answer from the control plane; `code` is the first error's. */
+export class ControlPlaneError extends Error {
+  readonly code: string;
+
+  constructor(message: string, code: string) {
+    super(message || "Control-plane request failed");
+    this.name = "ControlPlaneError";
+    this.code = code;
+  }
 }

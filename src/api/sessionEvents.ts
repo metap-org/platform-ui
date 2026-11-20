@@ -1,4 +1,4 @@
-/** Lets `apiFetch`/`graphqlFetch` — plain functions with no React tree to sit in — tell
+/** Lets `apiFetch` — a plain function with no React tree to sit in — tell
  *  `AuthContext` "the session just came back 401" without either side importing the other.
  *  `AuthContext` is the only real listener today (forces an immediate `["currentUser"]` refetch
  *  so `status` flips to "anonymous" without waiting for the next window-focus/reconnect refetch —

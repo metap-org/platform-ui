@@ -30,7 +30,7 @@ const STRATEGIES: ProvisionTenantInput["strategy"][] = ["schema", "dedicated_db"
 /** Every action hook in `./tenantAdmin.ts` is a plain async function (not a `useMutation` object
  *  — see that module's own doc comment), so this page tracks its own loading/error state per
  *  form/row, same convention `UsersAdminPage`/`CronJobsAdminPage`'s row-level actions already
- *  use. `GraphQLError` (thrown by `controlPlaneGraphqlFetch` on a GraphQL error response, e.g. the
+ *  use. `ControlPlaneError` (thrown by `controlPlaneGraphqlFetch` on a GraphQL error response, e.g. the
  *  409 duplicate-tenant-id case) is a real `Error` subclass, so this needs no special-casing
  *  beyond what `err instanceof Error` already covers. */
 function actionErrorMessage(err: unknown, fallback: string): string {

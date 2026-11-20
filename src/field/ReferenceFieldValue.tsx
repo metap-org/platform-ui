@@ -1,4 +1,4 @@
-import { useGraphQLRecord } from "../api/graphqlRecords";
+import { useRecord } from "../api/records";
 import type { EntityField } from "../metadata/types";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 
@@ -37,12 +37,12 @@ export function ReferenceFieldValue({
   const navAdapter = useNavigationAdapter();
 
   // `/api/${refEntity}/${id}` (REST) doesn't exist since Phase 90 removed REST entity CRUD —
-  // found live 2026-09-26, this component was never migrated in Phase 93. `useGraphQLRecord`
-  // fetches the same full record GraphQL's `{entity}(id)` returns; more than this component
+  // found live 2026-09-26, this component was never migrated in Phase 93. `useRecord`
+  // fetches the same full record `GET /api/{entity}/{id}` returns; more than this component
   // strictly needs (just `refDisplayField`), but that's exactly what the REST call it replaces
   // already fetched too, so no new cost.
   const shouldFetch = Boolean(refEntity && id) && !batchMode;
-  const { data: record } = useGraphQLRecord(refEntity ?? "", shouldFetch ? id : undefined);
+  const { data: record } = useRecord(refEntity ?? "", shouldFetch ? id : undefined);
 
   if (!id) {
     return <>—</>;

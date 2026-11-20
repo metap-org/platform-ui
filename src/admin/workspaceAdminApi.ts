@@ -1,17 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { graphqlFetch } from "../api/graphqlClient";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { apiFetch } from "../api/client";
+import { emptyToNull } from "../api/emptyToNull";
+import { useApiQuery } from "../api/useApiQuery";
 import type { AdminUserRow } from "./userAdminApi";
 
 /**
  * Administration of the caller's own tenant beyond members and roles (roadmap 115): its security
  * settings (tenant-tier config keys), service accounts with their API keys (M5, M11) and its owner
- * (M8). GraphQL fields the gateway serves from the token issuer over gRPC; all admin-only, and
- * the server enforces the rest (only the owner transfers ownership, a key may not outlive
- * `auth.apiKeyMaxLifetimeDays`).
+ * (M8). REST on the token issuer (`/admin/config`, `/admin/service-accounts`, `/admin/owner`); all
+ * admin-only, and the server enforces the rest (only the owner transfers ownership, a key may not
+ * outlive `auth.apiKeyMaxLifetimeDays`).
  */
-
-const GRAPHQL_PATH = "/graphql";
 
 // --- Security settings -----------------------------------------------------------------------
 
@@ -41,12 +40,10 @@ export type ConfigItem = {
 const CONFIG_KEY = ["workspace", "tenantConfig"];
 
 export function useTenantConfig() {
-  return useGraphQLQuery<{ tenantConfig: ConfigItem[] }, ConfigItem[]>(
+  return useApiQuery<{ data: ConfigItem[] }, ConfigItem[]>(
     CONFIG_KEY,
-    GRAPHQL_PATH,
-    "{ tenantConfig { key value level overridden public } }",
-    undefined,
-    (r) => r.tenantConfig,
+    "/admin/config",
+    (r) => r.data,
   );
 }
 
@@ -54,22 +51,17 @@ export function useTenantConfigActions() {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: CONFIG_KEY });
   return {
-    /** Rejects with `GraphQLError.code` `validation_failed` when the value is out of bounds. */
+    /** Rejects with `ApiError.code` `validation_failed` when the value is out of bounds. */
     async set(key: string, value: unknown) {
-      await graphqlFetch(
-        GRAPHQL_PATH,
-        "mutation($key: String!, $value: Json!) { setTenantConfig(key: $key, value: $value) { key } }",
-        { key, value },
-      );
+      await apiFetch(`/admin/config/${encodeURIComponent(key)}`, {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+      });
       await refresh();
     },
     /** Back to the default. */
     async reset(key: string) {
-      await graphqlFetch(
-        GRAPHQL_PATH,
-        "mutation($key: String!) { resetTenantConfig(key: $key) { key } }",
-        { key },
-      );
+      await apiFetch(`/admin/config/${encodeURIComponent(key)}`, { method: "DELETE" });
       await refresh();
     },
   };
@@ -101,24 +93,22 @@ const SA_KEY = ["workspace", "serviceAccounts"];
 const apiKeysKey = (userId: string | null) => ["workspace", "apiKeys", userId];
 
 export function useServiceAccounts() {
-  return useGraphQLQuery<{ serviceAccounts: ServiceAccount[] }, ServiceAccount[]>(
+  return useApiQuery<{ users: ServiceAccount[] }, ServiceAccount[]>(
     SA_KEY,
-    GRAPHQL_PATH,
-    "{ serviceAccounts { id displayName status roles createdAt } }",
-    undefined,
-    (r) => r.serviceAccounts,
+    "/admin/service-accounts",
+    (r) => r.users,
   );
 }
 
-const API_KEY_FIELDS = "id userId name prefix expiresAt revokedAt lastUsedAt createdAt";
+function toApiKey(key: ApiKey): ApiKey {
+  return emptyToNull(key, ["expiresAt", "revokedAt", "lastUsedAt"]);
+}
 
 export function useApiKeys(userId: string | null) {
-  return useGraphQLQuery<{ apiKeys: ApiKey[] }, ApiKey[]>(
+  return useApiQuery<{ apiKeys: ApiKey[] }, ApiKey[]>(
     apiKeysKey(userId),
-    GRAPHQL_PATH,
-    `query($userId: ID!) { apiKeys(userId: $userId) { ${API_KEY_FIELDS} } }`,
-    { userId },
-    (r) => r.apiKeys,
+    `/admin/users/${encodeURIComponent(userId ?? "")}/api-keys`,
+    (r) => r.apiKeys.map(toApiKey),
     userId !== null,
   );
 }
@@ -127,13 +117,12 @@ export function useServiceAccountActions() {
   const queryClient = useQueryClient();
   return {
     async createServiceAccount(name: string, roles: string[]): Promise<ServiceAccount> {
-      const r = await graphqlFetch<{ createServiceAccount: ServiceAccount }>(
-        GRAPHQL_PATH,
-        "mutation($name: String!, $roles: [String!]) { createServiceAccount(name: $name, roles: $roles) { id displayName status roles createdAt } }",
-        { name, roles },
-      );
+      const account = await apiFetch<ServiceAccount>("/admin/service-accounts", {
+        method: "POST",
+        body: JSON.stringify({ name, roles }),
+      });
       await queryClient.invalidateQueries({ queryKey: SA_KEY });
-      return r.createServiceAccount;
+      return account;
     },
     /** `expiresInDays` 0 or omitted: no expiry (refused when the tenant caps key lifetimes). */
     async createApiKey(
@@ -141,18 +130,15 @@ export function useServiceAccountActions() {
       name: string,
       expiresInDays?: number,
     ): Promise<CreatedApiKey> {
-      const r = await graphqlFetch<{ createApiKey: CreatedApiKey }>(
-        GRAPHQL_PATH,
-        `mutation($userId: ID!, $name: String!, $days: Int) { createApiKey(userId: $userId, name: $name, expiresInDays: $days) { token apiKey { ${API_KEY_FIELDS} } } }`,
-        { userId, name, days: expiresInDays || null },
+      const created = await apiFetch<CreatedApiKey>(
+        `/admin/users/${encodeURIComponent(userId)}/api-keys`,
+        { method: "POST", body: JSON.stringify({ name, expiresInDays: expiresInDays || 0 }) },
       );
       await queryClient.invalidateQueries({ queryKey: apiKeysKey(userId) });
-      return r.createApiKey;
+      return { ...created, apiKey: toApiKey(created.apiKey) };
     },
     async revokeApiKey(key: ApiKey) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { revokeApiKey(id: $id) }", {
-        id: key.id,
-      });
+      await apiFetch(`/admin/api-keys/${encodeURIComponent(key.id)}`, { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: apiKeysKey(key.userId) });
     },
   };
@@ -178,43 +164,30 @@ export type OwnerStatus = {
 };
 
 const OWNER_KEY = ["workspace", "ownerStatus"];
-const OWNER_FIELDS =
-  "ownerMemberId ownerEmail pendingRecovery { id newOwnerMemberId requestedByEmail reason effectiveAt createdAt completedAt }";
-
 export function useOwnerStatus() {
-  return useGraphQLQuery<{ ownerStatus: OwnerStatus }, OwnerStatus>(
-    OWNER_KEY,
-    GRAPHQL_PATH,
-    `{ ownerStatus { ${OWNER_FIELDS} } }`,
-    undefined,
-    (r) => r.ownerStatus,
-  );
+  return useApiQuery<OwnerStatus>(OWNER_KEY, "/admin/owner");
 }
 
 export function useOwnerActions() {
   const queryClient = useQueryClient();
   const settle = async (status: OwnerStatus) => {
-    queryClient.setQueryData(OWNER_KEY, { ownerStatus: status });
+    queryClient.setQueryData(OWNER_KEY, status);
     // Owner protection changes what other admins may do to a member: the user list reflects it.
     await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   };
   return {
     /** Only the current owner, to an active admin; takes effect at once. */
     async transferOwnership(memberId: string) {
-      const r = await graphqlFetch<{ transferOwnership: OwnerStatus }>(
-        GRAPHQL_PATH,
-        `mutation($memberId: String!) { transferOwnership(memberId: $memberId) { ${OWNER_FIELDS} } }`,
-        { memberId },
+      await settle(
+        await apiFetch<OwnerStatus>("/admin/owner/transfer", {
+          method: "POST",
+          body: JSON.stringify({ memberId }),
+        }),
       );
-      await settle(r.transferOwnership);
     },
     /** Any admin may stop a pending owner recovery during its 72 hours. */
     async cancelOwnerRecovery() {
-      const r = await graphqlFetch<{ cancelOwnerRecovery: OwnerStatus }>(
-        GRAPHQL_PATH,
-        `mutation { cancelOwnerRecovery { ${OWNER_FIELDS} } }`,
-      );
-      await settle(r.cancelOwnerRecovery);
+      await settle(await apiFetch<OwnerStatus>("/admin/owner/recovery/cancel", { method: "POST" }));
     },
   };
 }

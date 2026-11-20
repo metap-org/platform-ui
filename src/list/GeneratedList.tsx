@@ -18,13 +18,13 @@ import {
   toast,
 } from "@metap/ui";
 import {
-  deleteGraphQLRecord,
-  fetchAllGraphQLRecords,
-  useGraphQLRecordPage,
-  useInvalidateGraphQLRecords,
-  type GraphQLRecord,
-} from "../api/graphqlRecords";
-import { GraphQLError } from "../api/graphqlClient";
+  deleteRecord,
+  fetchAllRecords,
+  useRecordPage,
+  useInvalidateRecords,
+  type ApiRecord,
+} from "../api/records";
+import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
 import { FieldValue } from "../field/FieldValue";
@@ -34,7 +34,7 @@ import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { DataList, type DataListColumn, type DataListSort } from "./DataList";
 
-type RecordDto = GraphQLRecord;
+type RecordDto = ApiRecord;
 
 type SortState = DataListSort;
 
@@ -151,7 +151,7 @@ function exportLoadedRecords(
 }
 
 /** Fetches *every* record matching the current filter/sort — not just what's scrolled into view —
- *  via `fetchAllGraphQLRecords` (cursor pagination at the server's own max page size, 200, until
+ *  via `fetchAllRecords` (cursor pagination at the server's own max page size, 200, until
  *  `nextCursor` comes back null). `onProgress` reports rows fetched so far so the caller can show
  *  something better than a frozen button on a large export. */
 async function exportAllMatchingRecords(
@@ -162,12 +162,12 @@ async function exportAllMatchingRecords(
   sortParam: string | undefined,
   onProgress: (count: number) => void,
 ): Promise<void> {
-  const allRecords = await fetchAllGraphQLRecords(entityName, filters, sortParam, onProgress);
+  const allRecords = await fetchAllRecords(entityName, filters, sortParam, onProgress);
   formatAndDownloadRecords(format, entityName, fields, allRecords);
 }
 
 /** `sort`/filter params double as this route's shareable URL state (feature 23,
- *  `docs/features/23-ux-infrastructure-core.md`) — same key names the GraphQL query itself
+ *  `docs/features/23-ux-infrastructure-core.md`) — same key names the list query itself
  *  already uses, so there's one shape, not two. `limit`/`cursor` are deliberately excluded —
  *  scroll position isn't part of "deep link to this view". */
 function parseSortParam(value: string | null): SortState {
@@ -177,7 +177,7 @@ function parseSortParam(value: string | null): SortState {
   return field ? { field, descending } : null;
 }
 
-/** `SortState` -> the `"field"`/`"-field"` string convention every GraphQL list-query call site
+/** `SortState` -> the `"field"`/`"-field"` string convention every list-query call site
  *  here uses (mirrors what the URL/REST-era query param already looked like). */
 function sortParamOf(sort: SortState): string | undefined {
   if (!sort) return undefined;
@@ -194,10 +194,10 @@ export type GeneratedListProps = {
   /** Extra controls in the toolbar, next to the built-in ones (e.g. an "Add zone" wizard link). */
   actions?: ReactNode;
   /** Where the row's primary cell links to; turns the first visible column into a link. */
-  rowHref?: (record: GraphQLRecord) => string;
+  rowHref?: (record: ApiRecord) => string;
   /** Per-column cell renderers keyed by field name — a derived or styled cell without leaving the
    *  generated list. Return `undefined` to fall back to the default rendering for that row. */
-  cellRenderers?: Record<string, (record: GraphQLRecord) => ReactNode | undefined>;
+  cellRenderers?: Record<string, (record: ApiRecord) => ReactNode | undefined>;
   /** Filters always applied (e.g. a zone's own id on its detail tab); not shown as editable. */
   baseFilters?: Record<string, string>;
   /** Where "New" goes (default: the generic create form); `null` hides it, for an entity created
@@ -221,7 +221,7 @@ export function GeneratedList({
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
-  const invalidateRecords = useInvalidateGraphQLRecords();
+  const invalidateRecords = useInvalidateRecords();
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
   const [searchParams, setSearchParams] = useSearchParams();
   // Text filters are debounced (wait for the user to stop typing before refetching).
@@ -243,7 +243,7 @@ export function GeneratedList({
   const debouncedSearch = useDebouncedValue(searchInput, 400).trim();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
+  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   // Selection is scoped to the rows on screen only, not "every record matching the current
   // filter": silently expanding a bulk delete to rows the user has never seen would be a surprise.
@@ -371,7 +371,7 @@ export function GeneratedList({
     error: recordsError,
     isFetching,
     refetch,
-  } = useGraphQLRecordPage<Record<string, unknown>>(entityName, {
+  } = useRecordPage<Record<string, unknown>>(entityName, {
     filters: queryFilters,
     search: debouncedSearch,
     sort: sortParam,
@@ -426,7 +426,7 @@ export function GeneratedList({
     setDeleteError(null);
     setPendingDeleteId(record.id);
     try {
-      await deleteGraphQLRecord(entityName, record.id, record.version);
+      await deleteRecord(entityName, record.id, record.version);
       toast(t("common.deleteSuccess"));
       setSelectedIds((prev) => {
         if (!prev.has(record.id)) {
@@ -457,7 +457,7 @@ export function GeneratedList({
     setDeleteError(null);
     setBulkDeleting(true);
     const results = await Promise.allSettled(
-      targets.map((record) => deleteGraphQLRecord(entityName, record.id, record.version)),
+      targets.map((record) => deleteRecord(entityName, record.id, record.version)),
     );
     setBulkDeleting(false);
 
@@ -471,8 +471,7 @@ export function GeneratedList({
       const firstError = results.find((r) => r.status === "rejected") as
         PromiseRejectedResult | undefined;
       const reason = firstError?.reason;
-      const detail =
-        reason instanceof GraphQLError ? reason.message : t("common.somethingWentWrong");
+      const detail = reason instanceof ApiError ? reason.message : t("common.somethingWentWrong");
       setDeleteError(
         new Error(t("common.bulkDeletePartialError", { failed, total: results.length, detail })),
       );
@@ -506,7 +505,7 @@ export function GeneratedList({
       );
       toast(t("common.exportAllSuccess", { count: fetchedCount }));
     } catch (error) {
-      const detail = error instanceof GraphQLError ? error.message : t("common.somethingWentWrong");
+      const detail = error instanceof ApiError ? error.message : t("common.somethingWentWrong");
       toast(t("common.exportAllError", { count: fetchedCount, detail }), {
         variant: "destructive",
       });
@@ -672,7 +671,7 @@ export function GeneratedList({
       banner={
         deleteError ? (
           <Alert variant="destructive" className="flex items-start justify-between gap-2">
-            {deleteError instanceof GraphQLError &&
+            {deleteError instanceof ApiError &&
             deleteError.code === "record_referenced" &&
             deleteError.fieldErrors ? (
               <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />

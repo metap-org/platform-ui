@@ -14,7 +14,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../../api/ApiErrorMessage";
-import { GraphQLError } from "../../api/graphqlClient";
+import { ApiError } from "../../api/client";
 import { getEntityLabel } from "../../i18n/entityLabels";
 import { useEntities } from "../../metadata/useEntities";
 import type { EntitySummary } from "../../metadata/types";
@@ -250,7 +250,7 @@ export function RolePermissionsEditor({
       toast(t("admin.rolePermissions.saved"));
     } catch (err) {
       setSaveError(
-        err instanceof GraphQLError || err instanceof Error
+        err instanceof ApiError || err instanceof Error
           ? err.message
           : t("common.somethingWentWrong"),
       );

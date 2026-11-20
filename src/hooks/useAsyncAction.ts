@@ -6,7 +6,7 @@ import { toast } from "@metap/ui";
  *  setBusy(false)` shell found repeated ~16 times across `metap-demo-waf`
  *  (`platform-ui/docs/audits/03-waf-demo-component-placement-audit.md` finding #6,
  *  `docs/features/27-use-async-action-hook.md`). Deliberately NOT a replacement for
- *  `useApiMutation` — most of those call sites go through imperative GraphQL functions, not a
+ *  `useApiMutation` — most of those call sites go through imperative API functions, not a
  *  REST mutation hook, so this fills a gap `useApiMutation` doesn't reach rather than duplicating
  *  it.
  *

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Autocomplete } from "@metap/ui";
-import { useGraphQLRecord, useGraphQLRecords, type GraphQLRecord } from "../api/graphqlRecords";
+import { useRecord, useRecords, type ApiRecord } from "../api/records";
 import type { EntityField } from "../metadata/types";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
-function labelFor(record: GraphQLRecord, refDisplayField: string | undefined): string {
+function labelFor(record: ApiRecord, refDisplayField: string | undefined): string {
   const raw = refDisplayField ? record.data[refDisplayField] : undefined;
   return typeof raw === "string" ? raw : record.id;
 }
@@ -32,10 +32,7 @@ export function ReferenceFieldInput({
 
   // `/api/${refEntity}/*` (REST) doesn't exist since Phase 90 removed REST entity CRUD — found
   // live 2026-09-26, this component was never migrated in Phase 93.
-  const { data: currentRecord } = useGraphQLRecord(
-    refEntity ?? "",
-    refEntity ? currentValue : undefined,
-  );
+  const { data: currentRecord } = useRecord(refEntity ?? "", refEntity ? currentValue : undefined);
 
   // No search text yet -> just the first page, unfiltered, so a small reference set (a handful
   // of projects, say) shows options immediately on open instead of looking empty/broken until
@@ -47,7 +44,7 @@ export function ReferenceFieldInput({
     debouncedSearch.length > 0 && field.refDisplayField
       ? { [field.refDisplayField]: debouncedSearch }
       : {};
-  const { data: searchResults } = useGraphQLRecords(
+  const { data: searchResults } = useRecords(
     refEntity ?? "",
     searchFilters,
     10,

@@ -30,7 +30,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
-import { GraphQLError } from "../api/graphqlClient";
+import { ApiError } from "../api/client";
 import { AdminOnly } from "../auth/AdminOnly";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { relativeTime } from "../lib/dates";
@@ -152,7 +152,7 @@ function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }
 }
 
 function errorText(err: unknown, fallback: string): string {
-  if (err instanceof GraphQLError) {
+  if (err instanceof ApiError) {
     const field = err.fieldErrors ? Object.values(err.fieldErrors)[0]?.[0] : undefined;
     return field ?? err.message;
   }

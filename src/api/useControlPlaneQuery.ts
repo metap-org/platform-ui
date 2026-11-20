@@ -7,9 +7,8 @@ type ControlPlaneQueryOptions = {
   staleTime?: number;
 };
 
-/** `useGraphQLQuery`'s counterpart for the Bearer-only `control-plane-graphql` gateway — see
- *  `controlPlaneClient.ts`'s doc comment for why this can't just ride the session cookie the way
- *  `useGraphQLQuery` does. Takes both `gatewayUrl` (the GraphQL endpoint itself) and
+/** A query against the Bearer-only `control-plane-graphql` gateway (metap-lowcode) — see
+ *  `controlPlaneClient.ts`'s doc comment for why this can't just ride the session cookie. Takes both `gatewayUrl` (the GraphQL endpoint itself) and
  *  `authTokenUrl` (`GET /auth/token` on whichever backend owns the caller's session — `control-api`
  *  today) as explicit parameters, same "no baked-in backend topology" convention every other
  *  hook in this module follows. */

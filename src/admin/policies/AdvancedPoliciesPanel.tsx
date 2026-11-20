@@ -15,7 +15,7 @@ import {
   TagsInput,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { GraphQLError } from "../../api/graphqlClient";
+import { ApiError } from "../../api/client";
 import { ApiErrorMessage } from "../../api/ApiErrorMessage";
 import type { EntitySummary } from "../../metadata/types";
 import {
@@ -95,7 +95,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
     try {
       await deletePolicy(id);
     } catch (err) {
-      setRowError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
+      setRowError(err instanceof ApiError ? err.message : t("common.somethingWentWrong"));
     }
   }
 
@@ -107,7 +107,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
         <h4 className="text-base font-medium text-foreground">{t("admin.policies.createTitle")}</h4>
         {createPolicy.error ? (
           <Alert variant="destructive">
-            {createPolicy.error instanceof GraphQLError
+            {createPolicy.error instanceof ApiError
               ? createPolicy.error.message
               : t("common.somethingWentWrong")}
           </Alert>

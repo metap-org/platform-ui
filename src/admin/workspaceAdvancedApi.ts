@@ -1,16 +1,12 @@
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
-import { ApiError, CSRF_HEADER_NAME, readCsrfCookie } from "../api/client";
-import { graphqlFetch } from "../api/graphqlClient";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { ApiError, apiFetch, CSRF_HEADER_NAME, readCsrfCookie } from "../api/client";
+import { useApiQuery } from "../api/useApiQuery";
 
 /**
  * The tenant admin's single sign-on (roadmap 115 M7), support access (M10) and audit trail (M9).
- * GraphQL fields served by the token issuer over gRPC, admin-only; the audit file download is
- * REST (`GET /admin/audit/export`), since a file has no GraphQL shape.
+ * REST on the token issuer (`/admin/sso`, `/admin/support-grants`, `/admin/audit*`), admin-only.
  */
-
-const GRAPHQL_PATH = "/graphql";
 
 // --- Single sign-on (OIDC) -------------------------------------------------------------------
 
@@ -44,18 +40,10 @@ export type SsoConfigInput = {
   postLoginRedirect?: string;
 };
 
-const SSO_FIELDS =
-  "configured enabled issuerUrl clientId hasClientSecret scopes emailDomains defaultRole enforced postLoginRedirect redirectUri";
 const SSO_KEY = ["workspace", "sso"];
 
 export function useSsoConfig() {
-  return useGraphQLQuery<{ ssoConfig: SsoConfig }, SsoConfig>(
-    SSO_KEY,
-    GRAPHQL_PATH,
-    `{ ssoConfig { ${SSO_FIELDS} } }`,
-    undefined,
-    (r) => r.ssoConfig,
-  );
+  return useApiQuery<SsoConfig>(SSO_KEY, "/admin/sso");
 }
 
 export function useSsoActions() {
@@ -64,19 +52,16 @@ export function useSsoActions() {
     /** The server checks the issuer's discovery document before saving; only the owner may
      *  turn `enforced` on. */
     async save(input: SsoConfigInput): Promise<SsoConfig> {
-      const r = await graphqlFetch<{ setSsoConfig: SsoConfig }>(
-        GRAPHQL_PATH,
-        `mutation($issuerUrl: String!, $clientId: String!, $clientSecret: String, $scopes: [String!], $emailDomains: [String!], $defaultRole: String, $enabled: Boolean!, $enforced: Boolean, $postLoginRedirect: String) {
-          setSsoConfig(issuerUrl: $issuerUrl, clientId: $clientId, clientSecret: $clientSecret, scopes: $scopes, emailDomains: $emailDomains, defaultRole: $defaultRole, enabled: $enabled, enforced: $enforced, postLoginRedirect: $postLoginRedirect) { ${SSO_FIELDS} }
-        }`,
-        { ...input, clientSecret: input.clientSecret || null },
-      );
-      queryClient.setQueryData(SSO_KEY, { ssoConfig: r.setSsoConfig });
-      return r.setSsoConfig;
+      const saved = await apiFetch<SsoConfig>("/admin/sso", {
+        method: "PUT",
+        body: JSON.stringify({ ...input, clientSecret: input.clientSecret || "" }),
+      });
+      queryClient.setQueryData(SSO_KEY, saved);
+      return saved;
     },
     /** Removes the connection; members sign in with passwords again. */
     async remove() {
-      await graphqlFetch(GRAPHQL_PATH, "mutation { deleteSsoConfig }");
+      await apiFetch("/admin/sso", { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: SSO_KEY });
     },
   };
@@ -99,17 +84,13 @@ export type SupportGrant = {
   sessions: SupportSessionInfo[];
 };
 
-const GRANT_FIELDS =
-  "id reason role grantedBy expiresAt revokedAt createdAt active sessions { memberId startedByEmail startedAt }";
 const GRANTS_KEY = ["workspace", "supportGrants"];
 
 export function useSupportGrants() {
-  return useGraphQLQuery<{ supportGrants: SupportGrant[] }, SupportGrant[]>(
+  return useApiQuery<{ grants: SupportGrant[] }, SupportGrant[]>(
     GRANTS_KEY,
-    GRAPHQL_PATH,
-    `{ supportGrants { ${GRANT_FIELDS} } }`,
-    undefined,
-    (r) => r.supportGrants,
+    "/admin/support-grants",
+    (r) => r.grants,
   );
 }
 
@@ -119,20 +100,15 @@ export function useSupportActions() {
   return {
     /** `hours` 1–168 (default 24 on the server). */
     async grant(reason: string, role: string, hours: number) {
-      await graphqlFetch(
-        GRAPHQL_PATH,
-        `mutation($reason: String!, $role: String!, $hours: Int) { grantSupportAccess(reason: $reason, role: $role, hours: $hours) { id } }`,
-        { reason, role, hours },
-      );
+      await apiFetch("/admin/support-grants", {
+        method: "POST",
+        body: JSON.stringify({ reason, role, hours }),
+      });
       await refresh();
     },
     /** Ends the access at once: every support key is revoked, every support account removed. */
     async revoke(id: string) {
-      await graphqlFetch(
-        GRAPHQL_PATH,
-        "mutation($id: ID!) { revokeSupportGrant(id: $id) { id } }",
-        { id },
-      );
+      await apiFetch(`/admin/support-grants/${encodeURIComponent(id)}/revoke`, { method: "POST" });
       await refresh();
     },
   };
@@ -177,25 +153,31 @@ export type AuditChainReport = {
 
 const AUDIT_PAGE = 50;
 
+/** The audit filter as the search and export routes read it. */
+function auditParams(filter: AuditFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.actorUserId) params.set("actor", filter.actorUserId);
+  if (filter.entity) params.set("entity", filter.entity);
+  if (filter.recordId) params.set("record", filter.recordId);
+  if (filter.actions?.length) params.set("actions", filter.actions.join(","));
+  if (filter.from) params.set("from", filter.from);
+  if (filter.to) params.set("to", filter.to);
+  return params;
+}
+
 export function useAuditEntries(filter: AuditFilter) {
   const { status } = useAuth();
   return useInfiniteQuery({
     queryKey: ["workspace", "audit", filter],
     enabled: status === "authenticated",
     initialPageParam: "",
-    queryFn: async ({ pageParam }) => {
-      const r = await graphqlFetch<{
-        auditEntries: { entries: AuditEntry[]; nextCursor: string };
-      }>(
-        GRAPHQL_PATH,
-        `query($actorUserId: String, $entity: String, $recordId: String, $actions: [String!], $from: String, $to: String, $cursor: String, $limit: Int) {
-          auditEntries(actorUserId: $actorUserId, entity: $entity, recordId: $recordId, actions: $actions, from: $from, to: $to, cursor: $cursor, limit: $limit) {
-            nextCursor entries { id entity recordId action transitionAction actorUserId reason occurredAt diffJson seq hash }
-          }
-        }`,
-        { ...filter, cursor: pageParam || null, limit: AUDIT_PAGE },
+    queryFn: ({ pageParam }) => {
+      const params = auditParams(filter);
+      params.set("limit", String(AUDIT_PAGE));
+      if (pageParam) params.set("cursor", pageParam);
+      return apiFetch<{ entries: AuditEntry[]; nextCursor: string }>(
+        `/admin/audit?${params.toString()}`,
       );
-      return r.auditEntries;
     },
     getNextPageParam: (last) => last.nextCursor || undefined,
   });
@@ -203,23 +185,14 @@ export function useAuditEntries(filter: AuditFilter) {
 
 /** Recomputes the tenant's hash chain end to end. */
 export async function verifyAuditChain(): Promise<AuditChainReport> {
-  const r = await graphqlFetch<{ verifyAuditChain: AuditChainReport }>(
-    GRAPHQL_PATH,
-    "{ verifyAuditChain { ok checked brokenSeq reason headSeq headHash } }",
-  );
-  return r.verifyAuditChain;
+  return apiFetch<AuditChainReport>("/admin/audit/verify", { method: "POST" });
 }
 
 /** Downloads every entry matching `filter` as a CSV or JSON file. Fetched rather than opened as
  *  a link: a link would ask for text/html, which the dev server and nginx answer with the SPA. */
 export async function downloadAuditExport(filter: AuditFilter, format: "csv" | "json") {
-  const params = new URLSearchParams({ format });
-  if (filter.actorUserId) params.set("actor", filter.actorUserId);
-  if (filter.entity) params.set("entity", filter.entity);
-  if (filter.recordId) params.set("record", filter.recordId);
-  if (filter.actions?.length) params.set("actions", filter.actions.join(","));
-  if (filter.from) params.set("from", filter.from);
-  if (filter.to) params.set("to", filter.to);
+  const params = auditParams(filter);
+  params.set("format", format);
   const csrf = readCsrfCookie();
   const response = await fetch(`/admin/audit/export?${params.toString()}`, {
     credentials: "include",

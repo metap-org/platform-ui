@@ -1,16 +1,15 @@
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
-import { graphqlFetch } from "../api/graphqlClient";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { apiFetch } from "../api/client";
+import { emptyToNull } from "../api/emptyToNull";
+import { useApiQuery } from "../api/useApiQuery";
 
 /**
- * User administration for the caller's tenant (roadmap 113): GraphQL fields the gateway serves
- * from the token issuer's `UserAdminService` over gRPC. Every call needs the admin role; the
- * server also refuses what would hurt the caller or the tenant (disabling or demoting yourself,
- * leaving no active admin), reported as `GraphQLError.code` `self_modification` / `last_admin`.
+ * User administration for the caller's tenant (roadmap 113): `/admin/users*` on the token issuer.
+ * Every call needs the admin role; the server also refuses what would hurt the caller or the
+ * tenant (disabling or demoting yourself, leaving no active admin), reported as `ApiError.code`
+ * `self_modification` / `last_admin`.
  */
-
-const GRAPHQL_PATH = "/graphql";
 
 export type UserStatus = "active" | "disabled" | "invited";
 
@@ -63,8 +62,43 @@ export type AdminRole = {
   updatedAt: string | null;
 };
 
-export const ROLE_FIELDS =
-  "id name label description userCount policyCount builtin createdAt updatedAt";
+/** A role as the REST API sends it, in this app's shape. */
+export function toAdminRole(role: AdminRole): AdminRole {
+  return emptyToNull(role, ["label", "description", "createdAt", "updatedAt"]);
+}
+
+/** A member as the REST API sends it, in this app's shape. */
+export function toAdminUser(user: AdminUserRow): AdminUserRow {
+  return emptyToNull(user, ["lastLoginAt", "invitedBy", "invitationExpiresAt"]);
+}
+
+/** An audit page as the REST API sends it, in this app's shape. */
+export function toAuditPage(page: { events: UserAuditEvent[]; nextCursor: string }): {
+  events: UserAuditEvent[];
+  nextCursor: string | null;
+} {
+  return {
+    events: page.events.map((e) => emptyToNull(e, ["actorUserId"])),
+    nextCursor: page.nextCursor || null,
+  };
+}
+
+function toInviteResult(r: InviteResult): InviteResult {
+  return { ...r, user: toAdminUser(r.user), acceptUrl: r.acceptUrl || null };
+}
+
+function query(params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+function post(body?: unknown): RequestInit {
+  return { method: "POST", body: JSON.stringify(body ?? {}) };
+}
 
 /** What to show for a role: its label, else its name. */
 export function roleDisplayName(role: Pick<AdminRole, "name" | "label">): string {
@@ -79,29 +113,21 @@ export type UsersQuery = {
   limit: number;
 };
 
-const USER_FIELDS =
-  "id email displayName status roles authProvider hasPassword lastLoginAt createdAt invitedBy sharedIdentity invitationExpiresAt isOwner";
-
-const USERS_QUERY = `query AdminUsers($search: String, $status: String, $role: String, $offset: Int, $limit: Int) {
-  users(search: $search, status: $status, role: $role, offset: $offset, limit: $limit) {
-    total users { ${USER_FIELDS} }
-  }
-}`;
-
-export function useUsers(query: UsersQuery) {
-  return useGraphQLQuery<
-    { users: { total: number; users: AdminUserRow[] } },
+export function useUsers(params: UsersQuery) {
+  return useApiQuery<
+    { total: number; users: AdminUserRow[] },
     { total: number; users: AdminUserRow[] }
-  >(["admin", "users", query], GRAPHQL_PATH, USERS_QUERY, query, (r) => r.users);
+  >(["admin", "users", params], `/admin/users${query(params)}`, (r) => ({
+    total: r.total,
+    users: r.users.map(toAdminUser),
+  }));
 }
 
 export function useUser(id: string | null) {
-  return useGraphQLQuery<{ user: AdminUserRow | null }, AdminUserRow | null>(
+  return useApiQuery<AdminUserRow, AdminUserRow | null>(
     ["admin", "users", "one", id],
-    GRAPHQL_PATH,
-    `query AdminUser($id: ID!) { user(id: $id) { ${USER_FIELDS} } }`,
-    { id },
-    (r) => r.user,
+    `/admin/users/${encodeURIComponent(id ?? "")}`,
+    toAdminUser,
     id !== null,
   );
 }
@@ -109,12 +135,10 @@ export function useUser(id: string | null) {
 /** The tenant's role catalog — what a member may be given. `search` matches name, label or
  *  description. */
 export function useRoles(search?: string) {
-  return useGraphQLQuery<{ roles: AdminRole[] }, AdminRole[]>(
+  return useApiQuery<{ roles: AdminRole[] }, AdminRole[]>(
     ["admin", "roles", "list", search ?? ""],
-    GRAPHQL_PATH,
-    `query AdminRoles($search: String) { roles(search: $search) { ${ROLE_FIELDS} } }`,
-    { search: search || undefined },
-    (r) => r.roles,
+    `/admin/roles${query({ search })}`,
+    (r) => r.roles.map(toAdminRole),
   );
 }
 
@@ -135,13 +159,9 @@ export function useUserAudit(id: string | null, pageSize = 20) {
     enabled: status === "authenticated" && id !== null,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
-      graphqlFetch<{ userAudit: { events: UserAuditEvent[]; nextCursor: string | null } }>(
-        GRAPHQL_PATH,
-        `query UserAudit($id: ID!, $cursor: String, $limit: Int) {
-          userAudit(id: $id, cursor: $cursor, limit: $limit) { events { id action actorUserId occurredAt diff } nextCursor }
-        }`,
-        { id, cursor: pageParam, limit: pageSize },
-      ).then((r) => r.userAudit),
+      apiFetch<{ events: UserAuditEvent[]; nextCursor: string }>(
+        `/admin/users/${encodeURIComponent(id ?? "")}/audit${query({ cursor: pageParam ?? undefined, limit: pageSize })}`,
+      ).then(toAuditPage),
     getNextPageParam: (last) => last.nextCursor,
   });
 }
@@ -167,94 +187,58 @@ export function useUserAdminActions() {
     ]);
   }
 
-  async function userMutation(
-    field: string,
-    signature: string,
-    args: string,
-    variables: Record<string, unknown>,
-  ) {
-    const data = await graphqlFetch<Record<string, AdminUserRow>>(
-      GRAPHQL_PATH,
-      `mutation(${signature}) { ${field}(${args}) { ${USER_FIELDS} } }`,
-      variables,
-    );
-    await refresh(data[field]?.id);
-    return data[field];
+  const userPath = (id: string, rest = "") => `/admin/users/${encodeURIComponent(id)}${rest}`;
+
+  async function userMutation(id: string, path: string, init: RequestInit) {
+    const user = toAdminUser(await apiFetch<AdminUserRow>(path, init));
+    await refresh(id);
+    return user;
   }
 
   return {
     async createUser(input: CreateUserInput) {
-      const data = await graphqlFetch<{
-        createUser: { user: AdminUserRow; createdIdentity: boolean };
-      }>(
-        GRAPHQL_PATH,
-        `mutation($input: CreateUserInput!) { createUser(input: $input) { createdIdentity user { ${USER_FIELDS} } } }`,
-        { input },
+      const res = await apiFetch<{ user: AdminUserRow; createdIdentity: boolean }>(
+        "/admin/users",
+        post(input),
       );
       await refresh();
-      return data.createUser;
+      return { ...res, user: toAdminUser(res.user) };
     },
     async inviteUser(input: InviteUserInput): Promise<InviteResult> {
-      const data = await graphqlFetch<{ inviteUser: InviteResult }>(
-        GRAPHQL_PATH,
-        `mutation($input: InviteUserInput!) { inviteUser(input: $input) { emailSent acceptUrl expiresAt user { ${USER_FIELDS} } } }`,
-        { input },
-      );
-      await refresh(data.inviteUser.user.id);
-      return data.inviteUser;
+      const res = toInviteResult(await apiFetch<InviteResult>("/admin/invitations", post(input)));
+      await refresh(res.user.id);
+      return res;
     },
     /** A fresh link; the previous one stops working. */
     async resendInvitation(id: string): Promise<InviteResult> {
-      const data = await graphqlFetch<{ resendInvitation: InviteResult }>(
-        GRAPHQL_PATH,
-        `mutation($id: ID!) { resendInvitation(id: $id) { emailSent acceptUrl expiresAt user { ${USER_FIELDS} } } }`,
-        { id },
+      const res = toInviteResult(
+        await apiFetch<InviteResult>(userPath(id, "/invitation/resend"), post()),
       );
       await refresh(id);
-      return data.resendInvitation;
+      return res;
     },
     updateUser: (id: string, displayName: string) =>
-      userMutation(
-        "updateUser",
-        "$id: ID!, $displayName: String!",
-        "id: $id, displayName: $displayName",
-        { id, displayName },
-      ),
-    disableUser: (id: string) => userMutation("disableUser", "$id: ID!", "id: $id", { id }),
-    enableUser: (id: string) => userMutation("enableUser", "$id: ID!", "id: $id", { id }),
+      userMutation(id, userPath(id), { method: "PATCH", body: JSON.stringify({ displayName }) }),
+    disableUser: (id: string) => userMutation(id, userPath(id, "/disable"), post()),
+    enableUser: (id: string) => userMutation(id, userPath(id, "/enable"), post()),
     assignRole: (userId: string, role: string) =>
-      userMutation(
-        "assignUserRole",
-        "$userId: ID!, $role: String!",
-        "userId: $userId, role: $role",
-        { userId, role },
-      ),
+      userMutation(userId, userPath(userId, "/roles"), post({ role })),
     revokeRole: (userId: string, role: string) =>
-      userMutation(
-        "revokeUserRole",
-        "$userId: ID!, $role: String!",
-        "userId: $userId, role: $role",
-        { userId, role },
-      ),
+      userMutation(userId, userPath(userId, `/roles/${encodeURIComponent(role)}`), {
+        method: "DELETE",
+      }),
     async removeUser(id: string) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { removeUser(id: $id) }", { id });
+      await apiFetch(userPath(id), { method: "DELETE" });
       await refresh(id);
     },
     /** Removes the member's second factor so they can sign in with the password alone (and
      *  set a new one); for someone who lost their phone and their recovery codes. */
     async resetMfa(id: string) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { resetUserMfa(id: $id) }", { id });
+      await apiFetch(userPath(id, "/mfa/reset"), post());
       await refresh(id);
     },
     async resetPassword(id: string, password: string) {
-      await graphqlFetch(
-        GRAPHQL_PATH,
-        "mutation($id: ID!, $password: String!) { resetUserPassword(id: $id, password: $password) }",
-        {
-          id,
-          password,
-        },
-      );
+      await apiFetch(userPath(id, "/password"), post({ password }));
       await refresh(id);
     },
   };
