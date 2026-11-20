@@ -1,22 +1,19 @@
 import { apiFetch } from "../api/client";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { useApiQuery } from "../api/useApiQuery";
 
 /**
- * The caller's own account (roadmap 113). Reads go through GraphQL (`myTenants`, served from the
- * issuer's `AccountService` over gRPC); switching tenant and changing the password are REST
- * (`/auth/*`) because the server answers them with a new session cookie.
+ * The caller's own account (roadmap 113): `/me/*` on the token issuer; switching tenant and
+ * changing the password are `/auth/*` because the server answers them with a new session cookie.
  */
 
 export type MyTenant = { tenantId: string; name: string | null; current: boolean };
 
 /** Every tenant the signed-in person can switch to, the current one flagged. */
 export function useMyTenants() {
-  return useGraphQLQuery<{ myTenants: MyTenant[] }, MyTenant[]>(
+  return useApiQuery<{ tenants: MyTenant[] }, MyTenant[]>(
     ["account", "myTenants"],
-    "/graphql",
-    "{ myTenants { tenantId name current } }",
-    undefined,
-    (r) => r.myTenants,
+    "/me/tenants",
+    (r) => r.tenants.map((t) => ({ ...t, name: t.name || null })),
   );
 }
 

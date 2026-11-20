@@ -1,26 +1,24 @@
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
-import { graphqlFetch } from "../api/graphqlClient";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
-import { ROLE_FIELDS, type AdminRole, type UserAuditEvent } from "./userAdminApi";
+import { apiFetch } from "../api/client";
+import { emptyToNull } from "../api/emptyToNull";
+import { useApiQuery } from "../api/useApiQuery";
+import { toAdminRole, toAuditPage, type AdminRole, type UserAuditEvent } from "./userAdminApi";
 
 /**
- * The tenant's role catalog (roadmap 114): GraphQL fields the gateway serves from the token
- * issuer's `RoleAdminService` over gRPC. Admin role required. Deleting a role still in use is
- * refused with `GraphQLError.code` `role_in_use`, whose `fieldErrors.members` / `.policies` say what
- * blocks it (at most 5 each, then a "+N" entry). Assigning a role to someone stays
- * `useUserAdminActions().assignRole` / `revokeRole`.
+ * The tenant's role catalog (roadmap 114): `/admin/roles*` on the token issuer. Admin role
+ * required. Deleting a role still in use is refused with `ApiError.code` `role_in_use`, whose
+ * `fieldErrors.members` / `.policies` say what blocks it (at most 5 each, then a "+N" entry).
+ * Assigning a role to someone stays `useUserAdminActions().assignRole` / `revokeRole`.
  */
 
-const GRAPHQL_PATH = "/graphql";
+const rolePath = (name: string, rest = "") => `/admin/roles/${encodeURIComponent(name)}${rest}`;
 
 export function useRole(name: string | null) {
-  return useGraphQLQuery<{ role: AdminRole | null }, AdminRole | null>(
+  return useApiQuery<AdminRole, AdminRole | null>(
     ["admin", "roles", "one", name],
-    GRAPHQL_PATH,
-    `query AdminRole($name: String!) { role(name: $name) { ${ROLE_FIELDS} } }`,
-    { name },
-    (r) => r.role,
+    rolePath(name ?? ""),
+    toAdminRole,
     name !== null,
   );
 }
@@ -32,14 +30,13 @@ export function useRoleAudit(name: string | null, pageSize = 20) {
     queryKey: ["admin", "roles", "audit", name],
     enabled: status === "authenticated" && name !== null,
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) =>
-      graphqlFetch<{ roleAudit: { events: UserAuditEvent[]; nextCursor: string | null } }>(
-        GRAPHQL_PATH,
-        `query RoleAudit($name: String!, $cursor: String, $limit: Int) {
-          roleAudit(name: $name, cursor: $cursor, limit: $limit) { events { id action actorUserId occurredAt diff } nextCursor }
-        }`,
-        { name, cursor: pageParam, limit: pageSize },
-      ).then((r) => r.roleAudit),
+    queryFn: ({ pageParam }) => {
+      const q = new URLSearchParams({ limit: String(pageSize) });
+      if (pageParam) q.set("cursor", pageParam);
+      return apiFetch<{ events: UserAuditEvent[]; nextCursor: string }>(
+        `${rolePath(name ?? "", "/audit")}?${q.toString()}`,
+      ).then(toAuditPage);
+    },
     getNextPageParam: (last) => last.nextCursor,
   });
 }
@@ -70,28 +67,22 @@ export type RolePolicy = {
 
 export type RolePermissions = { role: string; grants: RoleGrant[]; advanced: RolePolicy[] };
 
-const PERMISSIONS_SELECTION =
-  "role grants { entity action } advanced { id entity action roles effect field subject condition }";
+function toRolePermissions(p: RolePermissions): RolePermissions {
+  return { ...p, advanced: p.advanced.map((a) => emptyToNull(a, ["field"])) };
+}
 
 export function useRolePermissions(name: string | null) {
-  return useGraphQLQuery<{ rolePermissions: RolePermissions }, RolePermissions>(
+  return useApiQuery<RolePermissions, RolePermissions>(
     ["admin", "roles", "permissions", name],
-    GRAPHQL_PATH,
-    `query RolePermissions($name: String!) { rolePermissions(name: $name) { ${PERMISSIONS_SELECTION} } }`,
-    { name },
-    (r) => r.rolePermissions,
+    rolePath(name ?? "", "/permissions"),
+    toRolePermissions,
     name !== null,
   );
 }
 
 /** One-off read of another role's permissions (the editor's "copy from"). */
 export async function fetchRolePermissions(name: string): Promise<RolePermissions> {
-  const data = await graphqlFetch<{ rolePermissions: RolePermissions }>(
-    GRAPHQL_PATH,
-    `query($name: String!) { rolePermissions(name: $name) { ${PERMISSIONS_SELECTION} } }`,
-    { name },
-  );
-  return data.rolePermissions;
+  return toRolePermissions(await apiFetch<RolePermissions>(rolePath(name, "/permissions")));
 }
 
 /** Every mutation refreshes all role queries (list, detail, permissions, history). */
@@ -99,38 +90,34 @@ export function useRoleAdminActions() {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });
 
-  async function roleMutation(field: "createRole" | "updateRole", input: RoleInput) {
-    const copy = field === "createRole";
-    const data = await graphqlFetch<Record<string, AdminRole>>(
-      GRAPHQL_PATH,
-      `mutation($name: String!, $label: String, $description: String${copy ? ", $copyFrom: String" : ""}) {
-        ${field}(name: $name, label: $label, description: $description${copy ? ", copyFrom: $copyFrom" : ""}) { ${ROLE_FIELDS} }
-      }`,
-      copy ? input : { name: input.name, label: input.label, description: input.description },
-    );
-    await refresh();
-    return data[field] as AdminRole;
-  }
-
   return {
-    createRole: (input: RoleInput) => roleMutation("createRole", input),
-    updateRole: (input: RoleInput) => roleMutation("updateRole", input),
+    async createRole(input: RoleInput) {
+      const role = await apiFetch<AdminRole>("/admin/roles", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      await refresh();
+      return toAdminRole(role);
+    },
+    async updateRole(input: RoleInput) {
+      const role = await apiFetch<AdminRole>(rolePath(input.name), {
+        method: "PATCH",
+        body: JSON.stringify({ label: input.label, description: input.description }),
+      });
+      await refresh();
+      return toAdminRole(role);
+    },
     /** Replaces the role's basic permissions with `grants` (its advanced policies stay). */
     async setRolePermissions(role: string, grants: RoleGrant[]) {
-      const data = await graphqlFetch<{ setRolePermissions: RolePermissions }>(
-        GRAPHQL_PATH,
-        `mutation($role: String!, $grants: [RoleGrantInput!]!) {
-          setRolePermissions(role: $role, grants: $grants) { ${PERMISSIONS_SELECTION} }
-        }`,
-        { role, grants },
-      );
+      const res = await apiFetch<RolePermissions>(rolePath(role, "/permissions"), {
+        method: "PUT",
+        body: JSON.stringify({ grants }),
+      });
       await refresh();
-      return data.setRolePermissions;
+      return toRolePermissions(res);
     },
     async deleteRole(name: string) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($name: String!) { deleteRole(name: $name) }", {
-        name,
-      });
+      await apiFetch(rolePath(name), { method: "DELETE" });
       await refresh();
     },
   };

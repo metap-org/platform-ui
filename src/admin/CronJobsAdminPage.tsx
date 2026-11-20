@@ -22,7 +22,7 @@ import {
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { GraphQLError } from "../api/graphqlClient";
+import { ApiError } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { relativeTime } from "../lib/dates";
 import { DataList, type DataListColumn } from "../list/DataList";
@@ -565,7 +565,7 @@ function CreateCronJobDialog({
         <div className="flex flex-col gap-5">
           {createJob.error ? (
             <Alert variant="destructive">
-              {createJob.error instanceof GraphQLError
+              {createJob.error instanceof ApiError
                 ? createJob.error.message
                 : t("common.somethingWentWrong")}
             </Alert>

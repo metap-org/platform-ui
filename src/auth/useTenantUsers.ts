@@ -1,16 +1,12 @@
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { useApiQuery } from "../api/useApiQuery";
 import { useCurrentUser } from "./useCurrentUser";
 
 export type TenantUser = { id: string; email: string };
-type TenantUsersResponse = { tenantUsers: TenantUser[] };
+type TenantUsersResponse = { users: TenantUser[] };
 
-/** `tenantUsers` GraphQL field (`metap-graphql-http::platform_fields`) — `GET /users`'s
- * replacement since 2026-09-26 (`../metap-docs/docs/roadmap/95-platform-graphql-fields.md`),
- * every user in the current tenant, the "pick a user" primitive an assignee/reporter/watcher
- * picker needs. Platform-level (every `@metap/platform-ui` consumer's backend exposes this field,
- * not specific to any one entity or app) — moved here 2026-08-31 from `apps/jira-fe`'s
- * `IssuePanels.tsx`, the first consumer to need it, once it was clear the logic itself had
- * nothing jira-specific in it.
+/** `GET /tenant-users`: every active member of the current tenant, the "pick a user" primitive
+ * an assignee/reporter/watcher picker needs. Platform-level (every `@metap/platform-ui` consumer's
+ * token issuer serves it, not specific to any one entity or app).
  *
  * `enabled` defaults to `true` (every existing call site is unaffected); pass `false` to skip the
  * request entirely for a caller that turns out not to need the list — see `useCurrentUserEmail`
@@ -18,12 +14,10 @@ type TenantUsersResponse = { tenantUsers: TenantUser[] };
  * `/auth/me`. `staleTime` is 5 minutes because this is a slow-moving list (a tenant gains users
  * rarely) that would otherwise re-fetch on every window focus under React Query's default of `0`. */
 export function useTenantUsers(enabled: boolean = true): TenantUser[] {
-  const { data } = useGraphQLQuery<TenantUsersResponse, TenantUser[]>(
+  const { data } = useApiQuery<TenantUsersResponse, TenantUser[]>(
     ["tenant-users"],
-    "/graphql",
-    "{ tenantUsers { id email } }",
-    undefined,
-    (r) => r.tenantUsers,
+    "/tenant-users",
+    (r) => r.users,
     enabled,
     { staleTime: 5 * 60 * 1000 },
   );

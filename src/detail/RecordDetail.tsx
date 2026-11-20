@@ -15,12 +15,8 @@ import {
   TooltipTrigger,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import {
-  deleteGraphQLRecord,
-  useGraphQLRecord,
-  useInvalidateGraphQLRecords,
-} from "../api/graphqlRecords";
-import { GraphQLError } from "../api/graphqlClient";
+import { deleteRecord, useRecord, useInvalidateRecords } from "../api/records";
+import { ApiError } from "../api/client";
 import { AuditTrail } from "./AuditTrail";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ReferencedByErrorMessage } from "../api/ReferencedByErrorMessage";
@@ -100,8 +96,8 @@ export function RecordDetail({
   const { t } = useTranslation();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
-  const invalidateRecords = useInvalidateGraphQLRecords();
-  const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
+  const invalidateRecords = useInvalidateRecords();
+  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { data: entity, isLoading: entityLoading, error: entityError } = useEntity(entityName);
   const {
@@ -109,7 +105,7 @@ export function RecordDetail({
     isLoading: recordLoading,
     error: recordError,
     refetch,
-  } = useGraphQLRecord(entityName, id);
+  } = useRecord(entityName, id);
 
   async function handleDelete() {
     if (!record || !window.confirm(t("common.deleteConfirm"))) {
@@ -119,7 +115,7 @@ export function RecordDetail({
     setDeleteError(null);
     setDeleting(true);
     try {
-      await deleteGraphQLRecord(entityName, id, record.version);
+      await deleteRecord(entityName, id, record.version);
       invalidateRecords();
       navAdapter.navigate(navAdapter.toRecordList(entityName));
     } catch (error) {
@@ -285,7 +281,7 @@ export function RecordDetail({
 
       {deleteError ? (
         <Alert variant="destructive" className="flex items-start justify-between gap-2">
-          {deleteError instanceof GraphQLError &&
+          {deleteError instanceof ApiError &&
           deleteError.code === "record_referenced" &&
           deleteError.fieldErrors ? (
             <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />

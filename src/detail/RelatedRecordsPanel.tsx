@@ -1,76 +1,55 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@metap/ui";
-import { listFieldName } from "../api/graphqlNaming";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { useQueries } from "@tanstack/react-query";
+import { listRecords } from "../api/records";
+import { useAuth } from "../auth/AuthContext";
 import type { RelatedView } from "../metadata/types";
 
 const DEFAULT_LIMIT = 5;
 
-/** Builds 1 combined GraphQL query for every `relatedViews` entry declared on an entity — 1
- *  aliased `{camelEntity}List(filter, limit)` fragment per entry (`listFieldName`, mirroring
- *  `metap-graphql`'s own naming so the field name this builds always matches what the schema
- *  actually generated), selecting exactly `relatedView.fields`. Variables are named
- *  `$filter{i}`/`$limit{i}` per entry so multiple sections can have different filter values/limits
- *  in the same request. */
-function buildQuery(relatedViews: RelatedView[]): string {
-  const parts = relatedViews.map((view, i) => {
-    const fieldSelection = view.fields.join("\n        ");
-    return `  ${view.name}: ${listFieldName(view.entity)}(filter: $filter${i}, limit: $limit${i}) {
-    records {
-      ${fieldSelection}
-    }
-  }`;
-  });
-  const variableDecls = relatedViews.map((_, i) => `$filter${i}: Json, $limit${i}: Int`).join(", ");
-  return `query RelatedRecords(${variableDecls}) {\n${parts.join("\n")}\n}`;
-}
-
-function buildVariables(relatedViews: RelatedView[], id: string): Record<string, unknown> {
-  const variables: Record<string, unknown> = {};
-  relatedViews.forEach((view, i) => {
-    variables[`filter${i}`] = { [view.filterField]: id };
-    variables[`limit${i}`] = view.limit ?? DEFAULT_LIMIT;
-  });
-  return variables;
-}
-
 /**
- * Renders 1 section per `RelatedView` an entity declares (`metap-metadata`'s `RelatedView`,
- * registered via `submit_related_views!` — see that macro's doc comment) — a generic,
- * metadata-driven replacement for a hand-written aggregate/overview page. Mounted automatically
- * by `RecordDetail` whenever `entity.relatedViews` is non-empty; nothing else needs to change per
- * entity that declares related views.
+ * Renders 1 section per `RelatedView` an entity declares (`metap-metadata`'s `RelatedView`) — a
+ * generic, metadata-driven replacement for a hand-written aggregate/overview page. Mounted
+ * automatically by `RecordDetail` whenever `entity.relatedViews` is non-empty; nothing else needs
+ * to change per entity that declares related views.
  *
- * `graphqlPath` defaults to `/graphql` — either a service's own GraphQL mount
- * (`metap-graphql-http`) when every related entity lives in the same backend, or a gateway
- * aggregating several services (`crates/metap-graphql-gateway`) when they don't, same as any other
- * consumer of `useGraphQLQuery`. Read-only by this component's own choice, not a transport
- * limitation (`graphqlFetch`/`useGraphQLQuery` support mutations fine — see `graphqlClient.ts`'s
- * doc comment) — a related-records panel has no natural mutation of its own to perform; mutating
- * any of this data still goes through each entity's own generic `/records/:entityName/*` REST
- * screens.
+ * One REST list per section (`/api/{entity}?{filterField}={id}&limit=`), in parallel; the API
+ * gateway routes each to whichever service serves that entity. Read-only: mutating any of this
+ * data goes through each entity's own screens.
  */
 export function RelatedRecordsPanel({
   id,
   relatedViews,
-  graphqlPath = "/graphql",
 }: {
   id: string;
   relatedViews: RelatedView[];
-  graphqlPath?: string;
 }) {
-  const query = buildQuery(relatedViews);
-  const variables = buildVariables(relatedViews, id);
+  const { status } = useAuth();
+  const results = useQueries({
+    queries: relatedViews.map((view) => ({
+      queryKey: [
+        "records",
+        "related",
+        view.entity,
+        view.filterField,
+        id,
+        view.limit ?? DEFAULT_LIMIT,
+      ],
+      queryFn: async () =>
+        (
+          await listRecords(view.entity, {
+            filters: { [view.filterField]: id },
+            limit: view.limit ?? DEFAULT_LIMIT,
+          })
+        ).data.map((record) => ({ id: record.id, ...record.data }) as Record<string, unknown>),
+      enabled: status === "authenticated",
+    })),
+  });
 
-  const { data, isLoading } = useGraphQLQuery<
-    Record<string, { records: Record<string, unknown>[] }>
-  >(
-    ["related-records", id, relatedViews.map((v) => v.name).join(",")],
-    graphqlPath,
-    query,
-    variables,
-  );
-
-  if (isLoading || !data) return null;
+  if (results.some((r) => r.isLoading)) return null;
+  const data: Record<string, { records: Record<string, unknown>[] }> = {};
+  relatedViews.forEach((view, i) => {
+    data[view.name] = { records: results[i]?.data ?? [] };
+  });
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

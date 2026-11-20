@@ -34,7 +34,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { GraphQLError, graphqlFetch } from "../api/graphqlClient";
+import { ApiError, apiFetch } from "../api/client";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { AdminOnly } from "../auth/AdminOnly";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
@@ -58,7 +58,7 @@ const MEMBERS_PAGE = 200;
 
 /** A server refusal this page explains itself; anything else shows the server's text. */
 function describeError(err: unknown, t: (key: string) => string): string {
-  const code = err instanceof GraphQLError ? err.code : "";
+  const code = err instanceof ApiError ? err.code : "";
   if (code === "role_exists") return t("admin.roles.error_role_exists");
   if (code === "last_admin" || code === "self_modification") return t(`admin.users.error_${code}`);
   return err instanceof Error ? err.message : t("common.somethingWentWrong");
@@ -110,7 +110,7 @@ function CreateRoleDialog({
       onCreated(role.name);
     } catch (err) {
       setError(describeError(err, t));
-      if (err instanceof GraphQLError && err.fieldErrors) setFieldErrors(err.fieldErrors);
+      if (err instanceof ApiError && err.fieldErrors) setFieldErrors(err.fieldErrors);
     } finally {
       setSaving(false);
     }
@@ -166,7 +166,7 @@ function CreateRoleDialog({
 }
 
 /** `role_in_use`: lists what still holds the role, so the admin knows what to clear first. */
-function InUseMessage({ error }: { error: GraphQLError }) {
+function InUseMessage({ error }: { error: ApiError }) {
   const { t } = useTranslation();
   const members = error.fieldErrors?.members ?? [];
   const policies = error.fieldErrors?.policies ?? [];
@@ -196,7 +196,7 @@ function RoleInfo({ role, onDeleted }: { role: AdminRole; onDeleted: () => void 
   const [draftDescription, setDraftDescription] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<GraphQLError | Error | null>(null);
+  const [deleteError, setDeleteError] = useState<ApiError | Error | null>(null);
   const label = draftLabel ?? role.label ?? "";
   const description = draftDescription ?? role.description ?? "";
   const dirty =
@@ -271,7 +271,7 @@ function RoleInfo({ role, onDeleted }: { role: AdminRole; onDeleted: () => void 
           <p className="text-sm text-muted-foreground">{t("admin.roles.builtinHint")}</p>
         ) : (
           <>
-            {deleteError instanceof GraphQLError && deleteError.code === "role_in_use" ? (
+            {deleteError instanceof ApiError && deleteError.code === "role_in_use" ? (
               <InUseMessage error={deleteError} />
             ) : deleteError ? (
               <Alert variant="destructive">{deleteError.message}</Alert>
@@ -313,12 +313,10 @@ function RoleInfo({ role, onDeleted }: { role: AdminRole; onDeleted: () => void 
 
 /** Searches the tenant's members for the "add member" picker. */
 async function searchMembers(query: string, exclude: Set<string>) {
-  const data = await graphqlFetch<{ users: { users: AdminUserRow[] } }>(
-    "/graphql",
-    `query($search: String, $limit: Int) { users(search: $search, limit: $limit) { users { id email displayName } } }`,
-    { search: query.trim() || undefined, limit: 10 },
-  );
-  return data.users.users
+  const params = new URLSearchParams({ limit: "10" });
+  if (query.trim()) params.set("search", query.trim());
+  const data = await apiFetch<{ users: AdminUserRow[] }>(`/admin/users?${params.toString()}`);
+  return data.users
     .filter((u) => !exclude.has(u.id))
     .map((u) => ({
       value: u.id,

@@ -1,17 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { ApiError, apiFetch } from "../api/client";
-import { graphqlFetch, GraphQLError } from "../api/graphqlClient";
-import { useGraphQLQuery } from "../api/useGraphQLQuery";
+import { useApiQuery } from "../api/useApiQuery";
 
 /**
  * Two-factor authentication and login sessions of the signed-in person (roadmap 115 M3/M4).
- * Signed-in calls are GraphQL (the issuer's `AccountService` over gRPC); the steps of a sign-in
- * that is not finished yet are REST (`/auth/login/mfa`, `/auth/mfa/setup*`), because they end by
- * setting the session cookie and there is no session to authenticate a GraphQL call with yet.
+ * Signed-in calls are `/me/mfa*` and `/me/sessions*` on the token issuer; the steps of a sign-in
+ * that is not finished yet are `/auth/login/mfa` and `/auth/mfa/setup*`, because they end by
+ * setting the session cookie and there is no session to authenticate with yet.
  */
-
-const GRAPHQL_PATH = "/graphql";
 
 export type MfaStatus = { enabled: boolean; recoveryCodesLeft: number };
 
@@ -35,78 +32,56 @@ const MFA_KEY = ["account", "mfaStatus"];
 const SESSIONS_KEY = ["account", "sessions"];
 
 export function useMfaStatus() {
-  return useGraphQLQuery<{ mfaStatus: MfaStatus }, MfaStatus>(
-    MFA_KEY,
-    GRAPHQL_PATH,
-    "{ mfaStatus { enabled recoveryCodesLeft } }",
-    undefined,
-    (r) => r.mfaStatus,
-  );
+  return useApiQuery<MfaStatus>(MFA_KEY, "/me/mfa");
 }
 
 export function useMySessions() {
-  return useGraphQLQuery<{ mySessions: LoginSession[] }, LoginSession[]>(
+  return useApiQuery<{ sessions: LoginSession[] }, LoginSession[]>(
     SESSIONS_KEY,
-    GRAPHQL_PATH,
-    "{ mySessions { id current tenantId tenantName createdAt lastSeenAt expiresAt ip userAgent } }",
-    undefined,
-    (r) => r.mySessions,
+    "/me/sessions",
+    (r) => r.sessions,
   );
 }
 
 /** Mutations of the signed-in person's own MFA and sessions; each refreshes what it changed.
- *  A wrong code rejects with `GraphQLError.code` `mfa_invalid_code`. */
+ *  A wrong code rejects with `ApiError.code` `mfa_invalid_code`. */
 export function useAccountSecurityActions() {
   const queryClient = useQueryClient();
   const refreshMfa = () => queryClient.invalidateQueries({ queryKey: MFA_KEY });
   const refreshSessions = () => queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
 
+  const post = (body?: unknown): RequestInit => ({
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+
   return {
-    async beginMfaEnrollment(): Promise<MfaEnrollment> {
-      const r = await graphqlFetch<{ beginMfaEnrollment: MfaEnrollment }>(
-        GRAPHQL_PATH,
-        "mutation { beginMfaEnrollment { secret otpauthUri } }",
-      );
-      return r.beginMfaEnrollment;
-    },
+    beginMfaEnrollment: () => apiFetch<MfaEnrollment>("/me/mfa/enrollment", post()),
     /** Turns MFA on; the recovery codes come back once, here. */
     async confirmMfaEnrollment(code: string): Promise<string[]> {
-      const r = await graphqlFetch<{ confirmMfaEnrollment: string[] }>(
-        GRAPHQL_PATH,
-        "mutation($code: String!) { confirmMfaEnrollment(code: $code) }",
-        { code },
-      );
+      const r = await apiFetch<{ codes: string[] }>("/me/mfa/enrollment/confirm", post({ code }));
       void refreshMfa();
-      return r.confirmMfaEnrollment;
+      return r.codes;
     },
     async disableMfa(code: string) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($code: String!) { disableMfa(code: $code) }", {
-        code,
-      });
+      await apiFetch("/me/mfa/disable", post({ code }));
       void refreshMfa();
     },
     /** New recovery codes; the old ones stop working. */
     async regenerateRecoveryCodes(code: string): Promise<string[]> {
-      const r = await graphqlFetch<{ regenerateRecoveryCodes: string[] }>(
-        GRAPHQL_PATH,
-        "mutation($code: String!) { regenerateRecoveryCodes(code: $code) }",
-        { code },
-      );
+      const r = await apiFetch<{ codes: string[] }>("/me/mfa/recovery-codes", post({ code }));
       void refreshMfa();
-      return r.regenerateRecoveryCodes;
+      return r.codes;
     },
     async revokeSession(id: string) {
-      await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { revokeSession(id: $id) }", { id });
+      await apiFetch(`/me/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
       void refreshSessions();
     },
     /** Signs out every session of the person but this one; resolves to how many ended. */
     async revokeOtherSessions(): Promise<number> {
-      const r = await graphqlFetch<{ revokeOtherSessions: number }>(
-        GRAPHQL_PATH,
-        "mutation { revokeOtherSessions }",
-      );
+      const r = await apiFetch<{ count: number }>("/me/sessions/revoke-others", post());
       void refreshSessions();
-      return r.revokeOtherSessions;
+      return r.count;
     },
   };
 }
@@ -184,9 +159,9 @@ export function describeUserAgent(ua: string): string {
   return [browser, os].filter(Boolean).join(" · ");
 }
 
-/** Text for an error from an MFA step, REST (`ApiError`) or GraphQL (`GraphQLError`) alike. */
+/** Text for an error from an MFA step. */
 export function describeMfaError(err: unknown, t: TFunction): string {
-  const code = err instanceof ApiError || err instanceof GraphQLError ? err.code : undefined;
+  const code = err instanceof ApiError ? err.code : undefined;
   switch (code) {
     case "mfa_invalid_code":
       return t("security.invalidCode");

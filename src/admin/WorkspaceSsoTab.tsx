@@ -15,7 +15,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
-import { GraphQLError } from "../api/graphqlClient";
+import { ApiError } from "../api/client";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { ConfirmButton } from "./ConfirmButton";
 import { roleDisplayName, useRoles } from "./userAdminApi";
@@ -79,7 +79,7 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
       });
       toast(t("workspace.ssoSaved"));
     } catch (err) {
-      if (err instanceof GraphQLError && err.fieldErrors) setFieldErrors(err.fieldErrors);
+      if (err instanceof ApiError && err.fieldErrors) setFieldErrors(err.fieldErrors);
       setError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setBusy(null);

@@ -91,7 +91,7 @@ export function RecoveryCodesPanel({
 /**
  * Turning on an authenticator app: scan the QR (or type the secret), confirm with a first code,
  * then keep the recovery codes. `begin`/`confirm` are the two calls of whichever path is enrolling
- * — the signed-in account page (GraphQL) or a sign-in the tenant forces to enrol (REST).
+ * — the signed-in account page (`/me/mfa*`) or a sign-in the tenant forces to enrol (`/auth/mfa/setup*`).
  */
 export function MfaEnrollmentFlow({
   begin,

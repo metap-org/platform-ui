@@ -18,18 +18,23 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly fieldErrors?: Record<string, string[]>;
+  /** Structured data about the failure when the server sends it — for a failed workflow guard
+   *  or validator: `{ field, label, op, expected, actual }` of the check that failed. */
+  readonly details?: Record<string, unknown>;
 
   constructor(
     status: number,
     code: string,
     message: string,
     fieldErrors?: Record<string, string[]>,
+    details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.details = details;
   }
 }
 
@@ -40,6 +45,7 @@ type ErrorBody = {
     requestId: string;
     traceId: string;
     fieldErrors?: Record<string, string[]>;
+    details?: Record<string, unknown>;
   };
 };
 
@@ -48,9 +54,7 @@ type ErrorBody = {
  * double-submit scheme this backs. `null` when absent (never logged in yet, or an older backend
  * that hasn't adopted cookie sessions at all — `apiFetch` degrades to sending no CSRF header,
  * which such a backend never checks for in the first place). */
-// Exported — `graphqlClient.ts`'s cookie-auth path (`graphqlFetch` with no `token`) reads the
-// same cookie/header pair, since `crates/metap-graphql-gateway`'s opt-in `COOKIE_AUTH_ENABLED` mode
-// requires the identical double-submit CSRF check REST already does.
+// Exported for the few calls that use `fetch` directly (a file download) and need the same header.
 export function readCsrfCookie(): string | null {
   if (typeof document === "undefined") {
     return null;
@@ -101,6 +105,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
         body.error.code,
         body.error.message,
         body.error.fieldErrors,
+        body.error.details,
       );
     }
 
