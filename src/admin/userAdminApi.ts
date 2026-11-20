@@ -30,6 +30,8 @@ export type AdminUserRow = {
   sharedIdentity: boolean;
   /** An invited member's open invitation expires then; `null` when none is open. */
   invitationExpiresAt: string | null;
+  /** The tenant's owner (roadmap 115 M8): other admins can't disable, demote or reset them. */
+  isOwner: boolean;
 };
 
 /** What inviting (or re-sending) returns. Without email (SMTP not set up, or the relay refused),
@@ -78,7 +80,7 @@ export type UsersQuery = {
 };
 
 const USER_FIELDS =
-  "id email displayName status roles authProvider hasPassword lastLoginAt createdAt invitedBy sharedIdentity invitationExpiresAt";
+  "id email displayName status roles authProvider hasPassword lastLoginAt createdAt invitedBy sharedIdentity invitationExpiresAt isOwner";
 
 const USERS_QUERY = `query AdminUsers($search: String, $status: String, $role: String, $offset: Int, $limit: Int) {
   users(search: $search, status: $status, role: $role, offset: $offset, limit: $limit) {
@@ -236,6 +238,12 @@ export function useUserAdminActions() {
       ),
     async removeUser(id: string) {
       await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { removeUser(id: $id) }", { id });
+      await refresh(id);
+    },
+    /** Removes the member's second factor so they can sign in with the password alone (and
+     *  set a new one); for someone who lost their phone and their recovery codes. */
+    async resetMfa(id: string) {
+      await graphqlFetch(GRAPHQL_PATH, "mutation($id: ID!) { resetUserMfa(id: $id) }", { id });
       await refresh(id);
     },
     async resetPassword(id: string, password: string) {
