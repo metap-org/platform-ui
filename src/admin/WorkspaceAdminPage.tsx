@@ -35,6 +35,9 @@ import { useCurrentUser } from "../auth/useCurrentUser";
 import { relativeTime } from "../lib/dates";
 import { DataList, type DataListColumn } from "../list/DataList";
 import { ConfirmButton } from "./ConfirmButton";
+import { WorkspaceAuditTab } from "./WorkspaceAuditTab";
+import { WorkspaceSsoTab } from "./WorkspaceSsoTab";
+import { WorkspaceSupportTab } from "./WorkspaceSupportTab";
 import { roleDisplayName, useRoles, useUsers } from "./userAdminApi";
 import {
   SECURITY_KEYS,
@@ -54,10 +57,12 @@ import {
 
 /**
  * The tenant admin's own workspace (roadmap 115): security settings (M3, M11), service accounts
- * with API keys (M5) and the owner (M8). Admin-only, like `UsersAdminPage`. The `tab` the page
+ * with API keys (M5), single sign-on (M7), support access (M10), the audit trail (M9) and the
+ * owner (M8). Admin-only, like `UsersAdminPage`. The `tab` the page
  * opens on can be set by the caller (e.g. from the URL).
  */
-export type WorkspaceAdminTab = "security" | "serviceAccounts" | "owner";
+export type WorkspaceAdminTab =
+  "security" | "serviceAccounts" | "sso" | "support" | "audit" | "owner";
 
 export function WorkspaceAdminPage({
   defaultTab = "security",
@@ -78,6 +83,9 @@ function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }
         <TabsList>
           <TabsTrigger value="security">{t("workspace.tabSecurity")}</TabsTrigger>
           <TabsTrigger value="serviceAccounts">{t("workspace.tabServiceAccounts")}</TabsTrigger>
+          <TabsTrigger value="sso">{t("workspace.tabSso")}</TabsTrigger>
+          <TabsTrigger value="support">{t("workspace.tabSupport")}</TabsTrigger>
+          <TabsTrigger value="audit">{t("workspace.tabAudit")}</TabsTrigger>
           <TabsTrigger value="owner">{t("workspace.tabOwner")}</TabsTrigger>
         </TabsList>
         <TabsContent value="security">
@@ -85,6 +93,15 @@ function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }
         </TabsContent>
         <TabsContent value="serviceAccounts">
           <ServiceAccountsTab />
+        </TabsContent>
+        <TabsContent value="sso">
+          <WorkspaceSsoTab />
+        </TabsContent>
+        <TabsContent value="support">
+          <WorkspaceSupportTab />
+        </TabsContent>
+        <TabsContent value="audit">
+          <WorkspaceAuditTab />
         </TabsContent>
         <TabsContent value="owner">
           <OwnerTab />
