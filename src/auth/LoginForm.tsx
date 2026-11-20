@@ -5,22 +5,43 @@ import { apiFetch, ApiError } from "../api/client";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { useAuth } from "./AuthContext";
 import { tenantLabel } from "./accountApi";
+import { MfaCodeInput, MfaEnrollmentFlow } from "./MfaEnrollment";
+import {
+  beginRequiredMfaSetup,
+  confirmRequiredMfaSetup,
+  describeMfaError,
+  discoverSso,
+  loginWithMfaCode,
+} from "./securityApi";
 
 type ProvidersResponse = { data: { providers: string[] } };
 
 type TenantChoice = { tenantId: string; name: string | null };
 
-/** `POST /auth/login`'s body: a session (token), or — for a person in several tenants who has
- *  not picked one — the tenants to choose from, with no session yet. */
+/** `POST /auth/login`'s body: a session (token); or — for a person in several tenants who has
+ *  not picked one — the tenants to choose from; or, with no session yet, a second step: a code
+ *  (`mfaRequired`) or enrolling an authenticator the tenant requires (`mfaSetupRequired`), both
+ *  continued with `mfaToken`. */
 type LoginResponse = {
-  data: { token?: string; tenantId?: string; selectTenant?: boolean; tenants?: TenantChoice[] };
+  data: {
+    token?: string;
+    tenantId?: string;
+    selectTenant?: boolean;
+    tenants?: TenantChoice[];
+    mfaRequired?: boolean;
+    mfaSetupRequired?: boolean;
+    mfaToken?: string;
+  };
 };
+
+type SecondStep = { kind: "code" | "setup"; mfaToken: string };
 
 const LOGIN_ERROR_KEYS: Record<string, string> = {
   invalid_credentials: "login.invalidCredentials",
   account_locked: "login.accountLocked",
   account_disabled: "login.accountDisabled",
   no_tenant_access: "login.noTenantAccess",
+  sso_required: "login.ssoRequired",
 };
 
 type LoginFormProps = {
@@ -44,6 +65,71 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
   const [submitting, setSubmitting] = useState(false);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [choices, setChoices] = useState<TenantChoice[] | null>(null);
+  const [secondStep, setSecondStep] = useState<SecondStep | null>(null);
+  const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
+  // Where single sign-on starts for the email typed, once looked up (a tenant that enforces SSO
+  // refuses the password, and the person needs a way on).
+  const [ssoStartUrl, setSsoStartUrl] = useState<string | null>(null);
+
+  async function finishSignIn() {
+    // Awaited (2026-09-04, `markAuthenticated`'s own doc comment on the `AuthContext` interface)
+    // — by the time this resolves, `status` has already settled to "authenticated", so the
+    // destination route's `RequireAuth` can't read a stale "anonymous" and bounce back here.
+    await markAuthenticated();
+    navAdapter.navigate(navAdapter.toHome());
+  }
+
+  function backToCredentials(message: string | null = null) {
+    setSecondStep(null);
+    setChoices(null);
+    setCode("");
+    setUseRecovery(false);
+    setError(message);
+  }
+
+  async function lookUpSso(): Promise<string | null> {
+    try {
+      const found = await discoverSso(email);
+      const url = found.ssoAvailable && found.startUrl ? found.startUrl : null;
+      setSsoStartUrl(url);
+      return url;
+    } catch {
+      setSsoStartUrl(null);
+      return null;
+    }
+  }
+
+  async function handleSsoClick() {
+    setError(null);
+    setSubmitting(true);
+    const url = await lookUpSso();
+    setSubmitting(false);
+    if (url) {
+      window.location.assign(url);
+    } else {
+      setError(t("login.ssoNotAvailable"));
+    }
+  }
+
+  async function handleCode() {
+    if (!secondStep) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await loginWithMfaCode(secondStep.mfaToken, code);
+      await finishSignIn();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "mfa_challenge") {
+        backToCredentials(t("security.challengeExpired"));
+      } else {
+        setError(describeMfaError(err, t));
+        setCode("");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     if (!tenantId) return;
@@ -75,12 +161,20 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
         setChoices(response.data.tenants ?? []);
         return;
       }
-      // Awaited (2026-09-04, `markAuthenticated`'s own doc comment on the `AuthContext` interface)
-      // — by the time this resolves, `status` has already settled to "authenticated", so the
-      // destination route's `RequireAuth` can't read a stale "anonymous" and bounce back here.
-      await markAuthenticated();
-      navAdapter.navigate(navAdapter.toHome());
+      if (response.data.mfaToken && (response.data.mfaRequired || response.data.mfaSetupRequired)) {
+        setChoices(null);
+        setSecondStep({
+          kind: response.data.mfaRequired ? "code" : "setup",
+          mfaToken: response.data.mfaToken,
+        });
+        return;
+      }
+      await finishSignIn();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "sso_required") {
+        setChoices(null);
+        void lookUpSso();
+      }
       const key = err instanceof ApiError ? LOGIN_ERROR_KEYS[err.code] : undefined;
       if (key) {
         setError(t(key));
@@ -90,6 +184,67 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (secondStep?.kind === "setup") {
+    const { mfaToken } = secondStep;
+    return (
+      <div className="mx-auto max-w-sm py-8">
+        <h2 className="mb-1 text-xl font-semibold text-foreground">{t("login.mfaSetupTitle")}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">{t("login.mfaSetupHint")}</p>
+        <MfaEnrollmentFlow
+          begin={() => beginRequiredMfaSetup(mfaToken)}
+          confirm={(value) => confirmRequiredMfaSetup(mfaToken, value)}
+          onDone={() => void finishSignIn()}
+          onCancel={() => backToCredentials()}
+          doneLabel={t("login.continue")}
+        />
+      </div>
+    );
+  }
+
+  if (secondStep?.kind === "code") {
+    return (
+      <div className="mx-auto max-w-xs py-8">
+        <h2 className="mb-1 text-xl font-semibold text-foreground">{t("login.mfaTitle")}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {useRecovery ? t("login.mfaRecoveryHint") : t("login.mfaHint")}
+        </p>
+        {error ? (
+          <Alert variant="destructive" className="mb-4">
+            {error}
+          </Alert>
+        ) : null}
+        <div className="flex flex-col gap-4">
+          <MfaCodeInput
+            key={useRecovery ? "recovery" : "totp"}
+            autoFocus
+            label={useRecovery ? t("security.recoveryCodeLabel") : t("security.codeLabel")}
+            value={code}
+            onChange={setCode}
+            onSubmit={() => void handleCode()}
+          />
+          <Button onClick={() => void handleCode()} disabled={!code.trim()} loading={submitting}>
+            {t("login.verify")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="self-center text-primary"
+            onClick={() => {
+              setUseRecovery((v) => !v);
+              setCode("");
+              setError(null);
+            }}
+          >
+            {useRecovery ? t("login.useAuthenticator") : t("login.useRecoveryCode")}
+          </Button>
+          <Button variant="ghost" onClick={() => backToCredentials()}>
+            {t("login.back")}
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (choices) {
@@ -134,6 +289,13 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
       {error ? (
         <Alert variant="destructive" className="mb-4">
           {error}
+          {ssoStartUrl ? (
+            <div className="mt-2">
+              <a href={ssoStartUrl} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                {t("login.ssoButton")}
+              </a>
+            </div>
+          ) : null}
         </Alert>
       ) : null}
       <div className="flex flex-col gap-4">
@@ -141,7 +303,10 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
           label={t("login.email")}
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.currentTarget.value)}
+          onChange={(event) => {
+            setEmail(event.currentTarget.value);
+            setSsoStartUrl(null);
+          }}
           onKeyDown={(event) => event.key === "Enter" && void handleSubmit()}
         />
         <Input
@@ -164,21 +329,29 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
         >
           {t("account.forgotLink")}
         </navAdapter.Link>
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-xs text-muted-foreground">{t("login.orDivider")}</span>
+          <Separator className="flex-1" />
+        </div>
         {oidcEnabled && tenantId ? (
-          <>
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">{t("login.orDivider")}</span>
-              <Separator className="flex-1" />
-            </div>
-            <a
-              href={`/auth/oidc/${encodeURIComponent(tenantId)}/login`}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              {t("login.ssoButton")}
-            </a>
-          </>
-        ) : null}
+          <a
+            href={`/auth/oidc/${encodeURIComponent(tenantId)}/login`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            {t("login.ssoButton")}
+          </a>
+        ) : (
+          // Single sign-on found from the email's domain (roadmap 115 M7): no tenant needed up front.
+          <Button
+            variant="outline"
+            disabled={!email.includes("@")}
+            loading={submitting && password.length === 0}
+            onClick={() => void handleSsoClick()}
+          >
+            {t("login.ssoWithEmail")}
+          </Button>
+        )}
       </div>
     </div>
   );

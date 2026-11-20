@@ -4,7 +4,15 @@ import { notifySessionExpired } from "./sessionEvents";
  * session just died — excluded from `notifySessionExpired` so login failures and the bootstrap
  * "am I logged in" check don't trigger a redundant extra `["currentUser"]` refetch on top of the
  * one they already are. */
-const SESSION_EXPIRY_EXEMPT_PATHS = ["/auth/login", "/auth/me", "/auth/logout"];
+const SESSION_EXPIRY_EXEMPT_PATHS = [
+  "/auth/login",
+  "/auth/me",
+  "/auth/logout",
+  // The steps of a sign-in not finished yet: a 401 there is a wrong code, not a lost session.
+  "/auth/login/mfa",
+  "/auth/mfa/setup",
+  "/auth/mfa/setup/confirm",
+];
 
 export class ApiError extends Error {
   readonly status: number;

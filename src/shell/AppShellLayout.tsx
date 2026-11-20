@@ -301,8 +301,15 @@ function MenuIcon() {
 }
 
 /** Email, roles and logout behind one button, instead of spreading them across the top bar. */
-function AccountMenu({ onLogout }: { onLogout: () => void }) {
+function AccountMenu({
+  onLogout,
+  accountSecurityPath,
+}: {
+  onLogout: () => void;
+  accountSecurityPath: string | null;
+}) {
   const { t } = useTranslation();
+  const navAdapter = useNavigationAdapter();
   const { data: user } = useCurrentUser();
   const email = useCurrentUserEmail();
   const name = email ?? user?.userId ?? "";
@@ -339,6 +346,11 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
           <LocaleSwitcher compact />
         </div>
         <DropdownMenuSeparator />
+        {accountSecurityPath ? (
+          <DropdownMenuItem onSelect={() => navAdapter.navigate(accountSecurityPath)}>
+            {t("shell.accountSecurity")}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => setPasswordOpen(true)}>
           {t("shell.changePassword")}
         </DropdownMenuItem>
@@ -361,10 +373,14 @@ export function AppShellLayout({
   brand,
   navItems,
   children,
+  accountSecurityPath = "/account/security",
 }: {
   brand: string;
   navItems: ShellNavItem[];
   children: ReactNode;
+  /** Where the account menu's "Account security" entry goes (mount `AccountSecurityPage` there);
+   *  `null` hides the entry. */
+  accountSecurityPath?: string | null;
 }) {
   const { t } = useTranslation();
   const { logout } = useAuth();
@@ -461,7 +477,10 @@ export function AppShellLayout({
               <div className="hidden md:block">
                 <TenantSwitcher />
               </div>
-              <AccountMenu onLogout={() => void handleLogout()} />
+              <AccountMenu
+                onLogout={() => void handleLogout()}
+                accountSecurityPath={accountSecurityPath}
+              />
             </div>
           </header>
           <main className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
