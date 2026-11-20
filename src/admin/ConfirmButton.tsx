@@ -18,19 +18,26 @@ export function ConfirmButton({
   description,
   destructive,
   busy,
+  disabled,
   onConfirm,
 }: {
   label: string;
   description: string;
   destructive?: boolean;
   busy: boolean;
+  disabled?: boolean;
   onConfirm: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant={destructive ? "destructive" : "outline"} size="sm" loading={busy}>
+        <Button
+          variant={destructive ? "destructive" : "outline"}
+          size="sm"
+          loading={busy}
+          disabled={disabled}
+        >
           {label}
         </Button>
       </AlertDialogTrigger>

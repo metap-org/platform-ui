@@ -193,6 +193,30 @@ sẵn (khác `useGraphQLQuery`), vì mỗi mutation cần 1 câu GraphQL string 
 Verify: `typecheck`/`lint`/`format:check` sạch (không đụng file khác đang có drift format sẵn có
 từ trước). Chưa test qua browser thật (đúng chính sách repo).
 
+## Màn tài khoản và workspace (roadmap 115, 2026-11-20)
+
+Giao diện cho phần user/tenant của `../metap-docs/docs/roadmap/115-metap-user-tenant-gaps-for-waap.md`,
+dùng ở portal WAAP:
+
+- `auth/LoginForm.tsx`: bước nhập mã xác minh hai bước (TOTP hoặc mã khôi phục), bước bắt buộc
+  thiết lập MFA khi tenant đặt `auth.requireMfa`, lỗi `sso_required` kèm nút SSO, nút "Tiếp tục bằng
+  SSO" tìm tenant theo tên miền email (`/auth/sso/discover`).
+- `auth/AccountSecurityPage.tsx`: bật/tắt MFA (QR, mã khôi phục), phiên đăng nhập của chính mình.
+  Shell trỏ tới qua `AppShellLayout`'s `accountSecurityPath` (mặc định `/account/security`).
+- `admin/WorkspaceAdminPage.tsx` (chỉ admin), menu tab dọc: Bảo mật (`auth.*` của tenant),
+  Tài khoản dịch vụ + API key, SSO (OIDC), Truy cập hỗ trợ, Nhật ký (lọc, xuất CSV/JSON, kiểm tra
+  chuỗi hash), Chủ sở hữu.
+- `admin/UsersAdminPage.tsx`: panel chi tiết dựng lại (đầu panel, tab Thông tin / Lịch sử, hàng
+  setting); vai trò và tên chỉ lưu khi bấm Lưu; tài khoản của chính mình chỉ trỏ sang trang bảo mật.
+- `admin/CronJobsAdminPage.tsx`: danh sách trên `DataList`, form tạo trong dialog, chi tiết và lịch
+  sử chạy trong panel bên phải.
+- `admin/PoliciesAdminPage.tsx`: không có `?role=` thì chọn sẵn vai trò đầu tiên không phải
+  `admin`/`platform_admin`.
+
+Bố cục các màn này dùng atom của `@metap/ui`: `SettingsSection`/`SettingsRow` (hàng setting nhãn
+trái, control phải), `StickyActionBar` (Lưu/Bỏ khi có thay đổi), `Tabs` dọc, `QrCode`. Không đặt
+padding hay `max-w-*` riêng ở trang: shell đã có padding.
+
 ## Lệnh
 
 ```bash

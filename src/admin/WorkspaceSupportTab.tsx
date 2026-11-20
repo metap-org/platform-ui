@@ -61,7 +61,7 @@ export function WorkspaceSupportTab() {
   );
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-sm font-semibold">{t("workspace.supportTitle")}</h3>

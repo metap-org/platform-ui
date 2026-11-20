@@ -12,14 +12,15 @@ import {
   Input,
   MultiSelect,
   NumberInput,
-  PageHeader,
-  SectionCard,
   Select,
+  SettingsRow,
+  SettingsSection,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   Skeleton,
+  StickyActionBar,
   Tabs,
   TabsContent,
   TabsList,
@@ -74,19 +75,58 @@ export function WorkspaceAdminPage({
   );
 }
 
+const TABS: WorkspaceAdminTab[] = [
+  "security",
+  "serviceAccounts",
+  "sso",
+  "support",
+  "audit",
+  "owner",
+];
+const TAB_LABEL_KEYS: Record<WorkspaceAdminTab, string> = {
+  security: "workspace.tabSecurity",
+  serviceAccounts: "workspace.tabServiceAccounts",
+  sso: "workspace.tabSso",
+  support: "workspace.tabSupport",
+  audit: "workspace.tabAudit",
+  owner: "workspace.tabOwner",
+};
+
+/** Sections as a side menu on wide screens (six don't fit side by side), a scrolling strip on
+ *  narrow ones; the content takes the rest of the width. */
 function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }) {
   const { t } = useTranslation();
+  const [tab, setTab] = useState<WorkspaceAdminTab>(defaultTab);
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <PageHeader title={t("workspace.title")} description={t("workspace.subtitle")} />
-      <Tabs defaultValue={defaultTab}>
-        <TabsList>
-          <TabsTrigger value="security">{t("workspace.tabSecurity")}</TabsTrigger>
-          <TabsTrigger value="serviceAccounts">{t("workspace.tabServiceAccounts")}</TabsTrigger>
-          <TabsTrigger value="sso">{t("workspace.tabSso")}</TabsTrigger>
-          <TabsTrigger value="support">{t("workspace.tabSupport")}</TabsTrigger>
-          <TabsTrigger value="audit">{t("workspace.tabAudit")}</TabsTrigger>
-          <TabsTrigger value="owner">{t("workspace.tabOwner")}</TabsTrigger>
+    <div className="flex flex-col gap-3">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">
+          {t("workspace.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t("workspace.subtitle")}</p>
+      </div>
+      {/* Narrow screens: a horizontal strip. */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as WorkspaceAdminTab)} className="md:hidden">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          {TABS.map((key) => (
+            <TabsTrigger key={key} value={key}>
+              {t(TAB_LABEL_KEYS[key])}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as WorkspaceAdminTab)}
+        orientation="vertical"
+        className="flex gap-6"
+      >
+        <TabsList className="hidden w-48 shrink-0 md:flex">
+          {TABS.map((key) => (
+            <TabsTrigger key={key} value={key}>
+              {t(TAB_LABEL_KEYS[key])}
+            </TabsTrigger>
+          ))}
         </TabsList>
         <TabsContent value="security">
           <SecurityTab />
@@ -201,75 +241,82 @@ function SecurityForm({ items, saved }: { items: ConfigItem[]; saved: SecurityDr
   }
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       {error ? <Alert variant="destructive">{error}</Alert> : null}
-      <SectionCard
+      <SettingsSection
         title={t("workspace.signInTitle")}
         description={t("workspace.signInDescription")}
       >
-        <div className="flex flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium">{t("workspace.requireMfa")}</div>
-              <p className="text-xs text-muted-foreground">{t("workspace.requireMfaHint")}</p>
-              {defaultHint(SECURITY_KEYS.requireMfa)}
-            </div>
-            <Toggle
-              checked={draft.requireMfa}
-              onCheckedChange={(requireMfa) => setDraft({ ...draft, requireMfa })}
-              aria-label={t("workspace.requireMfa")}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <NumberInput
-                label={t("workspace.passwordMinLength")}
-                helperText={t("workspace.passwordMinLengthHint")}
-                min={SECURITY_LIMITS.passwordMinLength.min}
-                max={SECURITY_LIMITS.passwordMinLength.max}
-                value={draft.passwordMinLength}
-                onChange={(passwordMinLength) => setDraft({ ...draft, passwordMinLength })}
-              />
-              {defaultHint(SECURITY_KEYS.passwordMinLength)}
-            </div>
-            <div className="flex flex-col gap-1">
-              <NumberInput
-                label={t("workspace.sessionTtl")}
-                helperText={t("workspace.sessionTtlHint")}
-                min={SECURITY_LIMITS.sessionTtlMinutes.min}
-                max={SECURITY_LIMITS.sessionTtlMinutes.max}
-                value={draft.sessionTtlMinutes}
-                onChange={(sessionTtlMinutes) => setDraft({ ...draft, sessionTtlMinutes })}
-              />
-              {defaultHint(SECURITY_KEYS.sessionTtlSeconds)}
-            </div>
-          </div>
-        </div>
-      </SectionCard>
-      <SectionCard
+        <SettingsRow
+          label={t("workspace.requireMfa")}
+          description={t("workspace.requireMfaHint")}
+          meta={defaultHint(SECURITY_KEYS.requireMfa)}
+        >
+          <Toggle
+            checked={draft.requireMfa}
+            onCheckedChange={(requireMfa) => setDraft({ ...draft, requireMfa })}
+            aria-label={t("workspace.requireMfa")}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.passwordMinLength")}
+          description={t("workspace.passwordMinLengthHint")}
+          meta={defaultHint(SECURITY_KEYS.passwordMinLength)}
+        >
+          <NumberInput
+            className="w-28"
+            aria-label={t("workspace.passwordMinLength")}
+            min={SECURITY_LIMITS.passwordMinLength.min}
+            max={SECURITY_LIMITS.passwordMinLength.max}
+            value={draft.passwordMinLength}
+            onChange={(passwordMinLength) => setDraft({ ...draft, passwordMinLength })}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.sessionTtl")}
+          description={t("workspace.sessionTtlHint")}
+          meta={defaultHint(SECURITY_KEYS.sessionTtlSeconds)}
+        >
+          <NumberInput
+            className="w-28"
+            aria-label={t("workspace.sessionTtl")}
+            min={SECURITY_LIMITS.sessionTtlMinutes.min}
+            max={SECURITY_LIMITS.sessionTtlMinutes.max}
+            value={draft.sessionTtlMinutes}
+            onChange={(sessionTtlMinutes) => setDraft({ ...draft, sessionTtlMinutes })}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection
         title={t("workspace.apiKeysTitle")}
         description={t("workspace.apiKeysDescription")}
       >
-        <div className="flex max-w-xs flex-col gap-1">
+        <SettingsRow
+          label={t("workspace.apiKeyMaxLifetime")}
+          description={t("workspace.apiKeyMaxLifetimeHint")}
+          meta={defaultHint(SECURITY_KEYS.apiKeyMaxLifetimeDays)}
+        >
           <NumberInput
-            label={t("workspace.apiKeyMaxLifetime")}
-            helperText={t("workspace.apiKeyMaxLifetimeHint")}
+            className="w-28"
+            aria-label={t("workspace.apiKeyMaxLifetime")}
             min={SECURITY_LIMITS.apiKeyMaxLifetimeDays.min}
             max={SECURITY_LIMITS.apiKeyMaxLifetimeDays.max}
             value={draft.apiKeyMaxLifetimeDays}
             onChange={(apiKeyMaxLifetimeDays) => setDraft({ ...draft, apiKeyMaxLifetimeDays })}
           />
-          {defaultHint(SECURITY_KEYS.apiKeyMaxLifetimeDays)}
-        </div>
-      </SectionCard>
-      <div className="flex gap-2">
-        <Button onClick={() => void save()} disabled={changes.length === 0} loading={saving}>
-          {t("workspace.save")}
-        </Button>
-        <Button variant="ghost" disabled={changes.length === 0} onClick={() => setDraft(saved)}>
+        </SettingsRow>
+      </SettingsSection>
+      <StickyActionBar
+        visible={changes.length > 0}
+        message={t("workspace.unsavedChanges", { count: changes.length })}
+      >
+        <Button size="sm" variant="ghost" onClick={() => setDraft(saved)}>
           {t("workspace.discard")}
         </Button>
-      </div>
+        <Button size="sm" onClick={() => void save()} loading={saving}>
+          {t("workspace.save")}
+        </Button>
+      </StickyActionBar>
     </div>
   );
 }
@@ -322,7 +369,7 @@ function ServiceAccountsTab() {
   ];
 
   return (
-    <div className="pt-2">
+    <div>
       <DataList
         title={t("workspace.tabServiceAccounts")}
         rows={accounts.data ?? []}
@@ -334,7 +381,7 @@ function ServiceAccountsTab() {
         onRefresh={() => void accounts.refetch()}
         refreshing={accounts.isFetching}
         onRowClick={(a) => setOpenId(a.id)}
-        bodyClassName="max-h-[calc(100vh-280px)] min-h-[240px]"
+        bodyClassName="max-h-[calc(100vh-240px)]"
         toolbar={
           <Button size="sm" onClick={() => setCreating(true)}>
             {t("workspace.saCreate")}
@@ -720,7 +767,7 @@ function OwnerTab() {
   }
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       {error ? <ApiErrorMessage error={error} /> : null}
       {recovery ? (
         <Alert variant="destructive" className="flex flex-col gap-2">
@@ -747,59 +794,62 @@ function OwnerTab() {
           </div>
         </Alert>
       ) : null}
-      <SectionCard title={t("workspace.ownerTitle")} description={t("workspace.ownerDescription")}>
-        <div className="flex items-center gap-2">
+      <SettingsSection
+        title={t("workspace.ownerTitle")}
+        description={t("workspace.ownerDescription")}
+      >
+        <SettingsRow label={t("workspace.ownerCurrent")}>
           <span className="text-sm font-medium">{owner.ownerEmail || owner.ownerMemberId}</span>
           {isOwner ? <Badge variant="outline">{t("workspace.ownerYou")}</Badge> : null}
-        </div>
-      </SectionCard>
-      <SectionCard
-        title={t("workspace.transferTitle")}
-        description={
-          isOwner ? t("workspace.transferDescription") : t("workspace.transferOwnerOnly")
-        }
-      >
-        {isOwner ? (
-          candidates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("workspace.transferNoAdmins")}</p>
-          ) : (
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[16rem] flex-1">
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.transferTitle")}
+          description={
+            !isOwner
+              ? t("workspace.transferOwnerOnly")
+              : candidates.length === 0
+                ? t("workspace.transferNoAdmins")
+                : t("workspace.transferDescription")
+          }
+          controlWidth="wide"
+        >
+          {isOwner && candidates.length > 0 ? (
+            <>
+              <div className="min-w-0 flex-1">
                 <Select
-                  label={t("workspace.transferTo")}
+                  aria-label={t("workspace.transferTo")}
                   placeholder={t("workspace.transferPick")}
                   options={candidates.map((u) => ({
                     value: u.id,
                     label: u.displayName ? `${u.displayName} (${u.email})` : u.email,
                   }))}
-                  value={target}
+                  value={target || undefined}
                   onValueChange={setTarget}
                 />
               </div>
-              {target ? (
-                <ConfirmButton
-                  label={t("workspace.transfer")}
-                  description={t("workspace.transferConfirm", {
-                    email: candidates.find((u) => u.id === target)?.email ?? "",
-                  })}
-                  destructive
-                  busy={busy === "transfer"}
-                  onConfirm={() =>
-                    void run(
-                      "transfer",
-                      async () => {
-                        await actions.transferOwnership(target);
-                        setTarget("");
-                      },
-                      t("workspace.transferred"),
-                    )
-                  }
-                />
-              ) : null}
-            </div>
-          )
-        ) : null}
-      </SectionCard>
+              <ConfirmButton
+                label={t("workspace.transfer")}
+                description={t("workspace.transferConfirm", {
+                  email: candidates.find((u) => u.id === target)?.email ?? "",
+                })}
+                destructive
+                busy={busy === "transfer"}
+                disabled={!target}
+                onConfirm={() =>
+                  void run(
+                    "transfer",
+                    async () => {
+                      await actions.transferOwnership(target);
+                      setTarget("");
+                    },
+                    t("workspace.transferred"),
+                  )
+                }
+              />
+            </>
+          ) : null}
+        </SettingsRow>
+      </SettingsSection>
     </div>
   );
 }

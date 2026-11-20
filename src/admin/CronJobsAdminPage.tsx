@@ -1,30 +1,40 @@
-import { Fragment, useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Alert,
+  Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   IconButton,
   Input,
   Select,
+  SettingsRow,
+  SettingsSection,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Textarea,
   Toggle,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { GraphQLError } from "../api/graphqlClient";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
+import { relativeTime } from "../lib/dates";
+import { DataList, type DataListColumn } from "../list/DataList";
 import {
   useAdminCronJobActions,
   useAdminCronJobs,
   useCreateAdminCronJob,
   useCronJobRuns,
+  type CronJob,
 } from "./adminApi";
 import { AdminOnly } from "../auth/AdminOnly";
+import { ConfirmButton } from "./ConfirmButton";
 
 // `email`/`steps` were missing here (found live 2026-09-06,
 // `docs/features/01-fe-platform-overhaul.md`) — `metap_cron::TargetType` has had 6 variants since
@@ -76,11 +86,17 @@ function KeyValueListEditor({
   removeLabel: string;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
+      {rows.length > 0 ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] gap-2 text-xs text-muted-foreground">
+          <span>{keyLabel}</span>
+          <span>{valueLabel}</span>
+        </div>
+      ) : null}
       {rows.map((row, index) => (
-        <div key={row.id} className="flex items-end gap-2">
+        <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] gap-2">
           <Input
-            label={index === 0 ? keyLabel : undefined}
+            aria-label={keyLabel}
             value={row.key}
             onChange={(event) => {
               const next = [...rows];
@@ -89,7 +105,7 @@ function KeyValueListEditor({
             }}
           />
           <Input
-            label={index === 0 ? valueLabel : undefined}
+            aria-label={valueLabel}
             value={row.value}
             onChange={(event) => {
               const next = [...rows];
@@ -101,66 +117,308 @@ function KeyValueListEditor({
             variant="ghost"
             size="sm"
             aria-label={removeLabel}
-            className="text-destructive hover:text-destructive"
+            className="self-center text-destructive hover:text-destructive"
             onClick={() => onChange(rows.filter((_, i) => i !== index))}
             icon={<span className="text-base leading-none">×</span>}
           />
         </div>
       ))}
-      <Button variant="outline" size="sm" onClick={() => onChange([...rows, emptyKeyValueRow()])}>
-        {addLabel}
-      </Button>
+      <div>
+        <Button variant="ghost" size="sm" onClick={() => onChange([...rows, emptyKeyValueRow()])}>
+          + {addLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function runStatusVariant(status: string): "success" | "destructive" | "warning" | "secondary" {
+  if (status === "succeeded" || status === "success" || status === "completed") return "success";
+  if (status === "failed" || status === "error") return "destructive";
+  if (status === "running" || status === "pending" || status === "queued") return "warning";
+  return "secondary";
+}
+
+/** A field of the create form: label over its control, help under it, in a 2-column grid. */
+function Field({
+  label,
+  hint,
+  wide,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`flex min-w-0 flex-col gap-1${wide ? " sm:col-span-2" : ""}`}>
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      {children}
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </div>
   );
 }
 
 function CronJobRuns({ jobId }: { jobId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: runs, isLoading, error } = useCronJobRuns(jobId);
 
-  if (isLoading) {
-    return <Spinner size="sm" />;
+  if (isLoading) return <Spinner size="sm" />;
+  if (error) return <ApiErrorMessage error={error} />;
+  if ((runs ?? []).length === 0) {
+    return <p className="px-4 py-3 text-sm text-muted-foreground">{t("admin.cronJobs.noRuns")}</p>;
   }
-  if (error) {
-    return <ApiErrorMessage error={error} />;
-  }
-
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("admin.cronJobs.runs.status")}</TableHead>
-          <TableHead>{t("admin.cronJobs.runs.scheduledFor")}</TableHead>
-          <TableHead>{t("admin.cronJobs.runs.finishedAt")}</TableHead>
-          <TableHead>{t("admin.cronJobs.runs.error")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {(runs ?? []).length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={4}>{t("common.noRecords")}</TableCell>
-          </TableRow>
-        ) : (
-          (runs ?? []).map((run) => (
-            <TableRow key={run.id}>
-              <TableCell>{run.status}</TableCell>
-              <TableCell>{run.scheduledFor}</TableCell>
-              <TableCell>{run.finishedAt ?? "—"}</TableCell>
-              <TableCell>{run.error ?? "—"}</TableCell>
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+    <ul className="divide-y divide-border">
+      {(runs ?? []).map((run) => (
+        <li key={run.id} className="flex flex-col gap-0.5 px-4 py-2 text-sm">
+          <div className="flex items-center gap-2">
+            <Badge variant={runStatusVariant(run.status)}>{run.status}</Badge>
+            <span title={run.scheduledFor}>
+              {t("admin.cronJobs.runScheduled", {
+                when: relativeTime(run.scheduledFor, i18n.language),
+              })}
+            </span>
+            <span className="ml-auto text-xs text-muted-foreground" title={run.finishedAt ?? ""}>
+              {run.finishedAt
+                ? t("admin.cronJobs.runFinished", {
+                    when: relativeTime(run.finishedAt, i18n.language),
+                  })
+                : "—"}
+            </span>
+          </div>
+          {run.error ? (
+            <code className="break-all text-xs text-destructive">{run.error}</code>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function JobDetail({ job }: { job: CronJob }) {
+  const { t, i18n } = useTranslation();
+  return (
+    <div className="flex flex-col gap-4 pt-2">
+      <SettingsSection title={t("admin.cronJobs.schedule")}>
+        <SettingsRow label={t("admin.cronJobs.cronExpr")}>
+          <code className="rounded bg-muted px-2 py-0.5 text-sm">{job.cronExpr}</code>
+        </SettingsRow>
+        <SettingsRow label={t("admin.cronJobs.timezone")}>
+          <span className="text-sm">{job.timezone}</span>
+        </SettingsRow>
+        <SettingsRow label={t("admin.cronJobs.nextRunAt")}>
+          <span className="text-sm" title={job.nextRunAt}>
+            {job.enabled ? relativeTime(job.nextRunAt, i18n.language) : t("admin.cronJobs.paused")}
+          </span>
+        </SettingsRow>
+        <SettingsRow label={t("admin.cronJobs.lastRunAt")}>
+          <span className="text-sm" title={job.lastRunAt ?? ""}>
+            {job.lastRunAt
+              ? relativeTime(job.lastRunAt, i18n.language)
+              : t("admin.cronJobs.neverRan")}
+          </span>
+        </SettingsRow>
+        <SettingsRow
+          label={t("admin.cronJobs.dispatchMode")}
+          description={t(`admin.cronJobs.dispatch_${job.dispatchMode}_hint`, { defaultValue: "" })}
+        >
+          <span className="text-sm">
+            {t(`admin.cronJobs.dispatch_${job.dispatchMode}`, { defaultValue: job.dispatchMode })}
+          </span>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection
+        title={t("admin.cronJobs.target")}
+        actions={
+          <Badge variant="outline">
+            {t(`admin.cronJobs.type_${job.targetType}`, { defaultValue: job.targetType })}
+          </Badge>
+        }
+      >
+        <pre className="max-h-64 overflow-auto px-4 py-3 text-xs">
+          {JSON.stringify(job.targetConfig, null, 2)}
+        </pre>
+      </SettingsSection>
+      <SettingsSection title={t("admin.cronJobs.runs.title")}>
+        <CronJobRuns jobId={job.id} />
+      </SettingsSection>
+    </div>
   );
 }
 
 function CronJobsAdminPageContent() {
-  const { t } = useTranslation();
-  const { data: jobs, isLoading, error, refetch } = useAdminCronJobs();
-  const createJob = useCreateAdminCronJob();
+  const { t, i18n } = useTranslation();
+  const { data: jobs, isLoading, error, refetch, isFetching } = useAdminCronJobs();
   const { toggleEnabled, deleteJob } = useAdminCronJobActions();
+  const [creating, setCreating] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<unknown>(null);
+  const open = (jobs ?? []).find((j) => j.id === openId) ?? null;
+  const needle = search.trim().toLowerCase();
+  const rows = (jobs ?? []).filter(
+    (j) => !needle || j.name.toLowerCase().includes(needle) || j.targetType.includes(needle),
+  );
 
+  async function act(id: string, fn: () => Promise<unknown>) {
+    setBusy(id);
+    setRowError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setRowError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const typeLabel = (type: string) => t(`admin.cronJobs.type_${type}`, { defaultValue: type });
+
+  const columns: DataListColumn<CronJob>[] = [
+    {
+      key: "name",
+      header: t("admin.cronJobs.name"),
+      required: true,
+      cell: (job) => (
+        <div className="min-w-0">
+          <div className="truncate font-medium">{job.name}</div>
+          <div className="truncate text-xs text-muted-foreground">{typeLabel(job.targetType)}</div>
+        </div>
+      ),
+    },
+    {
+      key: "schedule",
+      header: t("admin.cronJobs.schedule"),
+      width: "14rem",
+      cell: (job) => (
+        <div className="min-w-0">
+          <code className="text-xs">{job.cronExpr}</code>
+          <div className="truncate text-xs text-muted-foreground">{job.timezone}</div>
+        </div>
+      ),
+    },
+    {
+      key: "nextRun",
+      header: t("admin.cronJobs.nextRunAt"),
+      width: "9rem",
+      cell: (job) =>
+        job.enabled ? (
+          <span title={job.nextRunAt}>{relativeTime(job.nextRunAt, i18n.language)}</span>
+        ) : (
+          <span className="text-muted-foreground">{t("admin.cronJobs.paused")}</span>
+        ),
+    },
+    {
+      key: "lastRun",
+      header: t("admin.cronJobs.lastRunAt"),
+      width: "9rem",
+      cell: (job) =>
+        job.lastRunAt ? (
+          <span title={job.lastRunAt}>{relativeTime(job.lastRunAt, i18n.language)}</span>
+        ) : (
+          <span className="text-muted-foreground">{t("admin.cronJobs.neverRan")}</span>
+        ),
+    },
+    {
+      key: "enabled",
+      header: t("admin.cronJobs.enabled"),
+      width: "6rem",
+      cell: (job) => (
+        <span onClick={(event) => event.stopPropagation()}>
+          <Toggle
+            checked={job.enabled}
+            disabled={busy === job.id}
+            aria-label={t("admin.cronJobs.enabled")}
+            onCheckedChange={() => void act(job.id, () => toggleEnabled(job))}
+          />
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <DataList
+        title={t("admin.cronJobs.title")}
+        rows={rows}
+        getRowId={(job) => job.id}
+        columns={columns}
+        loading={isLoading}
+        error={error}
+        emptyText={t("admin.cronJobs.empty")}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("admin.cronJobs.searchPlaceholder"),
+        }}
+        onRefresh={() => void refetch()}
+        refreshing={isFetching}
+        onRowClick={(job) => setOpenId(job.id)}
+        banner={rowError ? <ApiErrorMessage error={rowError} /> : null}
+        toolbar={
+          <Button size="sm" onClick={() => setCreating(true)}>
+            {t("admin.cronJobs.createTitle")}
+          </Button>
+        }
+        rowActionsWidth="96px"
+        rowActions={(job) => (
+          <ConfirmButton
+            label={t("common.delete")}
+            description={t("admin.cronJobs.deleteConfirm", { name: job.name })}
+            destructive
+            busy={busy === `delete-${job.id}`}
+            onConfirm={() =>
+              void act(`delete-${job.id}`, async () => {
+                await deleteJob(job.id);
+                if (openId === job.id) setOpenId(null);
+              })
+            }
+          />
+        )}
+      />
+      <CreateCronJobDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={() => {
+          setCreating(false);
+          void refetch();
+        }}
+      />
+      <Sheet open={open !== null} onOpenChange={(next) => !next && setOpenId(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+          {open ? (
+            <>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  {open.name}
+                  <Badge variant={open.enabled ? "success" : "secondary"}>
+                    {open.enabled ? t("admin.cronJobs.on") : t("admin.cronJobs.paused")}
+                  </Badge>
+                </SheetTitle>
+              </SheetHeader>
+              <JobDetail job={open} />
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+function CreateCronJobDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const { t } = useTranslation();
+  const createJob = useCreateAdminCronJob();
   const [name, setName] = useState("");
   const [cronExpr, setCronExpr] = useState("");
   const [timezone, setTimezone] = useState("UTC");
@@ -168,11 +426,8 @@ function CronJobsAdminPageContent() {
   const [dispatchMode, setDispatchMode] = useState<string>(DISPATCH_MODES[0] ?? "outbox");
 
   // One state group per `TargetType` shape (`metap_cron::model::TargetType`'s doc comment is the
-  // source of truth for these) — replaces a single raw-JSON `Textarea` a caller had to hand-type
-  // against undocumented shape knowledge (`docs/features/01-fe-platform-overhaul.md`'s original
-  // gap). `steps` is the deliberate exception: it's a chain of the other 4 shapes, and a full
-  // recursive step-list editor is a separate, bigger effort — kept as labeled raw JSON for now
-  // rather than blocking the other 4 on it.
+  // source of truth for these). `steps` stays labeled raw JSON: it chains the other shapes, and a
+  // recursive step editor is a bigger, separate effort.
   const [wtEntity, setWtEntity] = useState("");
   const [wtRecordId, setWtRecordId] = useState("");
   const [wtAction, setWtAction] = useState("");
@@ -180,25 +435,23 @@ function CronJobsAdminPageContent() {
   const [bqaAction, setBqaAction] = useState("");
   const [bqaFilters, setBqaFilters] = useState<KeyValueRow[]>([emptyKeyValueRow()]);
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [webhookMethod, setWebhookMethod] = useState<string>(HTTP_METHODS[0] ?? "POST");
+  const [webhookMethod, setWebhookMethod] = useState<string>(HTTP_METHODS[1] ?? "POST");
   const [webhookHeaders, setWebhookHeaders] = useState<KeyValueRow[]>([]);
-  // JSON, not a plain string — `metap_cron::model::TargetType`'s own doc comment says
-  // `bodyTemplate?`, but the field `cron-scheduler::executor::webhook::WebhookConfig` actually
-  // deserializes is `body: Option<Value>` (found live 2026-09-06 cross-checking the real struct —
-  // that doc comment is stale/wrong), sent verbatim as the request body with no template
-  // substitution of any kind.
+  // JSON sent verbatim as the request body (`WebhookConfig.body: Option<Value>`), no templating.
   const [webhookBody, setWebhookBody] = useState("");
   const [webhookAuthFromSecret, setWebhookAuthFromSecret] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [stepsJson, setStepsJson] = useState('{\n  "steps": []\n}');
-
   const [targetConfigError, setTargetConfigError] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
-  function resetTargetConfigFields() {
+  function reset() {
+    setName("");
+    setCronExpr("");
+    setTimezone("UTC");
+    setTargetType(TARGET_TYPES[0] ?? "webhook");
+    setDispatchMode(DISPATCH_MODES[0] ?? "outbox");
     setWtEntity("");
     setWtRecordId("");
     setWtAction("");
@@ -206,7 +459,7 @@ function CronJobsAdminPageContent() {
     setBqaAction("");
     setBqaFilters([emptyKeyValueRow()]);
     setWebhookUrl("");
-    setWebhookMethod(HTTP_METHODS[0] ?? "POST");
+    setWebhookMethod(HTTP_METHODS[1] ?? "POST");
     setWebhookHeaders([]);
     setWebhookBody("");
     setWebhookAuthFromSecret(false);
@@ -214,11 +467,17 @@ function CronJobsAdminPageContent() {
     setEmailSubject("");
     setEmailBody("");
     setStepsJson('{\n  "steps": []\n}');
+    setTargetConfigError(null);
+    createJob.reset();
   }
 
-  /** Builds the exact `target_config` shape `metap_cron::model::TargetType`'s doc comment
-   *  declares for the currently-selected `targetType`, from this component's own structured
-   *  fields — `null` on a JSON parse failure for `steps` (the one shape still hand-typed). */
+  function close() {
+    reset();
+    onClose();
+  }
+
+  /** The `target_config` shape `metap_cron::model::TargetType` declares for `targetType`;
+   *  `null` when a JSON field doesn't parse. */
   function buildTargetConfig(): Record<string, unknown> | null {
     switch (targetType) {
       case "workflow_transition":
@@ -264,9 +523,6 @@ function CronJobsAdminPageContent() {
     }
   }
 
-  // Live validation feedback for `webhook`'s body field as the admin types, separate from
-  // `targetConfigError` (which is only set on submit, for `steps`) since this one's field is
-  // always visible while `targetType === "webhook"`, not gated behind a submit attempt.
   let webhookBodyJsonError = false;
   if (webhookBody.trim().length > 0) {
     try {
@@ -283,7 +539,6 @@ function CronJobsAdminPageContent() {
       setTargetConfigError(t("common.invalidJson"));
       return;
     }
-
     try {
       await createJob.mutateAsync({
         name,
@@ -294,284 +549,270 @@ function CronJobsAdminPageContent() {
         dispatchMode,
         enabled: true,
       });
-      setName("");
-      setCronExpr("");
-      resetTargetConfigFields();
-      await refetch();
+      reset();
+      onCreated();
     } catch {
-      // surfaced via createJob.error below
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (!window.confirm(t("common.deleteConfirm"))) {
-      return;
-    }
-    setRowError(null);
-    try {
-      await deleteJob(id);
-    } catch (err) {
-      setRowError(err instanceof GraphQLError ? err.message : t("common.somethingWentWrong"));
+      // shown from createJob.error
     }
   }
 
   return (
-    <div className="py-8">
-      <h2 className="mb-4 text-xl font-semibold text-foreground">{t("admin.cronJobs.title")}</h2>
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t("admin.cronJobs.createTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-5">
+          {createJob.error ? (
+            <Alert variant="destructive">
+              {createJob.error instanceof GraphQLError
+                ? createJob.error.message
+                : t("common.somethingWentWrong")}
+            </Alert>
+          ) : null}
 
-      <div className="mb-8 flex max-w-[480px] flex-col gap-4">
-        <h4 className="text-base font-medium text-foreground">{t("admin.cronJobs.createTitle")}</h4>
-        {createJob.error ? (
-          <Alert variant="destructive">
-            {createJob.error instanceof GraphQLError
-              ? createJob.error.message
-              : t("common.somethingWentWrong")}
-          </Alert>
-        ) : null}
-        <Input
-          label={t("admin.cronJobs.name")}
-          value={name}
-          onChange={(event) => setName(event.currentTarget.value)}
-        />
-        <Input
-          label={t("admin.cronJobs.cronExpr")}
-          helperText={t("admin.cronJobs.cronExprDescription")}
-          value={cronExpr}
-          onChange={(event) => setCronExpr(event.currentTarget.value)}
-        />
-        <Input
-          label={t("admin.cronJobs.timezone")}
-          value={timezone}
-          onChange={(event) => setTimezone(event.currentTarget.value)}
-        />
-        <Select
-          label={t("admin.cronJobs.targetType")}
-          options={TARGET_TYPES.map((v) => ({ value: v, label: v }))}
-          value={targetType}
-          onValueChange={(value) => setTargetType(value)}
-        />
-        <Select
-          label={t("admin.cronJobs.dispatchMode")}
-          options={DISPATCH_MODES.map((v) => ({ value: v, label: v }))}
-          value={dispatchMode}
-          onValueChange={(value) => setDispatchMode(value)}
-        />
-        <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t("admin.cronJobs.targetConfig")}
-          </span>
-          {targetType === "workflow_transition" ? (
-            <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t("admin.cronJobs.name")} wide>
               <Input
-                label={t("admin.cronJobs.targetEntity")}
-                value={wtEntity}
-                onChange={(event) => setWtEntity(event.currentTarget.value)}
+                aria-label={t("admin.cronJobs.name")}
+                value={name}
+                onChange={(event) => setName(event.currentTarget.value)}
               />
+            </Field>
+            <Field
+              label={t("admin.cronJobs.cronExpr")}
+              hint={t("admin.cronJobs.cronExprDescription")}
+            >
               <Input
-                label={t("admin.cronJobs.targetRecordId")}
-                value={wtRecordId}
-                onChange={(event) => setWtRecordId(event.currentTarget.value)}
+                aria-label={t("admin.cronJobs.cronExpr")}
+                className="font-mono"
+                placeholder="0 */15 * * * *"
+                value={cronExpr}
+                onChange={(event) => setCronExpr(event.currentTarget.value)}
               />
+            </Field>
+            <Field label={t("admin.cronJobs.timezone")} hint={t("admin.cronJobs.timezoneHint")}>
               <Input
-                label={t("admin.cronJobs.targetAction")}
-                value={wtAction}
-                onChange={(event) => setWtAction(event.currentTarget.value)}
+                aria-label={t("admin.cronJobs.timezone")}
+                value={timezone}
+                onChange={(event) => setTimezone(event.currentTarget.value)}
               />
-            </>
-          ) : null}
-          {targetType === "bulk_query_action" ? (
-            <>
-              <Input
-                label={t("admin.cronJobs.targetEntity")}
-                value={bqaEntity}
-                onChange={(event) => setBqaEntity(event.currentTarget.value)}
-              />
-              <Input
-                label={t("admin.cronJobs.targetAction")}
-                value={bqaAction}
-                onChange={(event) => setBqaAction(event.currentTarget.value)}
-              />
-              <span className="text-xs text-muted-foreground">
-                {t("admin.cronJobs.targetFilters")}
-              </span>
-              <KeyValueListEditor
-                rows={bqaFilters}
-                onChange={setBqaFilters}
-                keyLabel={t("admin.cronJobs.filterField")}
-                valueLabel={t("admin.cronJobs.filterValue")}
-                addLabel={t("admin.cronJobs.addFilter")}
-                removeLabel={t("common.delete")}
-              />
-            </>
-          ) : null}
-          {targetType === "webhook" ? (
-            <>
-              <Input
-                label={t("admin.cronJobs.targetUrl")}
-                value={webhookUrl}
-                onChange={(event) => setWebhookUrl(event.currentTarget.value)}
-              />
+            </Field>
+            <Field label={t("admin.cronJobs.targetType")}>
               <Select
-                label={t("admin.cronJobs.targetMethod")}
-                options={HTTP_METHODS.map((v) => ({ value: v, label: v }))}
-                value={webhookMethod}
-                onValueChange={(value) => setWebhookMethod(value)}
+                aria-label={t("admin.cronJobs.targetType")}
+                options={TARGET_TYPES.map((v) => ({
+                  value: v,
+                  label: t(`admin.cronJobs.type_${v}`, { defaultValue: v }),
+                }))}
+                value={targetType}
+                onValueChange={setTargetType}
               />
-              <span className="text-xs text-muted-foreground">
-                {t("admin.cronJobs.targetHeaders")}
+            </Field>
+            <Field
+              label={t("admin.cronJobs.dispatchMode")}
+              hint={t(`admin.cronJobs.dispatch_${dispatchMode}_hint`, { defaultValue: "" })}
+            >
+              <Select
+                aria-label={t("admin.cronJobs.dispatchMode")}
+                options={DISPATCH_MODES.map((v) => ({
+                  value: v,
+                  label: t(`admin.cronJobs.dispatch_${v}`, { defaultValue: v }),
+                }))}
+                value={dispatchMode}
+                onValueChange={setDispatchMode}
+              />
+            </Field>
+          </div>
+
+          <div className="rounded-lg border border-border">
+            <div className="border-b border-border px-4 py-2 text-sm font-semibold">
+              {t("admin.cronJobs.target")}:{" "}
+              <span className="font-normal text-muted-foreground">
+                {t(`admin.cronJobs.type_${targetType}`, { defaultValue: targetType })}
               </span>
-              <KeyValueListEditor
-                rows={webhookHeaders}
-                onChange={setWebhookHeaders}
-                keyLabel={t("admin.cronJobs.headerName")}
-                valueLabel={t("admin.cronJobs.headerValue")}
-                addLabel={t("admin.cronJobs.addHeader")}
-                removeLabel={t("common.delete")}
-              />
-              <Textarea
-                label={t("admin.cronJobs.targetBody")}
-                helperText={t("admin.cronJobs.targetBodyDescription")}
-                value={webhookBody}
-                onChange={(event) => setWebhookBody(event.currentTarget.value)}
-                error={webhookBodyJsonError ? t("common.invalidJson") : undefined}
-                rows={2}
-              />
-              <Toggle
-                checked={webhookAuthFromSecret}
-                onCheckedChange={setWebhookAuthFromSecret}
-                label={t("admin.cronJobs.targetAuthFromSecret")}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("admin.cronJobs.targetAuthFromSecretDescription")}
-              </p>
-            </>
-          ) : null}
-          {targetType === "email" ? (
-            <>
-              <Input
-                label={t("admin.cronJobs.targetEmailTo")}
-                helperText={t("admin.cronJobs.targetEmailToDescription")}
-                value={emailTo}
-                onChange={(event) => setEmailTo(event.currentTarget.value)}
-              />
-              <Input
-                label={t("admin.cronJobs.targetEmailSubject")}
-                value={emailSubject}
-                onChange={(event) => setEmailSubject(event.currentTarget.value)}
-              />
-              <Textarea
-                label={t("admin.cronJobs.targetEmailBody")}
-                value={emailBody}
-                onChange={(event) => setEmailBody(event.currentTarget.value)}
-                rows={3}
-              />
-            </>
-          ) : null}
-          {targetType === "steps" ? (
-            <Textarea
-              label={t("admin.cronJobs.targetConfig")}
-              helperText={t("admin.cronJobs.targetStepsDescription")}
-              value={stepsJson}
-              onChange={(event) => setStepsJson(event.currentTarget.value)}
-              error={targetConfigError ?? undefined}
-              rows={6}
-            />
-          ) : null}
-        </div>
-        <Button
-          onClick={() => void handleCreate()}
-          disabled={name.trim().length === 0 || cronExpr.trim().length === 0}
-          loading={createJob.isPending}
-        >
-          {t("common.new")}
-        </Button>
-      </div>
-
-      {rowError ? (
-        <Alert variant="destructive" className="mb-4 flex items-center justify-between gap-2">
-          <span>{rowError}</span>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            aria-label="Dismiss"
-            onClick={() => setRowError(null)}
-            icon={
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-              </svg>
-            }
-          />
-        </Alert>
-      ) : null}
-
-      {isLoading ? (
-        <Spinner />
-      ) : error ? (
-        <ApiErrorMessage error={error} />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("admin.cronJobs.name")}</TableHead>
-              <TableHead>{t("admin.cronJobs.cronExpr")}</TableHead>
-              <TableHead>{t("admin.cronJobs.timezone")}</TableHead>
-              <TableHead>{t("admin.cronJobs.targetType")}</TableHead>
-              <TableHead>{t("admin.cronJobs.dispatchMode")}</TableHead>
-              <TableHead>{t("admin.cronJobs.nextRunAt")}</TableHead>
-              <TableHead>{t("admin.cronJobs.enabled")}</TableHead>
-              <TableHead>{t("common.actions")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(jobs ?? []).map((job) => (
-              <Fragment key={job.id}>
-                <TableRow>
-                  <TableCell>{job.name}</TableCell>
-                  <TableCell>{job.cronExpr}</TableCell>
-                  <TableCell>{job.timezone}</TableCell>
-                  <TableCell>{job.targetType}</TableCell>
-                  <TableCell>{job.dispatchMode}</TableCell>
-                  <TableCell>{job.nextRunAt}</TableCell>
-                  <TableCell>
-                    <Toggle checked={job.enabled} onCheckedChange={() => void toggleEnabled(job)} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setExpandedJobId((current) => (current === job.id ? null : job.id))
-                        }
-                      >
-                        {expandedJobId === job.id
-                          ? t("workflow.hide")
-                          : t("admin.cronJobs.runs.title")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => void handleDelete(job.id)}
-                      >
-                        {t("common.delete")}
-                      </Button>
+            </div>
+            <div className="grid gap-4 p-4 sm:grid-cols-2">
+              {targetType === "workflow_transition" ? (
+                <>
+                  <Field label={t("admin.cronJobs.targetEntity")}>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetEntity")}
+                      placeholder="waf.zones"
+                      value={wtEntity}
+                      onChange={(event) => setWtEntity(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetAction")}>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetAction")}
+                      value={wtAction}
+                      onChange={(event) => setWtAction(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetRecordId")} wide>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetRecordId")}
+                      className="font-mono"
+                      value={wtRecordId}
+                      onChange={(event) => setWtRecordId(event.currentTarget.value)}
+                    />
+                  </Field>
+                </>
+              ) : null}
+              {targetType === "bulk_query_action" ? (
+                <>
+                  <Field label={t("admin.cronJobs.targetEntity")}>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetEntity")}
+                      placeholder="waf.zones"
+                      value={bqaEntity}
+                      onChange={(event) => setBqaEntity(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetAction")}>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetAction")}
+                      value={bqaAction}
+                      onChange={(event) => setBqaAction(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetFilters")} wide>
+                    <KeyValueListEditor
+                      rows={bqaFilters}
+                      onChange={setBqaFilters}
+                      keyLabel={t("admin.cronJobs.filterField")}
+                      valueLabel={t("admin.cronJobs.filterValue")}
+                      addLabel={t("admin.cronJobs.addFilter")}
+                      removeLabel={t("common.delete")}
+                    />
+                  </Field>
+                </>
+              ) : null}
+              {targetType === "webhook" ? (
+                <>
+                  <div className="grid gap-2 sm:col-span-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                    <Field label={t("admin.cronJobs.targetMethod")}>
+                      <Select
+                        aria-label={t("admin.cronJobs.targetMethod")}
+                        options={HTTP_METHODS.map((v) => ({ value: v, label: v }))}
+                        value={webhookMethod}
+                        onValueChange={setWebhookMethod}
+                      />
+                    </Field>
+                    <Field label={t("admin.cronJobs.targetUrl")}>
+                      <Input
+                        aria-label={t("admin.cronJobs.targetUrl")}
+                        placeholder="https://"
+                        value={webhookUrl}
+                        onChange={(event) => setWebhookUrl(event.currentTarget.value)}
+                      />
+                    </Field>
+                  </div>
+                  <Field label={t("admin.cronJobs.targetHeaders")} wide>
+                    <KeyValueListEditor
+                      rows={webhookHeaders}
+                      onChange={setWebhookHeaders}
+                      keyLabel={t("admin.cronJobs.headerName")}
+                      valueLabel={t("admin.cronJobs.headerValue")}
+                      addLabel={t("admin.cronJobs.addHeader")}
+                      removeLabel={t("common.delete")}
+                    />
+                  </Field>
+                  <Field
+                    label={t("admin.cronJobs.targetBody")}
+                    hint={t("admin.cronJobs.targetBodyDescription")}
+                    wide
+                  >
+                    <Textarea
+                      aria-label={t("admin.cronJobs.targetBody")}
+                      className="font-mono text-xs"
+                      value={webhookBody}
+                      onChange={(event) => setWebhookBody(event.currentTarget.value)}
+                      error={webhookBodyJsonError ? t("common.invalidJson") : undefined}
+                      rows={3}
+                    />
+                  </Field>
+                  <div className="flex items-start justify-between gap-4 sm:col-span-2">
+                    <div>
+                      <div className="text-sm font-medium">
+                        {t("admin.cronJobs.targetAuthFromSecret")}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {t("admin.cronJobs.targetAuthFromSecretDescription")}
+                      </p>
                     </div>
-                  </TableCell>
-                </TableRow>
-                {expandedJobId === job.id ? (
-                  <TableRow>
-                    <TableCell colSpan={8}>
-                      <CronJobRuns jobId={job.id} />
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </Fragment>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
+                    <Toggle
+                      checked={webhookAuthFromSecret}
+                      onCheckedChange={setWebhookAuthFromSecret}
+                      aria-label={t("admin.cronJobs.targetAuthFromSecret")}
+                    />
+                  </div>
+                </>
+              ) : null}
+              {targetType === "email" ? (
+                <>
+                  <Field
+                    label={t("admin.cronJobs.targetEmailTo")}
+                    hint={t("admin.cronJobs.targetEmailToDescription")}
+                    wide
+                  >
+                    <Input
+                      aria-label={t("admin.cronJobs.targetEmailTo")}
+                      value={emailTo}
+                      onChange={(event) => setEmailTo(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetEmailSubject")} wide>
+                    <Input
+                      aria-label={t("admin.cronJobs.targetEmailSubject")}
+                      value={emailSubject}
+                      onChange={(event) => setEmailSubject(event.currentTarget.value)}
+                    />
+                  </Field>
+                  <Field label={t("admin.cronJobs.targetEmailBody")} wide>
+                    <Textarea
+                      aria-label={t("admin.cronJobs.targetEmailBody")}
+                      value={emailBody}
+                      onChange={(event) => setEmailBody(event.currentTarget.value)}
+                      rows={4}
+                    />
+                  </Field>
+                </>
+              ) : null}
+              {targetType === "steps" ? (
+                <Field
+                  label={t("admin.cronJobs.targetConfig")}
+                  hint={t("admin.cronJobs.targetStepsDescription")}
+                  wide
+                >
+                  <Textarea
+                    aria-label={t("admin.cronJobs.targetConfig")}
+                    className="font-mono text-xs"
+                    value={stepsJson}
+                    onChange={(event) => setStepsJson(event.currentTarget.value)}
+                    error={targetConfigError ?? undefined}
+                    rows={8}
+                  />
+                </Field>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={close}>
+            {t("shell.cancel")}
+          </Button>
+          <Button
+            onClick={() => void handleCreate()}
+            disabled={name.trim().length === 0 || cronExpr.trim().length === 0}
+            loading={createJob.isPending}
+          >
+            {t("admin.cronJobs.create")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
