@@ -32,12 +32,22 @@ export function fromGrantSet(set: Set<string>): RoleGrant[] {
   });
 }
 
+// The matrix asks for an entity's workflow actions and action keys many times per render (every
+// row, every cell); they depend only on the entity's metadata, so compute them once per entity
+// object. The results are shared: callers must not mutate them.
+const workflowActionsCache = new WeakMap<EntitySummary, { action: string; label: string }[]>();
+const actionKeysCache = new WeakMap<EntitySummary, readonly string[]>();
+
 export function workflowActions(entity: EntitySummary): { action: string; label: string }[] {
+  const cached = workflowActionsCache.get(entity);
+  if (cached) return cached;
   const seen = new Map<string, string>();
   for (const t of entity.workflow?.transitions ?? []) {
     if (!seen.has(t.action)) seen.set(t.action, t.label || t.action);
   }
-  return [...seen].map(([action, label]) => ({ action, label }));
+  const actions = [...seen].map(([action, label]) => ({ action, label }));
+  workflowActionsCache.set(entity, actions);
+  return actions;
 }
 
 export function transitionAction(action: string): string {
@@ -46,12 +56,26 @@ export function transitionAction(action: string): string {
 
 /** Every action key an entity can be granted: base actions, plus `transition` and one
  *  `transition:<action>` per workflow action when it has a workflow. */
-export function entityActionKeys(entity: EntitySummary): string[] {
+export function entityActionKeys(entity: EntitySummary): readonly string[] {
+  const cached = actionKeysCache.get(entity);
+  if (cached) return cached;
   const keys: string[] = [...BASE_ACTIONS];
   if (entity.workflow) {
     keys.push(TRANSITION, ...workflowActions(entity).map((w) => transitionAction(w.action)));
   }
+  actionKeysCache.set(entity, keys);
   return keys;
+}
+
+/** Which of an entity's grants are held, as a string: two sets with the same signature for an
+ *  entity render that entity's row identically, so a row can skip rendering when it is unchanged
+ *  (the grant set itself is a new object on every edit, whichever row it touched). */
+export function entityGrantSignature(set: Set<string>, entity: EntitySummary): string {
+  let signature = "";
+  for (const action of entityActionKeys(entity)) {
+    signature += set.has(grantKey(entity.name, action)) ? "1" : "0";
+  }
+  return signature;
 }
 
 /** How many of an entity's workflow actions are allowed: all when `transition` is granted. */

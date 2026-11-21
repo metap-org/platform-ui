@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -34,6 +34,7 @@ import {
   changeCount,
   columnState,
   defaultGroupFor,
+  entityGrantSignature,
   fromGrantSet,
   grantKey,
   matchingPreset,
@@ -59,6 +60,19 @@ export type RolePermissionsEditorProps = {
   advancedHref?: (entity: string) => string;
 };
 
+/** An edit to the draft, applied to the latest draft (not to the set a row last rendered with, which
+ *  is stale once another row changed — rows only re-render when their own grants change). */
+type Update = (edit: (current: Set<string>) => Set<string>) => void;
+
+const NO_POLICIES: RolePolicy[] = [];
+
+function presetOptions(t: (key: string) => string, custom: boolean) {
+  return [
+    ...(custom ? [{ value: "custom", label: t("admin.rolePermissions.presetCustom") }] : []),
+    ...PRESETS.map((p) => ({ value: p, label: t(`admin.rolePermissions.preset_${p}`) })),
+  ];
+}
+
 function WorkflowCell({
   entity,
   draft,
@@ -66,7 +80,7 @@ function WorkflowCell({
 }: {
   entity: EntitySummary;
   draft: Set<string>;
-  onChange: (next: Set<string>) => void;
+  onChange: Update;
 }) {
   const { t } = useTranslation();
   if (!entity.workflow) return <span className="text-center text-muted-foreground">–</span>;
@@ -78,7 +92,7 @@ function WorkflowCell({
         aria-label={t("admin.rolePermissions.workflowAll")}
         checked={allowed > 0 && allowed === total}
         indeterminate={allowed > 0 && allowed < total}
-        onCheckedChange={(checked) => onChange(setWorkflowAll(draft, entity, checked))}
+        onCheckedChange={(checked) => onChange((cur) => setWorkflowAll(cur, entity, checked))}
       />
       <Popover>
         <PopoverTrigger asChild>
@@ -101,7 +115,7 @@ function WorkflowCell({
                 label={w.label}
                 checked={all || draft.has(grantKey(entity.name, transitionAction(w.action)))}
                 onCheckedChange={(checked) =>
-                  onChange(setWorkflowAction(draft, entity, w.action, checked))
+                  onChange((cur) => setWorkflowAction(cur, entity, w.action, checked))
                 }
               />
             ))}
@@ -168,10 +182,195 @@ function AdvancedMarker({ policies, href }: { policies: RolePolicy[]; href: stri
   );
 }
 
+type RowProps = {
+  entity: EntitySummary;
+  label: string;
+  current: Set<string>;
+  advanced: RolePolicy[];
+  href: string;
+  onChange: Update;
+};
+
+/** One entity's row. Memoized on what it shows: the entity, its own grants (by signature) and its
+ *  advanced policies — ticking a box in one row does not render the others. */
+const EntityRow = memo(
+  function EntityRow({ entity, label, current, advanced, href, onChange }: RowProps) {
+    const { t } = useTranslation();
+    const preset = matchingPreset(current, entity);
+    const custom = preset === null;
+    const options = useMemo(() => presetOptions(t, custom), [t, custom]);
+    return (
+      <div className={`${GRID} px-3 py-1 hover:bg-muted/20`}>
+        <span className="min-w-0 truncate pl-5" title={entity.name}>
+          {label}
+        </span>
+        <Select
+          className="h-7 px-2 text-xs"
+          aria-label={t("admin.rolePermissions.rowPreset", { entity: label })}
+          options={options}
+          value={preset ?? "custom"}
+          onValueChange={(value) => {
+            if (value !== "custom") onChange((cur) => applyPreset(cur, entity, value as Preset));
+          }}
+        />
+        {BASE_ACTIONS.map((action) => {
+          const key = grantKey(entity.name, action);
+          return (
+            <span key={action} className="flex justify-center">
+              <Checkbox
+                aria-label={`${label}: ${t(`admin.rolePermissions.action_${action}`)}`}
+                checked={current.has(key)}
+                onCheckedChange={(checked) =>
+                  onChange((cur) => {
+                    const next = new Set(cur);
+                    if (checked) next.add(key);
+                    else next.delete(key);
+                    return next;
+                  })
+                }
+              />
+            </span>
+          );
+        })}
+        <WorkflowCell entity={entity} draft={current} onChange={onChange} />
+        <AdvancedMarker policies={advanced} href={href} />
+      </div>
+    );
+  },
+  (a, b) =>
+    a.entity === b.entity &&
+    a.label === b.label &&
+    a.advanced === b.advanced &&
+    a.href === b.href &&
+    a.onChange === b.onChange &&
+    entityGrantSignature(a.current, a.entity) === entityGrantSignature(b.current, b.entity),
+);
+
+type GroupProps = {
+  group: string;
+  members: EntitySummary[];
+  collapsed: boolean;
+  current: Set<string>;
+  advancedByEntity: Map<string, RolePolicy[]>;
+  labelFor: (entity: EntitySummary) => string;
+  getHref: (entity: string) => string;
+  onChange: Update;
+  onToggle: (group: string) => void;
+};
+
+function groupSignature(current: Set<string>, members: EntitySummary[]): string {
+  return members.map((e) => entityGrantSignature(current, e)).join("|");
+}
+
+function sameMembers(a: EntitySummary[], b: EntitySummary[]): boolean {
+  return a === b || (a.length === b.length && a.every((e, i) => e === b[i]));
+}
+
+/** A group's header (its preset and column toggles) and rows; renders again only when its own
+ *  members' grants, collapsed state or advanced policies change. */
+const PermissionGroup = memo(
+  function PermissionGroup({
+    group,
+    members,
+    collapsed,
+    current,
+    advancedByEntity,
+    labelFor,
+    getHref,
+    onChange,
+    onToggle,
+  }: GroupProps) {
+    const { t } = useTranslation();
+    const first = matchingPreset(current, members[0]!);
+    const groupPreset = members.every((e) => matchingPreset(current, e) === first) ? first : null;
+    const custom = groupPreset === null;
+    const options = useMemo(() => presetOptions(t, custom), [t, custom]);
+    return (
+      <div className="border-b border-border last:border-b-0">
+        <div className={`${GRID} bg-muted/40 px-3 py-1.5`}>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-left font-semibold"
+            aria-expanded={!collapsed}
+            onClick={() => onToggle(group)}
+          >
+            <span className="text-xs text-muted-foreground">{collapsed ? "▸" : "▾"}</span>
+            {group}
+            <span className="text-xs font-normal text-muted-foreground">({members.length})</span>
+          </button>
+          <Select
+            className="h-7 px-2 text-xs"
+            aria-label={t("admin.rolePermissions.groupPreset", { group })}
+            options={options}
+            value={groupPreset ?? "custom"}
+            onValueChange={(value) => {
+              if (value === "custom") return;
+              onChange((cur) => {
+                let next = cur;
+                for (const e of members) next = applyPreset(next, e, value as Preset);
+                return next;
+              });
+            }}
+          />
+          {COLUMNS.map((action) => {
+            const state = columnState(current, members, action);
+            const relevant = action !== TRANSITION || members.some((e) => e.workflow);
+            return (
+              <span key={action} className="flex justify-center">
+                {relevant ? (
+                  <Checkbox
+                    aria-label={t("admin.rolePermissions.groupColumn", {
+                      group,
+                      action: t(`admin.rolePermissions.action_${action}`),
+                    })}
+                    checked={state === true}
+                    indeterminate={state === "mixed"}
+                    onCheckedChange={(checked) =>
+                      onChange((cur) => setColumn(cur, members, action, checked))
+                    }
+                  />
+                ) : null}
+              </span>
+            );
+          })}
+          <span />
+        </div>
+        {collapsed
+          ? null
+          : members.map((entity) => (
+              <EntityRow
+                key={entity.name}
+                entity={entity}
+                label={labelFor(entity)}
+                current={current}
+                advanced={advancedByEntity.get(entity.name) ?? NO_POLICIES}
+                href={getHref(entity.name)}
+                onChange={onChange}
+              />
+            ))}
+      </div>
+    );
+  },
+  (a, b) =>
+    a.group === b.group &&
+    a.collapsed === b.collapsed &&
+    a.advancedByEntity === b.advancedByEntity &&
+    a.labelFor === b.labelFor &&
+    a.getHref === b.getHref &&
+    a.onChange === b.onChange &&
+    a.onToggle === b.onToggle &&
+    sameMembers(a.members, b.members) &&
+    groupSignature(a.current, a.members) === groupSignature(b.current, b.members),
+);
+
 /** One role's permissions on every entity, on one screen (roadmap 114): grouped rows, per-row and
  *  per-group presets, column toggles per group, single workflow actions, a marker on entities with
  *  advanced (conditional/field/deny) policies, and one Save for every change. Key it by the role
- *  name: the unsaved draft belongs to one role. */
+ *  name: the unsaved draft belongs to one role.
+ *
+ *  Rendering is kept cheap on purpose: the matrix has a Radix Select, four checkboxes and two
+ *  popovers per entity, so an edit must not render every row (see EntityRow / PermissionGroup),
+ *  and typing in the search box filters from a deferred value. */
 export function RolePermissionsEditor({
   role,
   groupFor = defaultGroupFor,
@@ -184,6 +383,7 @@ export function RolePermissionsEditor({
   const { setRolePermissions } = useRoleAdminActions();
   const [draft, setDraft] = useState<Set<string> | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [onlyGranted, setOnlyGranted] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -193,7 +393,36 @@ export function RolePermissionsEditor({
   const savedSet = useMemo(() => toGrantSet(saved?.grants ?? []), [saved]);
   const current = draft ?? savedSet;
   const changes = draft ? changeCount(savedSet, draft) : 0;
-  const hrefFor = advancedHref ?? ((e: string) => policiesEntityHref(e, "advanced"));
+
+  // Stable handlers for the memoized rows: they read the latest values from refs, so their
+  // identity never changes and an edit applies to the latest draft.
+  const savedSetRef = useRef(savedSet);
+  const advancedHrefRef = useRef(advancedHref);
+  useEffect(() => {
+    savedSetRef.current = savedSet;
+    advancedHrefRef.current = advancedHref;
+  });
+  const update = useCallback<Update>((edit) => {
+    setSaveError(null);
+    setDraft((prev) => edit(prev ?? savedSetRef.current));
+  }, []);
+  const getHref = useCallback(
+    (entity: string) =>
+      (advancedHrefRef.current ?? ((e: string) => policiesEntityHref(e, "advanced")))(entity),
+    [],
+  );
+  const toggleGroup = useCallback((group: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  }, []);
+  const labelFor = useCallback(
+    (e: EntitySummary) => getEntityLabel(i18n.language, e.name, e.label),
+    [i18n.language],
+  );
 
   // Unsaved changes survive nothing but a save: warn before the tab closes.
   useEffect(() => {
@@ -209,24 +438,29 @@ export function RolePermissionsEditor({
     return map;
   }, [saved]);
 
-  const label = (e: EntitySummary) => getEntityLabel(i18n.language, e.name, e.label);
+  // Entities holding any grant, computed once per edit (only when the filter is on) rather than
+  // scanning every grant for every entity.
+  const grantedEntities = useMemo(() => {
+    if (!onlyGranted) return null;
+    const names = new Set<string>();
+    for (const key of current) names.add(key.slice(0, key.indexOf(" ")));
+    return names;
+  }, [onlyGranted, current]);
+
   const groups = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     const map = new Map<string, EntitySummary[]>();
     for (const e of entities ?? []) {
-      const text = `${e.name} ${getEntityLabel(i18n.language, e.name, e.label)}`.toLowerCase();
-      if (q && !text.includes(q)) continue;
-      if (
-        onlyGranted &&
-        ![...current].some((k) => k.startsWith(`${e.name} `)) &&
-        !advancedByEntity.has(e.name)
-      )
+      if (q && !`${e.name} ${labelFor(e)}`.toLowerCase().includes(q)) continue;
+      if (grantedEntities && !grantedEntities.has(e.name) && !advancedByEntity.has(e.name))
         continue;
       const g = groupFor(e);
-      map.set(g, [...(map.get(g) ?? []), e]);
+      const list = map.get(g);
+      if (list) list.push(e);
+      else map.set(g, [e]);
     }
     return [...map].sort(([a], [b]) => a.localeCompare(b));
-  }, [entities, search, onlyGranted, current, advancedByEntity, groupFor, i18n.language]);
+  }, [entities, deferredSearch, grantedEntities, advancedByEntity, groupFor, labelFor]);
 
   if (role.name === "admin") {
     return <Alert className="mt-2">{t("admin.rolePermissions.adminBypass")}</Alert>;
@@ -234,11 +468,6 @@ export function RolePermissionsEditor({
   if (entitiesLoading || isLoading) return <Spinner />;
   if (entitiesError) return <ApiErrorMessage error={entitiesError} />;
   if (error) return <ApiErrorMessage error={error} />;
-
-  const update = (next: Set<string>) => {
-    setSaveError(null);
-    setDraft(next);
-  };
 
   async function handleSave() {
     if (!draft) return;
@@ -263,7 +492,8 @@ export function RolePermissionsEditor({
     setCopying(true);
     try {
       const other = await fetchRolePermissions(from);
-      update(toGrantSet(other.grants));
+      const copied = toGrantSet(other.grants);
+      update(() => copied);
       toast(t("admin.rolePermissions.copied", { name: from }));
     } catch (err) {
       toast(err instanceof Error ? err.message : t("common.somethingWentWrong"), {
@@ -273,11 +503,6 @@ export function RolePermissionsEditor({
       setCopying(false);
     }
   }
-
-  const presetOptions = (custom: boolean) => [
-    ...(custom ? [{ value: "custom", label: t("admin.rolePermissions.presetCustom") }] : []),
-    ...PRESETS.map((p) => ({ value: p, label: t(`admin.rolePermissions.preset_${p}`) })),
-  ];
 
   return (
     <div className="flex flex-col gap-3 pt-2">
@@ -349,119 +574,20 @@ export function RolePermissionsEditor({
               {t("admin.rolePermissions.noEntities")}
             </p>
           ) : null}
-          {groups.map(([group, members]) => {
-            const isCollapsed = collapsed.has(group);
-            const groupPreset = members.every(
-              (e) => matchingPreset(current, e) === matchingPreset(current, members[0]!),
-            )
-              ? matchingPreset(current, members[0]!)
-              : null;
-            return (
-              <div key={group} className="border-b border-border last:border-b-0">
-                <div className={`${GRID} bg-muted/40 px-3 py-1.5`}>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 text-left font-semibold"
-                    aria-expanded={!isCollapsed}
-                    onClick={() =>
-                      setCollapsed((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(group)) next.delete(group);
-                        else next.add(group);
-                        return next;
-                      })
-                    }
-                  >
-                    <span className="text-xs text-muted-foreground">{isCollapsed ? "▸" : "▾"}</span>
-                    {group}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      ({members.length})
-                    </span>
-                  </button>
-                  <Select
-                    className="h-7 px-2 text-xs"
-                    aria-label={t("admin.rolePermissions.groupPreset", { group })}
-                    options={presetOptions(groupPreset === null)}
-                    value={groupPreset ?? "custom"}
-                    onValueChange={(value) => {
-                      if (value === "custom") return;
-                      let next = current;
-                      for (const e of members) next = applyPreset(next, e, value as Preset);
-                      update(next);
-                    }}
-                  />
-                  {COLUMNS.map((action) => {
-                    const state = columnState(current, members, action);
-                    const relevant = action !== TRANSITION || members.some((e) => e.workflow);
-                    return (
-                      <span key={action} className="flex justify-center">
-                        {relevant ? (
-                          <Checkbox
-                            aria-label={t("admin.rolePermissions.groupColumn", {
-                              group,
-                              action: t(`admin.rolePermissions.action_${action}`),
-                            })}
-                            checked={state === true}
-                            indeterminate={state === "mixed"}
-                            onCheckedChange={(checked) =>
-                              update(setColumn(current, members, action, checked))
-                            }
-                          />
-                        ) : null}
-                      </span>
-                    );
-                  })}
-                  <span />
-                </div>
-                {isCollapsed
-                  ? null
-                  : members.map((entity) => {
-                      const preset = matchingPreset(current, entity);
-                      return (
-                        <div key={entity.name} className={`${GRID} px-3 py-1 hover:bg-muted/20`}>
-                          <span className="min-w-0 truncate pl-5" title={entity.name}>
-                            {label(entity)}
-                          </span>
-                          <Select
-                            className="h-7 px-2 text-xs"
-                            aria-label={t("admin.rolePermissions.rowPreset", {
-                              entity: label(entity),
-                            })}
-                            options={presetOptions(preset === null)}
-                            value={preset ?? "custom"}
-                            onValueChange={(value) => {
-                              if (value !== "custom")
-                                update(applyPreset(current, entity, value as Preset));
-                            }}
-                          />
-                          {BASE_ACTIONS.map((action) => {
-                            const key = grantKey(entity.name, action);
-                            return (
-                              <span key={action} className="flex justify-center">
-                                <Checkbox
-                                  aria-label={`${label(entity)}: ${t(`admin.rolePermissions.action_${action}`)}`}
-                                  checked={current.has(key)}
-                                  onCheckedChange={(checked) => {
-                                    const next = new Set(current);
-                                    if (checked) next.add(key);
-                                    else next.delete(key);
-                                    update(next);
-                                  }}
-                                />
-                              </span>
-                            );
-                          })}
-                          <WorkflowCell entity={entity} draft={current} onChange={update} />
-                          <AdvancedMarker
-                            policies={advancedByEntity.get(entity.name) ?? []}
-                            href={hrefFor(entity.name)}
-                          />
-                        </div>
-                      );
-                    })}
-              </div>
-            );
-          })}
+          {groups.map(([group, members]) => (
+            <PermissionGroup
+              key={group}
+              group={group}
+              members={members}
+              collapsed={collapsed.has(group)}
+              current={current}
+              advancedByEntity={advancedByEntity}
+              labelFor={labelFor}
+              getHref={getHref}
+              onChange={update}
+              onToggle={toggleGroup}
+            />
+          ))}
         </div>
       </div>
       <p className="text-xs text-muted-foreground">{t("admin.rolePermissions.footerHint")}</p>
