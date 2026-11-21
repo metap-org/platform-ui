@@ -2,6 +2,7 @@ import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import type { WorkflowTransition } from "../metadata/types";
 import type { TransitionAvailability } from "../detail/recordCapabilities";
+import { guardReason } from "./guardMessage";
 
 /** The row of "from → to" transition buttons — extracted out of `WorkflowActionBar` so
  * `WorkflowDiagram`'s dialog can show the exact same buttons (same disabled/tooltip logic) next
@@ -52,7 +53,7 @@ export function TransitionButtons({
             <TooltipTrigger asChild>
               <span>{button}</span>
             </TooltipTrigger>
-            <TooltipContent>{info.reason ?? ""}</TooltipContent>
+            <TooltipContent>{guardReason(t, info) ?? ""}</TooltipContent>
           </Tooltip>
         );
       })}

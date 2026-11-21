@@ -10,6 +10,7 @@ import {
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { transitionRecord, useInvalidateRecords } from "../api/records";
+import { guardErrorMessage } from "./guardMessage";
 import { ApiError } from "../api/client";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import type { EntityWorkflow } from "../metadata/types";
@@ -65,7 +66,9 @@ export function WorkflowActionBar({
       invalidateRecords();
       onTransitioned(response.data);
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : t("common.somethingWentWrong"));
+      setActionError(
+        error instanceof ApiError ? guardErrorMessage(t, error) : t("common.somethingWentWrong"),
+      );
     } finally {
       setPendingAction(null);
     }

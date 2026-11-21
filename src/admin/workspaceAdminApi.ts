@@ -35,6 +35,8 @@ export type ConfigItem = {
   /** Set for this tenant (otherwise the default applies). */
   overridden: boolean;
   public: boolean;
+  /** A secret's `value` is only a marker, never the secret: show it write-only. */
+  secret?: boolean;
 };
 
 const CONFIG_KEY = ["workspace", "tenantConfig"];

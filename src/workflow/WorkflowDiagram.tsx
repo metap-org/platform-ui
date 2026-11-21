@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@metap/ui";
 import { useTranslation } from "react-i18next";
+import { guardReason } from "./guardMessage";
 import type { EntityWorkflow, WorkflowTransition } from "../metadata/types";
 import type { TransitionAvailability } from "../detail/recordCapabilities";
 import { computeLevels, groupByLevel } from "./layout";
@@ -457,7 +458,14 @@ export function WorkflowDiagram({
                   onMouseEnter={() => setHoveredEdgeKey(key)}
                   onMouseLeave={() => setHoveredEdgeKey((prev) => (prev === key ? null : prev))}
                 >
-                  {blocked ? <title>{transitionInfo.get(transition.action)?.reason}</title> : null}
+                  {blocked ? (
+                    <title>
+                      {(() => {
+                        const info = transitionInfo.get(transition.action);
+                        return info ? guardReason(t, info) : undefined;
+                      })()}
+                    </title>
+                  ) : null}
                   <path d={geometry.path} fill="none" stroke="transparent" strokeWidth={12} />
                   <path
                     d={geometry.path}
