@@ -549,6 +549,11 @@ const en = {
     tenantsDescription:
       "Every tenant on the platform. Suspend, resume or schedule the deletion of one, or create a new tenant with its first admin.",
     tenantCreate: "New tenant",
+    unnamed: "Unnamed",
+    edit: "Edit",
+    editTitle: "Edit tenant",
+    save: "Save",
+    updatedToast: "Tenant updated",
     access: "Access",
     accessTitle: "Access to {{name}}",
     accessHint: "Get into the tenant for support, or move its ownership when its owner is gone.",
@@ -1667,6 +1672,11 @@ const vi = {
     tenantsDescription:
       "Mọi tenant trên nền tảng. Tạm ngưng, tiếp tục hoặc lên lịch xoá một tenant, hoặc tạo tenant mới kèm quản trị viên đầu tiên.",
     tenantCreate: "Tạo tenant",
+    unnamed: "Chưa đặt tên",
+    edit: "Sửa",
+    editTitle: "Sửa tenant",
+    save: "Lưu",
+    updatedToast: "Đã cập nhật tenant",
     access: "Truy cập",
     accessTitle: "Truy cập {{name}}",
     accessHint: "Vào tenant để hỗ trợ, hoặc chuyển quyền owner khi owner không còn.",

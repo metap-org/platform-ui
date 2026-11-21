@@ -157,6 +157,13 @@ function PlatformTenants() {
                 key={tenant.id}
                 tenant={tenant}
                 busy={busyId === tenant.id}
+                onEdit={(change) =>
+                  run(
+                    tenant.id,
+                    () => actions.update(tenant.id, change),
+                    t("platform.updatedToast"),
+                  )
+                }
                 onSuspend={() =>
                   run(tenant.id, () => actions.suspend(tenant.id), t("platform.suspendedToast"))
                 }
@@ -213,6 +220,7 @@ function PlatformTenants() {
 function TenantRow({
   tenant,
   busy,
+  onEdit,
   onSuspend,
   onResume,
   onCancelDeletion,
@@ -220,6 +228,7 @@ function TenantRow({
 }: {
   tenant: TenantDirectoryEntry;
   busy: boolean;
+  onEdit: (change: { name?: string; tier?: string }) => void;
   onSuspend: () => void;
   onResume: () => void;
   onCancelDeletion: () => void;
@@ -228,12 +237,17 @@ function TenantRow({
   const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const [managing, setManaging] = useState(false);
+  const [editing, setEditing] = useState(false);
   const pendingDeletion = Boolean(tenant.deletionEffectiveAt);
   const gone = tenant.status === "deleted";
   return (
     <TableRow>
       <TableCell>
-        <div className="font-medium">{tenant.name || tenant.id}</div>
+        {tenant.name ? (
+          <div className="font-medium">{tenant.name}</div>
+        ) : (
+          <div className="font-medium italic text-muted-foreground">{t("platform.unnamed")}</div>
+        )}
         <div className="font-mono text-xs text-muted-foreground">{tenant.id}</div>
       </TableCell>
       <TableCell>
@@ -255,6 +269,11 @@ function TenantRow({
       </TableCell>
       <TableCell>
         <div className="flex justify-end gap-2">
+          {gone ? null : (
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              {t("platform.edit")}
+            </Button>
+          )}
           {gone ? null : (
             <Button size="sm" variant="outline" onClick={() => setManaging(true)}>
               {t("platform.access")}
@@ -293,6 +312,16 @@ function TenantRow({
             </Button>
           )}
         </div>
+        {editing ? (
+          <EditTenantDialog
+            tenant={tenant}
+            onClose={() => setEditing(false)}
+            onSave={(change) => {
+              setEditing(false);
+              onEdit(change);
+            }}
+          />
+        ) : null}
         {managing ? (
           <TenantAccessDialog tenant={tenant} onClose={() => setManaging(false)} />
         ) : null}
@@ -634,6 +663,57 @@ function TenantAccessDialog({
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t("platform.done")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditTenantDialog({
+  tenant,
+  onClose,
+  onSave,
+}: {
+  tenant: TenantDirectoryEntry;
+  onClose: () => void;
+  onSave: (change: { name?: string; tier?: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState(tenant.name);
+  const [tier, setTier] = useState(tenant.tier);
+  const change = {
+    ...(name.trim() !== tenant.name ? { name: name.trim() } : {}),
+    ...(tier.trim() !== tenant.tier ? { tier: tier.trim() } : {}),
+  };
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("platform.editTitle")}</DialogTitle>
+          <DialogDescription className="font-mono text-xs">{tenant.id}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <Input
+            label={t("platform.createName")}
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+          />
+          <Input
+            label={t("platform.colTier")}
+            value={tier}
+            onChange={(e) => setTier(e.currentTarget.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            disabled={Object.keys(change).length === 0 || !name.trim() || !tier.trim()}
+            onClick={() => onSave(change)}
+          >
+            {t("platform.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

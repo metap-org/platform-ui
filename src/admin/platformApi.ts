@@ -75,6 +75,14 @@ export function usePlatformTenantActions() {
       await refresh();
       return created;
     },
+    /** Renames a tenant and/or changes its tier; an omitted field is left alone. */
+    async update(id: string, change: { name?: string; tier?: string }) {
+      await apiFetch(`/platform/tenants/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(change),
+      });
+      await refresh();
+    },
     suspend: (id: string) => post(`/platform/tenants/${encodeURIComponent(id)}/suspend`),
     resume: (id: string) => post(`/platform/tenants/${encodeURIComponent(id)}/resume`),
     /** Schedules deletion; the tenant is kept for `retentionDays` (server default 30). */
