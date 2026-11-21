@@ -37,6 +37,7 @@ import { relativeTime } from "../lib/dates";
 import { DataList, type DataListColumn } from "../list/DataList";
 import { ConfirmButton } from "./ConfirmButton";
 import { WorkspaceAuditTab } from "./WorkspaceAuditTab";
+import { WorkspaceCredentialsTab } from "./WorkspaceCredentialsTab";
 import { WorkspaceSsoTab } from "./WorkspaceSsoTab";
 import { WorkspaceSupportTab } from "./WorkspaceSupportTab";
 import { roleDisplayName, useRoles, useUsers } from "./userAdminApi";
@@ -58,12 +59,12 @@ import {
 
 /**
  * The tenant admin's own workspace (roadmap 115): security settings (M3, M11), service accounts
- * with API keys (M5), single sign-on (M7), support access (M10), the audit trail (M9) and the
+ * with API keys (M5), credentials (database or secret manager), single sign-on (M7), support access (M10), the audit trail (M9) and the
  * owner (M8). Admin-only, like `UsersAdminPage`. The `tab` the page
  * opens on can be set by the caller (e.g. from the URL).
  */
 export type WorkspaceAdminTab =
-  "security" | "serviceAccounts" | "sso" | "support" | "audit" | "owner";
+  "security" | "serviceAccounts" | "credentials" | "sso" | "support" | "audit" | "owner";
 
 export function WorkspaceAdminPage({
   defaultTab = "security",
@@ -78,6 +79,7 @@ export function WorkspaceAdminPage({
 const TABS: WorkspaceAdminTab[] = [
   "security",
   "serviceAccounts",
+  "credentials",
   "sso",
   "support",
   "audit",
@@ -86,17 +88,24 @@ const TABS: WorkspaceAdminTab[] = [
 const TAB_LABEL_KEYS: Record<WorkspaceAdminTab, string> = {
   security: "workspace.tabSecurity",
   serviceAccounts: "workspace.tabServiceAccounts",
+  credentials: "workspace.tabCredentials",
   sso: "workspace.tabSso",
   support: "workspace.tabSupport",
   audit: "workspace.tabAudit",
   owner: "workspace.tabOwner",
 };
 
+/** `?tab=credentials` opens that section — how other screens link to it. */
+function tabFromUrl(): WorkspaceAdminTab | null {
+  const requested = new URLSearchParams(window.location.search).get("tab");
+  return TABS.find((tab) => tab === requested) ?? null;
+}
+
 /** Sections as a side menu on wide screens (six don't fit side by side), a scrolling strip on
  *  narrow ones; the content takes the rest of the width. */
 function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<WorkspaceAdminTab>(defaultTab);
+  const [tab, setTab] = useState<WorkspaceAdminTab>(() => tabFromUrl() ?? defaultTab);
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -133,6 +142,9 @@ function WorkspaceAdminContent({ defaultTab }: { defaultTab: WorkspaceAdminTab }
         </TabsContent>
         <TabsContent value="serviceAccounts">
           <ServiceAccountsTab />
+        </TabsContent>
+        <TabsContent value="credentials">
+          <WorkspaceCredentialsTab />
         </TabsContent>
         <TabsContent value="sso">
           <WorkspaceSsoTab />
