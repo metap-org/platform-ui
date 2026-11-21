@@ -9,6 +9,9 @@ import {
   SettingsSection,
   Skeleton,
   StickyActionBar,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   TagsInput,
   Toggle,
   toast,
@@ -18,14 +21,17 @@ import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { ApiError } from "../api/client";
 import { useCurrentUser } from "../auth/useCurrentUser";
 import { ConfirmButton } from "./ConfirmButton";
+import { linesFrom, mapFrom, type MapLine } from "./ssoRoleMap";
+import { DomainProofs, RoleMapEditor } from "./ssoShared";
+import { SamlForm } from "./WorkspaceSamlForm";
 import { roleDisplayName, useRoles } from "./userAdminApi";
 import { useOwnerStatus } from "./workspaceAdminApi";
 import {
+  useSamlConfig,
   useSsoActions,
   useSsoConfig,
   type SsoConfig,
   type SsoConfigInput,
-  type SsoDomain,
 } from "./workspaceAdvancedApi";
 
 const DEFAULT_SCOPES = ["openid", "email", "profile"];
@@ -46,100 +52,35 @@ function draftFrom(cfg: SsoConfig): SsoConfigInput {
   };
 }
 
-/** The saved domains and what each still needs: the TXT record to publish, and a check. */
-function DomainProofs({ domains }: { domains: SsoDomain[] }) {
-  const { t } = useTranslation();
-  const actions = useSsoActions();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ domain: string; text: string } | null>(null);
-  if (domains.length === 0) return null;
-
-  async function check(domain: string) {
-    setBusy(domain);
-    setMessage(null);
-    try {
-      await actions.verifyDomain(domain);
-      toast(t("workspace.ssoDomainVerifiedToast", { domain }));
-    } catch (err) {
-      const text =
-        err instanceof ApiError && err.code === "domain_not_verified"
-          ? t("workspace.ssoDomainNotFound", { host: `_metap-verify.${domain}` })
-          : err instanceof ApiError && err.code === "unique_violation"
-            ? t("workspace.ssoDomainClaimed")
-            : err instanceof Error
-              ? err.message
-              : t("common.somethingWentWrong");
-      setMessage({ domain, text });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <ul className="flex w-full flex-col divide-y divide-border rounded-md border border-border">
-      {domains.map((d) => (
-        <li key={d.domain} className="flex flex-col gap-2 p-3">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{d.domain}</span>
-            <Badge variant={d.status === "verified" ? "success-soft" : "warning-soft"}>
-              {d.status === "verified"
-                ? t("workspace.ssoDomainVerified")
-                : t("workspace.ssoDomainPending")}
-            </Badge>
-          </div>
-          {d.status === "pending" ? (
-            <>
-              <p className="text-xs text-muted-foreground">{t("workspace.ssoDomainHow")}</p>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-muted-foreground">{t("workspace.ssoDomainHost")}</dt>
-                <dd className="break-all font-mono">{d.verifyHost}</dd>
-                <dt className="text-muted-foreground">{t("workspace.ssoDomainValue")}</dt>
-                <dd className="break-all font-mono">{d.verifyValue}</dd>
-              </dl>
-              {message && message.domain === d.domain ? (
-                <p className="text-xs text-destructive">{message.text}</p>
-              ) : null}
-              <div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={busy === d.domain}
-                  onClick={() => void check(d.domain)}
-                >
-                  {t("workspace.ssoDomainCheck")}
-                </Button>
-              </div>
-            </>
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** One line of the group-to-role table; the group is edited as text, the role picked. */
-type MapLine = { group: string; role: string };
-
-function linesFrom(map: Record<string, string>): MapLine[] {
-  return Object.entries(map).map(([group, role]) => ({ group, role }));
-}
-
-function mapFrom(lines: MapLine[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of lines) {
-    if (line.group.trim() && line.role) out[line.group.trim()] = line.role;
-  }
-  return out;
-}
-
-/** Single sign-on through the tenant's OIDC identity provider (roadmap 115 M7). */
+/** Single sign-on through the tenant's identity provider: OpenID Connect (roadmap 115 M7) or SAML.
+ *  One protocol is on at a time; the switch only chooses which form to show. */
 export function WorkspaceSsoTab() {
-  const sso = useSsoConfig();
-  if (sso.isLoading) return <Skeleton className="h-72 w-full" />;
-  if (sso.error) return <ApiErrorMessage error={sso.error} />;
-  if (!sso.data) return null;
-  // Keyed on what the server holds, so a save restarts the form from the stored values.
-  return <SsoForm key={JSON.stringify(sso.data)} saved={sso.data} />;
+  const { t } = useTranslation();
+  const oidc = useSsoConfig();
+  const saml = useSamlConfig();
+  const [protocol, setProtocol] = useState<"oidc" | "saml" | null>(null);
+  if (oidc.isLoading || saml.isLoading) return <Skeleton className="h-72 w-full" />;
+  if (oidc.error) return <ApiErrorMessage error={oidc.error} />;
+  if (saml.error) return <ApiErrorMessage error={saml.error} />;
+  if (!oidc.data || !saml.data) return null;
+  // Start on the protocol that is set up (SAML only when OpenID Connect is not).
+  const shown = protocol ?? (saml.data.configured && !oidc.data.configured ? "saml" : "oidc");
+  return (
+    <div className="flex flex-col gap-4">
+      <Tabs value={shown} onValueChange={(v) => setProtocol(v as "oidc" | "saml")}>
+        <TabsList>
+          <TabsTrigger value="oidc">{t("workspace.ssoProtocolOidc")}</TabsTrigger>
+          <TabsTrigger value="saml">{t("workspace.ssoProtocolSaml")}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {/* Keyed on what the server holds, so a save restarts the form from the stored values. */}
+      {shown === "saml" ? (
+        <SamlForm key={JSON.stringify(saml.data)} saved={saml.data} />
+      ) : (
+        <SsoForm key={JSON.stringify(oidc.data)} saved={oidc.data} />
+      )}
+    </div>
+  );
 }
 
 function SsoForm({ saved }: { saved: SsoConfig }) {
@@ -350,65 +291,12 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
             onChange={(e) => set({ roleClaim: e.currentTarget.value })}
           />
         </SettingsRow>
-        <SettingsRow
-          label={t("workspace.ssoRoleMap")}
-          description={t("workspace.ssoRoleMapHint")}
-          controlWidth="wide"
-        >
-          <div className="flex w-full flex-col gap-2">
-            {lines.map((line, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  className="flex-1"
-                  aria-label={t("workspace.ssoRoleMapGroup")}
-                  placeholder={t("workspace.ssoRoleMapGroup")}
-                  value={line.group}
-                  onChange={(e) =>
-                    setLines_(
-                      lines.map((l, i) =>
-                        i === index ? { ...l, group: e.currentTarget.value } : l,
-                      ),
-                    )
-                  }
-                />
-                <div className="w-48">
-                  <Select
-                    lazy
-                    aria-label={t("workspace.ssoRoleMapRole")}
-                    placeholder={t("workspace.ssoRoleMapRole")}
-                    options={(roles ?? [])
-                      .filter((r) => r.name !== "admin" && r.name !== "platform_admin")
-                      .map((r) => ({ value: r.name, label: roleDisplayName(r) }))}
-                    value={line.role || undefined}
-                    onValueChange={(role) =>
-                      setLines_(lines.map((l, i) => (i === index ? { ...l, role } : l)))
-                    }
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t("workspace.ssoRoleMapRemove")}
-                  onClick={() => setLines_(lines.filter((_, i) => i !== index))}
-                >
-                  ×
-                </Button>
-              </div>
-            ))}
-            {fieldErrors.roleMap?.[0] ? (
-              <p className="text-xs text-destructive">{fieldErrors.roleMap[0]}</p>
-            ) : null}
-            <div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setLines_([...lines, { group: "", role: "" }])}
-              >
-                {t("workspace.ssoRoleMapAdd")}
-              </Button>
-            </div>
-          </div>
-        </SettingsRow>
+        <RoleMapEditor
+          lines={lines}
+          onChange={setLines_}
+          roles={roles ?? []}
+          error={fieldErrors.roleMap?.[0]}
+        />
         <SettingsRow
           label={t("workspace.ssoPostLogin")}
           description={t("workspace.ssoPostLoginHint")}

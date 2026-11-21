@@ -40,6 +40,41 @@ export type SsoDomain = {
   verifyValue: string;
 };
 
+export type SamlConfig = {
+  configured: boolean;
+  enabled: boolean;
+  idpMetadataUrl: string;
+  idpEntityId: string;
+  /** The provider's sign-in endpoint, read from its metadata. */
+  idpSsoUrl: string;
+  emailAttribute: string;
+  roleAttribute: string;
+  roleMap: Record<string, string>;
+  emailDomains: string[];
+  defaultRole: string;
+  enforced: boolean;
+  postLoginRedirect: string;
+  /** Register these at the identity provider. */
+  entityId: string;
+  acsUrl: string;
+  metadataUrl: string;
+  domains: SsoDomain[];
+};
+
+export type SamlConfigInput = {
+  /** Metadata as a URL (fetched when saved) or as XML; neither keeps what is stored. */
+  idpMetadataUrl?: string;
+  idpMetadataXml?: string;
+  emailAttribute: string;
+  roleAttribute: string;
+  roleMap: Record<string, string>;
+  emailDomains: string[];
+  defaultRole?: string;
+  enabled: boolean;
+  enforced: boolean;
+  postLoginRedirect?: string;
+};
+
 export type SsoConfigInput = {
   issuerUrl: string;
   clientId: string;
@@ -59,6 +94,33 @@ const SSO_KEY = ["workspace", "sso"];
 
 export function useSsoConfig() {
   return useApiQuery<SsoConfig>(SSO_KEY, "/admin/sso");
+}
+
+const SAML_KEY = ["workspace", "saml"];
+
+export function useSamlConfig() {
+  return useApiQuery<SamlConfig>(SAML_KEY, "/admin/sso/saml");
+}
+
+export function useSamlActions() {
+  const queryClient = useQueryClient();
+  return {
+    /** The server reads the provider's metadata before saving; only the owner may turn
+     *  `enforced` on, and only one protocol can be on. */
+    async save(input: SamlConfigInput): Promise<SamlConfig> {
+      const saved = await apiFetch<SamlConfig>("/admin/sso/saml", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      });
+      queryClient.setQueryData(SAML_KEY, saved);
+      return saved;
+    },
+    /** Removes the connection; members sign in with passwords again. */
+    async remove() {
+      await apiFetch("/admin/sso/saml", { method: "DELETE" });
+      await queryClient.invalidateQueries({ queryKey: SAML_KEY });
+    },
+  };
 }
 
 export function useSsoActions() {
@@ -82,6 +144,8 @@ export function useSsoActions() {
         { method: "POST" },
       );
       queryClient.setQueryData(SSO_KEY, saved);
+      // The domains are shared with the SAML settings.
+      void queryClient.invalidateQueries({ queryKey: SAML_KEY });
       return saved;
     },
     /** Removes the connection; members sign in with passwords again. */

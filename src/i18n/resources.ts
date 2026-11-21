@@ -296,6 +296,33 @@ const en = {
     ssoDomainNotFound:
       "The record {{host}} was not found with this value yet. Try again in a few minutes.",
     ssoDomainClaimed: "Another workspace has already verified this domain.",
+    ssoProtocolOidc: "OpenID Connect",
+    ssoProtocolSaml: "SAML",
+    samlRegister: "Register this service at your provider",
+    samlRegisterHint:
+      "Create a SAML application at your identity provider with these values, then paste its metadata below.",
+    samlRegisterValues: "Values",
+    samlEntityId: "Entity ID",
+    samlAcsUrl: "Assertion consumer URL",
+    samlMetadataUrl: "Service metadata",
+    samlConnection: "SAML connection",
+    samlDescription:
+      "People sign in at your identity provider and come back with a signed assertion. Only one of OpenID Connect and SAML can be on.",
+    samlProvider: "Identity provider",
+    samlIdpEntityId: "Entity ID",
+    samlIdpSsoUrl: "Sign-in URL",
+    samlMetadataFromUrl: "Metadata URL",
+    samlMetadataHint:
+      "Read once, when you save; save again to pick up a new certificate. Or paste the XML below (the XML wins).",
+    samlMetadataXml: "Metadata XML",
+    samlMetadataKept: "The stored metadata is kept; paste XML here to replace it.",
+    samlEmailAttribute: "Email attribute",
+    samlEmailAttributeHint:
+      "The attribute that carries the address. Empty uses the NameID when it is an address.",
+    samlRoleAttribute: "Groups attribute",
+    samlRoleAttributeHint:
+      "The attribute that lists the person's groups or roles at the provider, for example groups.",
+    samlIncomplete: "Give the provider's metadata (a URL or the XML) to connect.",
     ssoRoleClaim: "Groups claim",
     ssoRoleClaimHint:
       "The id_token claim that lists the person's groups or roles at the provider, for example groups.",
@@ -1442,6 +1469,33 @@ const vi = {
     ssoDomainVerifiedToast: "Đã xác minh {{domain}}",
     ssoDomainNotFound: "Chưa thấy bản ghi {{host}} với giá trị này. Hãy thử lại sau vài phút.",
     ssoDomainClaimed: "Một workspace khác đã xác minh domain này.",
+    ssoProtocolOidc: "OpenID Connect",
+    ssoProtocolSaml: "SAML",
+    samlRegister: "Đăng ký dịch vụ này ở nhà cung cấp",
+    samlRegisterHint:
+      "Tạo một ứng dụng SAML ở nhà cung cấp danh tính với các giá trị này, rồi dán metadata của nó vào bên dưới.",
+    samlRegisterValues: "Giá trị",
+    samlEntityId: "Entity ID",
+    samlAcsUrl: "URL nhận assertion",
+    samlMetadataUrl: "Metadata của dịch vụ",
+    samlConnection: "Kết nối SAML",
+    samlDescription:
+      "Người dùng đăng nhập ở nhà cung cấp danh tính rồi quay lại với một assertion có chữ ký. Chỉ bật được một trong OpenID Connect và SAML.",
+    samlProvider: "Nhà cung cấp danh tính",
+    samlIdpEntityId: "Entity ID",
+    samlIdpSsoUrl: "URL đăng nhập",
+    samlMetadataFromUrl: "URL metadata",
+    samlMetadataHint:
+      "Chỉ đọc một lần khi bạn lưu; lưu lại để nhận chứng chỉ mới. Hoặc dán XML bên dưới (XML được ưu tiên).",
+    samlMetadataXml: "Metadata XML",
+    samlMetadataKept: "Giữ metadata đã lưu; dán XML vào đây để thay.",
+    samlEmailAttribute: "Thuộc tính email",
+    samlEmailAttributeHint:
+      "Thuộc tính chứa địa chỉ email. Để trống thì dùng NameID khi nó là một địa chỉ.",
+    samlRoleAttribute: "Thuộc tính nhóm",
+    samlRoleAttributeHint:
+      "Thuộc tính liệt kê nhóm hoặc vai trò của người đó ở nhà cung cấp, ví dụ groups.",
+    samlIncomplete: "Cần metadata của nhà cung cấp (URL hoặc XML) để kết nối.",
     ssoRoleClaim: "Claim nhóm",
     ssoRoleClaimHint:
       "Claim trong id_token liệt kê nhóm hoặc vai trò của người đó ở nhà cung cấp, ví dụ groups.",
