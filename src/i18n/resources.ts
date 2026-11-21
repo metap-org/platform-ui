@@ -282,6 +282,20 @@ const en = {
       "People with these addresses are sent here from the sign-in page, and only they may sign in through SSO. Empty: any address the provider vouches for.",
     ssoDefaultRole: "Role for new members",
     ssoDefaultRoleHint: "Given to someone signing in for the first time. Never admin.",
+    ssoDomainProof: "Domain ownership",
+    ssoDomainProofHint:
+      "A domain only routes sign-ins here, and only lets an address match or create a member, once you have proved you own it. Save the settings first; a domain you add shows up here.",
+    ssoDomainVerified: "Verified",
+    ssoDomainPending: "Not verified",
+    ssoDomainHow:
+      "Publish this TXT record at your DNS provider, then check. DNS changes can take a while to spread.",
+    ssoDomainHost: "Name",
+    ssoDomainValue: "Value",
+    ssoDomainCheck: "Check now",
+    ssoDomainVerifiedToast: "{{domain}} verified",
+    ssoDomainNotFound:
+      "The record {{host}} was not found with this value yet. Try again in a few minutes.",
+    ssoDomainClaimed: "Another workspace has already verified this domain.",
     ssoRoleClaim: "Groups claim",
     ssoRoleClaimHint:
       "The id_token claim that lists the person's groups or roles at the provider, for example groups.",
@@ -1415,6 +1429,19 @@ const vi = {
       "Người có địa chỉ thuộc các tên miền này được chuyển tới đây từ trang đăng nhập, và chỉ họ được đăng nhập qua SSO. Để trống: mọi địa chỉ nhà cung cấp xác nhận.",
     ssoDefaultRole: "Vai trò cho thành viên mới",
     ssoDefaultRoleHint: "Cấp cho người đăng nhập lần đầu. Không bao giờ là admin.",
+    ssoDomainProof: "Quyền sở hữu domain",
+    ssoDomainProofHint:
+      "Domain chỉ định tuyến đăng nhập về đây, và chỉ cho phép một địa chỉ khớp hoặc tạo thành viên, sau khi bạn chứng minh sở hữu nó. Hãy lưu cấu hình trước; domain bạn thêm sẽ hiện ở đây.",
+    ssoDomainVerified: "Đã xác minh",
+    ssoDomainPending: "Chưa xác minh",
+    ssoDomainHow:
+      "Tạo bản ghi TXT này ở nơi quản lý DNS của bạn rồi bấm kiểm tra. DNS có thể mất một lúc để lan truyền.",
+    ssoDomainHost: "Tên",
+    ssoDomainValue: "Giá trị",
+    ssoDomainCheck: "Kiểm tra ngay",
+    ssoDomainVerifiedToast: "Đã xác minh {{domain}}",
+    ssoDomainNotFound: "Chưa thấy bản ghi {{host}} với giá trị này. Hãy thử lại sau vài phút.",
+    ssoDomainClaimed: "Một workspace khác đã xác minh domain này.",
     ssoRoleClaim: "Claim nhóm",
     ssoRoleClaimHint:
       "Claim trong id_token liệt kê nhóm hoặc vai trò của người đó ở nhà cung cấp, ví dụ groups.",
