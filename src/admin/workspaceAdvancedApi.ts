@@ -23,6 +23,9 @@ export type SsoConfig = {
   /** Password sign-in refused for everyone but the owner. */
   enforced: boolean;
   postLoginRedirect: string;
+  /** The id_token claim that carries groups or roles, and what each value means here. */
+  roleClaim: string;
+  roleMap: Record<string, string>;
   /** The callback URL to register at the identity provider. */
   redirectUri: string;
 };
@@ -38,6 +41,8 @@ export type SsoConfigInput = {
   enabled: boolean;
   enforced: boolean;
   postLoginRedirect?: string;
+  roleClaim: string;
+  roleMap: Record<string, string>;
 };
 
 const SSO_KEY = ["workspace", "sso"];

@@ -150,6 +150,8 @@ const en = {
     confirmExistingHint: "You already have an account: confirm it's you with its password.",
     expiresAt: "This invitation expires {{when}}.",
     forgotLink: "Forgot your password?",
+    error_sso_required:
+      "You have joined this workspace, which signs in through its identity provider. Sign in with your company account.",
     forgotTitle: "Reset your password",
     forgotIntro: "Enter your email and we'll send you a link to set a new password.",
     forgotSubmit: "Send the link",
@@ -280,6 +282,17 @@ const en = {
       "People with these addresses are sent here from the sign-in page, and only they may sign in through SSO. Empty: any address the provider vouches for.",
     ssoDefaultRole: "Role for new members",
     ssoDefaultRoleHint: "Given to someone signing in for the first time. Never admin.",
+    ssoRoleClaim: "Groups claim",
+    ssoRoleClaimHint:
+      "The id_token claim that lists the person's groups or roles at the provider, for example groups.",
+    ssoRoleMap: "Group to role",
+    ssoRoleMapHint:
+      "Each sign-in sets these roles from the claim: a group grants its role, and leaving the group takes it away. Roles not listed here, and the owner's, are never changed. Never admin.",
+    ssoRoleMapGroup: "Group at the provider",
+    ssoRoleMapRole: "Role here",
+    ssoRoleMapAdd: "Add a mapping",
+    ssoRoleMapRemove: "Remove this mapping",
+
     ssoNoRole: "No role",
     ssoScopes: "Scopes",
     ssoPostLogin: "After sign-in, go to",
@@ -1267,6 +1280,8 @@ const vi = {
     confirmExistingHint: "Bạn đã có tài khoản: xác nhận bằng mật khẩu của tài khoản đó.",
     expiresAt: "Lời mời hết hạn lúc {{when}}.",
     forgotLink: "Quên mật khẩu?",
+    error_sso_required:
+      "Bạn đã tham gia workspace này, nơi đăng nhập qua nhà cung cấp danh tính. Hãy đăng nhập bằng tài khoản công ty.",
     forgotTitle: "Đặt lại mật khẩu",
     forgotIntro: "Nhập email, chúng tôi sẽ gửi link để đặt mật khẩu mới.",
     forgotSubmit: "Gửi link",
@@ -1400,6 +1415,17 @@ const vi = {
       "Người có địa chỉ thuộc các tên miền này được chuyển tới đây từ trang đăng nhập, và chỉ họ được đăng nhập qua SSO. Để trống: mọi địa chỉ nhà cung cấp xác nhận.",
     ssoDefaultRole: "Vai trò cho thành viên mới",
     ssoDefaultRoleHint: "Cấp cho người đăng nhập lần đầu. Không bao giờ là admin.",
+    ssoRoleClaim: "Claim nhóm",
+    ssoRoleClaimHint:
+      "Claim trong id_token liệt kê nhóm hoặc vai trò của người đó ở nhà cung cấp, ví dụ groups.",
+    ssoRoleMap: "Nhóm sang vai trò",
+    ssoRoleMapHint:
+      "Mỗi lần đăng nhập, các vai trò này được đặt theo claim: vào nhóm thì có vai trò, rời nhóm thì mất. Vai trò không có trong danh sách, và vai trò của owner, không bao giờ bị đổi. Không bao giờ là admin.",
+    ssoRoleMapGroup: "Nhóm ở nhà cung cấp",
+    ssoRoleMapRole: "Vai trò ở đây",
+    ssoRoleMapAdd: "Thêm ánh xạ",
+    ssoRoleMapRemove: "Xoá ánh xạ này",
+
     ssoNoRole: "Không có vai trò",
     ssoScopes: "Scope",
     ssoPostLogin: "Sau khi đăng nhập, chuyển tới",

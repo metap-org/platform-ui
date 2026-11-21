@@ -23,6 +23,7 @@ import {
 const ERROR_KEYS: Record<string, string> = {
   invitation_invalid: "account.error_invitation_invalid",
   invitation_needs_sign_in: "account.error_invitation_needs_sign_in",
+  sso_required: "account.error_sso_required",
   reset_token_invalid: "account.error_reset_token_invalid",
   invalid_credentials: "account.error_wrong_current_password",
   account_locked: "login.accountLocked",
