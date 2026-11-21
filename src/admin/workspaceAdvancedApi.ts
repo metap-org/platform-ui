@@ -28,6 +28,16 @@ export type SsoConfig = {
   roleMap: Record<string, string>;
   /** The callback URL to register at the identity provider. */
   redirectUri: string;
+  /** Each domain named above and whether the workspace has proved it owns it. */
+  domains: SsoDomain[];
+};
+
+export type SsoDomain = {
+  domain: string;
+  status: "pending" | "verified";
+  /** Publish `verifyValue` as a TXT record at `verifyHost`, then check. */
+  verifyHost: string;
+  verifyValue: string;
 };
 
 export type SsoConfigInput = {
@@ -61,6 +71,16 @@ export function useSsoActions() {
         method: "PUT",
         body: JSON.stringify({ ...input, clientSecret: input.clientSecret || "" }),
       });
+      queryClient.setQueryData(SSO_KEY, saved);
+      return saved;
+    },
+    /** Looks for the domain's ownership record. Rejects (409 `domain_not_verified`) while it is
+     *  not there yet; `unique_violation` when another workspace already owns the domain. */
+    async verifyDomain(domain: string): Promise<SsoConfig> {
+      const saved = await apiFetch<SsoConfig>(
+        `/admin/sso/domains/${encodeURIComponent(domain)}/verify`,
+        { method: "POST" },
+      );
       queryClient.setQueryData(SSO_KEY, saved);
       return saved;
     },

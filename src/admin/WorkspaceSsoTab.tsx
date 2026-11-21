@@ -25,6 +25,7 @@ import {
   useSsoConfig,
   type SsoConfig,
   type SsoConfigInput,
+  type SsoDomain,
 } from "./workspaceAdvancedApi";
 
 const DEFAULT_SCOPES = ["openid", "email", "profile"];
@@ -43,6 +44,77 @@ function draftFrom(cfg: SsoConfig): SsoConfigInput {
     roleClaim: cfg.roleClaim ?? "",
     roleMap: cfg.roleMap ?? {},
   };
+}
+
+/** The saved domains and what each still needs: the TXT record to publish, and a check. */
+function DomainProofs({ domains }: { domains: SsoDomain[] }) {
+  const { t } = useTranslation();
+  const actions = useSsoActions();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ domain: string; text: string } | null>(null);
+  if (domains.length === 0) return null;
+
+  async function check(domain: string) {
+    setBusy(domain);
+    setMessage(null);
+    try {
+      await actions.verifyDomain(domain);
+      toast(t("workspace.ssoDomainVerifiedToast", { domain }));
+    } catch (err) {
+      const text =
+        err instanceof ApiError && err.code === "domain_not_verified"
+          ? t("workspace.ssoDomainNotFound", { host: `_metap-verify.${domain}` })
+          : err instanceof ApiError && err.code === "unique_violation"
+            ? t("workspace.ssoDomainClaimed")
+            : err instanceof Error
+              ? err.message
+              : t("common.somethingWentWrong");
+      setMessage({ domain, text });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <ul className="flex w-full flex-col divide-y divide-border rounded-md border border-border">
+      {domains.map((d) => (
+        <li key={d.domain} className="flex flex-col gap-2 p-3">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{d.domain}</span>
+            <Badge variant={d.status === "verified" ? "success-soft" : "warning-soft"}>
+              {d.status === "verified"
+                ? t("workspace.ssoDomainVerified")
+                : t("workspace.ssoDomainPending")}
+            </Badge>
+          </div>
+          {d.status === "pending" ? (
+            <>
+              <p className="text-xs text-muted-foreground">{t("workspace.ssoDomainHow")}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                <dt className="text-muted-foreground">{t("workspace.ssoDomainHost")}</dt>
+                <dd className="break-all font-mono">{d.verifyHost}</dd>
+                <dt className="text-muted-foreground">{t("workspace.ssoDomainValue")}</dt>
+                <dd className="break-all font-mono">{d.verifyValue}</dd>
+              </dl>
+              {message && message.domain === d.domain ? (
+                <p className="text-xs text-destructive">{message.text}</p>
+              ) : null}
+              <div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={busy === d.domain}
+                  onClick={() => void check(d.domain)}
+                >
+                  {t("workspace.ssoDomainCheck")}
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** One line of the group-to-role table; the group is edited as text, the role picked. */
@@ -239,6 +311,15 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
             }
           />
         </SettingsRow>
+        {saved.domains && saved.domains.length > 0 ? (
+          <SettingsRow
+            label={t("workspace.ssoDomainProof")}
+            description={t("workspace.ssoDomainProofHint")}
+            controlWidth="wide"
+          >
+            <DomainProofs domains={saved.domains} />
+          </SettingsRow>
+        ) : null}
         <SettingsRow
           label={t("workspace.ssoDefaultRole")}
           description={t("workspace.ssoDefaultRoleHint")}
