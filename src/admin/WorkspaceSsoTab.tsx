@@ -40,7 +40,24 @@ function draftFrom(cfg: SsoConfig): SsoConfigInput {
     enabled: cfg.configured ? cfg.enabled : true,
     enforced: cfg.enforced,
     postLoginRedirect: cfg.postLoginRedirect,
+    roleClaim: cfg.roleClaim ?? "",
+    roleMap: cfg.roleMap ?? {},
   };
+}
+
+/** One line of the group-to-role table; the group is edited as text, the role picked. */
+type MapLine = { group: string; role: string };
+
+function linesFrom(map: Record<string, string>): MapLine[] {
+  return Object.entries(map).map(([group, role]) => ({ group, role }));
+}
+
+function mapFrom(lines: MapLine[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of lines) {
+    if (line.group.trim() && line.role) out[line.group.trim()] = line.role;
+  }
+  return out;
 }
 
 /** Single sign-on through the tenant's OIDC identity provider (roadmap 115 M7). */
@@ -61,10 +78,15 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
   const { data: me } = useCurrentUser();
   const isOwner = !!me?.userId && me.userId === owner.data?.ownerMemberId;
   const [draft, setDraft] = useState<SsoConfigInput>(() => draftFrom(saved));
+  const [lines, setLines] = useState<MapLine[]>(() => linesFrom(saved.roleMap ?? {}));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const set = (patch: Partial<SsoConfigInput>) => setDraft((d) => ({ ...d, ...patch }));
+  const setLines_ = (next: MapLine[]) => {
+    setLines(next);
+    set({ roleMap: mapFrom(next) });
+  };
   const needsSecret = !saved.hasClientSecret && !draft.clientSecret;
 
   async function save() {
@@ -231,6 +253,79 @@ function SsoForm({ saved }: { saved: SsoConfig }) {
               value={draft.defaultRole || undefined}
               onValueChange={(defaultRole) => set({ defaultRole })}
             />
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoRoleClaim")}
+          description={t("workspace.ssoRoleClaimHint")}
+          controlWidth="wide"
+        >
+          <Input
+            className="w-full"
+            aria-label={t("workspace.ssoRoleClaim")}
+            placeholder="groups"
+            error={fieldErrors.roleClaim?.[0]}
+            value={draft.roleClaim}
+            onChange={(e) => set({ roleClaim: e.currentTarget.value })}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t("workspace.ssoRoleMap")}
+          description={t("workspace.ssoRoleMapHint")}
+          controlWidth="wide"
+        >
+          <div className="flex w-full flex-col gap-2">
+            {lines.map((line, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  className="flex-1"
+                  aria-label={t("workspace.ssoRoleMapGroup")}
+                  placeholder={t("workspace.ssoRoleMapGroup")}
+                  value={line.group}
+                  onChange={(e) =>
+                    setLines_(
+                      lines.map((l, i) =>
+                        i === index ? { ...l, group: e.currentTarget.value } : l,
+                      ),
+                    )
+                  }
+                />
+                <div className="w-48">
+                  <Select
+                    lazy
+                    aria-label={t("workspace.ssoRoleMapRole")}
+                    placeholder={t("workspace.ssoRoleMapRole")}
+                    options={(roles ?? [])
+                      .filter((r) => r.name !== "admin" && r.name !== "platform_admin")
+                      .map((r) => ({ value: r.name, label: roleDisplayName(r) }))}
+                    value={line.role || undefined}
+                    onValueChange={(role) =>
+                      setLines_(lines.map((l, i) => (i === index ? { ...l, role } : l)))
+                    }
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("workspace.ssoRoleMapRemove")}
+                  onClick={() => setLines_(lines.filter((_, i) => i !== index))}
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+            {fieldErrors.roleMap?.[0] ? (
+              <p className="text-xs text-destructive">{fieldErrors.roleMap[0]}</p>
+            ) : null}
+            <div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLines_([...lines, { group: "", role: "" }])}
+              >
+                {t("workspace.ssoRoleMapAdd")}
+              </Button>
+            </div>
           </div>
         </SettingsRow>
         <SettingsRow
