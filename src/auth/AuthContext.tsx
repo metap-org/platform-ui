@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../api/client";
 import { onSessionExpired } from "../api/sessionEvents";
+import { CURRENT_USER_STALE_MS } from "./useCurrentUser";
 
 export type AuthStatus = "unknown" | "authenticated" | "anonymous";
 
@@ -63,6 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["currentUser"],
     queryFn: () => apiFetch<MeResponse>("/auth/me"),
     retry: false,
+    // Same key as `useCurrentUser`, and each observer decides on its own whether the data is stale
+    // when it mounts: this one must agree, or the provider would re-ask on every remount itself.
+    staleTime: CURRENT_USER_STALE_MS,
     refetchInterval: 20 * 60 * 1000,
   });
 

@@ -12,6 +12,15 @@ export type CurrentUser = {
   roles: string[];
 };
 
+/** How long the caller's own record counts as fresh. React Query refetches a stale query every time
+ *  a component that reads it mounts, and this record is read by the shell *and* by most pages
+ *  (`AdminOnly`, `Can`, the Users and Workspace pages, ...): with the default `staleTime` of 0 every
+ *  navigation to such a page re-asked `GET /auth/me`. The session is kept alive by `AuthProvider`'s
+ *  own 20-minute poll (that one ignores `staleTime`), and login, logout, tenant switch and a 401
+ *  anywhere refetch it explicitly, so a few minutes of freshness only delays seeing a role change
+ *  made while someone was already signed in. */
+export const CURRENT_USER_STALE_MS = 5 * 60 * 1000;
+
 /** Backed by `GET /auth/me` — the frontend's only way to know the caller's roles, since roles
  * are deliberately never encoded on the JWT itself (looked up fresh per request server-side).
  *
@@ -28,6 +37,7 @@ export function useCurrentUser() {
     queryKey: ["currentUser"],
     queryFn: () => apiFetch<{ data: CurrentUser }>("/auth/me"),
     retry: false,
+    staleTime: CURRENT_USER_STALE_MS,
     select: (response) => response.data,
   });
 }
