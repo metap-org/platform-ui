@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, ApiError } from "../api/client";
 import { useNavigationAdapter } from "../navigation/NavigationContext";
 import { useAuth } from "./AuthContext";
-import { tenantLabel } from "./accountApi";
+import { tenantLabel, useSignupOpen } from "./accountApi";
 import { MfaCodeInput, MfaEnrollmentFlow } from "./MfaEnrollment";
 import {
   beginRequiredMfaSetup,
@@ -59,6 +59,7 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
   const { t } = useTranslation();
   const { markAuthenticated } = useAuth();
   const navAdapter = useNavigationAdapter();
+  const signupOpen = useSignupOpen().data === true;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -329,6 +330,14 @@ export function LoginForm({ tenantId }: LoginFormProps = {}) {
         >
           {t("account.forgotLink")}
         </navAdapter.Link>
+        {signupOpen ? (
+          <navAdapter.Link
+            to="/signup"
+            className="self-center text-sm text-primary hover:underline"
+          >
+            {t("signup.link")}
+          </navAdapter.Link>
+        ) : null}
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />
           <span className="text-xs text-muted-foreground">{t("login.orDivider")}</span>

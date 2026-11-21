@@ -101,3 +101,41 @@ export function stripTokenFromUrl() {
   url.searchParams.delete("token");
   window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
 }
+
+// --- Self-service signup (roadmap 115 M2) ------------------------------------------------------
+
+/** Whether this deployment lets anyone register a tenant of their own (`/auth/signup/status`). */
+export function useSignupOpen() {
+  return useApiQuery<{ data: { enabled: boolean } }, boolean>(
+    ["account", "signupStatus"],
+    "/auth/signup/status",
+    (r) => r.data.enabled,
+    true,
+    { staleTime: 5 * 60 * 1000 },
+  );
+}
+
+export type SignupInput = {
+  tenantName: string;
+  email: string;
+  displayName?: string;
+  password: string;
+};
+
+/** Emails a confirmation link; answers the same whether or not the address already has an
+ *  account, so it cannot be used to find out who does. Rejects with `signup_disabled`,
+ *  `validation_failed` (`fieldErrors`) or `captcha_failed`. */
+export async function startSignup(input: SignupInput) {
+  await apiFetch("/auth/signup", { method: "POST", body: JSON.stringify(input) });
+}
+
+/** Opens the confirmed link: creates the tenant with the person as its admin and signs them in
+ *  (cookie). `mfaRequired` when the address already has an account with a second factor: sign in
+ *  the usual way then. Rejects with `signup_invalid`. */
+export async function completeSignup(token: string): Promise<{ mfaRequired: boolean }> {
+  const res = await apiFetch<{ data?: { mfaRequired?: boolean } }>("/auth/signup/verify", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  return { mfaRequired: Boolean(res?.data?.mfaRequired) };
+}
