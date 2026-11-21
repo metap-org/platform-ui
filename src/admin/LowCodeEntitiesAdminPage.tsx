@@ -205,6 +205,7 @@ const FieldRowEditor = memo(function FieldRowEditor({
       </TableCell>
       <TableCell>
         <Select
+          lazy
           options={FIELD_KINDS.map((k) => ({ value: k, label: k }))}
           value={row.kind}
           onValueChange={(value) => onUpdate(index, { kind: value })}
@@ -236,6 +237,7 @@ const FieldRowEditor = memo(function FieldRowEditor({
       </TableCell>
       <TableCell>
         <Select
+          lazy
           options={[
             { value: "substring", label: t("admin.lowcode.searchModeSubstring") },
             { value: "fts", label: t("admin.lowcode.searchModeFts") },

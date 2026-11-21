@@ -18,6 +18,19 @@ logic-nghiệp-vụ (ví dụ đệ quy cây điều kiện ABAC ở `ConditionN
 className="flex ...">` bọc ngoài để bố cục — xem gạch đầu dòng Tree/TreeView bên dưới) vẫn ở lại
 đây vì đó là composition của 1 tính năng cụ thể, không phải atom dùng lại được.
 
+## Nguyên tắc hiệu năng UI (2026-11-21)
+
+Rút ra từ màn Policies bị khựng (ma trận quyền × entity). Chi phí UI nằm ở **lần dựng đầu** nhiều hơn là ở re-render, nên kiểm theo thứ tự này:
+
+1. **Đếm số thứ được mount, không đếm số lần render.** Một thành phần nặng lặp trong mỗi hàng/ô (Radix `Select`, `Popover`, `DatePicker`) nhân lên theo số hàng. Radix `Select` mount toàn bộ option kể cả khi đang đóng. Với bất kỳ `Select` nào nằm trong hàng lặp, ma trận hay bảng sửa tại chỗ: dùng `<Select lazy ...>` (design-system): nút tĩnh giống hệt, thành Select thật ở lần tương tác đầu. Bộ lọc đơn lẻ trên thanh công cụ thì không cần.
+2. **Danh sách dài thì ảo hoá hoặc phân trang** (`DataList` dùng `@tanstack/react-virtual`); không render hàng trăm hàng thật.
+3. **Hàng/nhóm trong danh sách lớn là `memo` với comparator theo dữ liệu của chính nó** (ví dụ `entityGrantSignature`), và callback truyền xuống phải ổn định (`useCallback`, hoặc functional updater đọc state qua ref). Một thay đổi ở một hàng không được render lại các hàng khác.
+4. **Việc lọc/tìm kiếm trên danh sách lớn dùng `useDeferredValue`** để gõ phím không bị chặn.
+5. **Không tạo `Intl.*` / `toLocaleString(locale, opts)` trong hàng.** Dùng `formatDateTime`, `shortDate`, `relativeTime` ở `lib/dates.ts` (formatter được cache theo locale), hoặc formatter cấp module như `fieldKindConfig.ts`.
+6. **Dữ liệu**: metadata tĩnh dùng `staleTime: Infinity`, danh sách chậm đổi dùng `staleTime` dài; không retry lỗi 4xx; layout route mount một lần (không bọc `RequireAuth` ở từng route).
+7. **Key ổn định.** `key={selected.name}` ép remount cả cây khi đổi lựa chọn; chỉ dùng khi thật sự muốn reset state.
+8. **Đo bằng đọc mã trước khi tối ưu** (đếm mount, tìm vòng `.map` chứa component nặng); không đoán. Không dùng tự động hoá trình duyệt để kiểm: người dùng tự thử trong trình duyệt thật.
+
 ## Trạng thái (2026-08-28)
 
 **Đã port 100% sang `@metap/ui`, gỡ hẳn `@mantine/*` khỏi `package.json`.** Toàn bộ

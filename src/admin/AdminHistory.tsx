@@ -3,7 +3,7 @@ import { Badge, Button, Spinner } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useTenantUsers } from "../auth/useTenantUsers";
-import { relativeTime } from "../lib/dates";
+import { relativeTime, formatDateTime } from "../lib/dates";
 import type { UserAuditEvent } from "./userAdminApi";
 
 const AUDIT_ACTION_KEYS: Record<UserAuditEvent["action"], string> = {
@@ -56,7 +56,7 @@ export function AdminHistory({
               </span>
               <span
                 className="shrink-0 text-xs text-muted-foreground"
-                title={new Date(event.occurredAt).toLocaleString()}
+                title={formatDateTime(event.occurredAt)}
               >
                 {relativeTime(event.occurredAt, i18n.language)}
               </span>

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@metap/ui";
 import { useTranslation } from "react-i18next";
-import { relativeTime } from "../lib/dates";
+import { relativeTime, formatDateTime } from "../lib/dates";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useEntityLabels } from "../i18n/useEntityLabels";
 import { useTenantUsers } from "../auth/useTenantUsers";
@@ -81,7 +81,7 @@ export function AuditTrailList({
                 {event.transitionAction ? ` (${event.transitionAction})` : ""}
               </span>
               <span className="text-xs text-muted-foreground">
-                {new Date(event.occurredAt).toLocaleString()}
+                {formatDateTime(event.occurredAt)}
                 {actorEmail ? ` · ${t("detail.auditBy", { actor: actorEmail })}` : ""}
               </span>
             </div>
@@ -275,7 +275,7 @@ export function AuditLog({
                     >
                       <TableCell
                         className="whitespace-nowrap px-3 py-1.5 text-muted-foreground"
-                        title={new Date(entry.occurredAt).toLocaleString(locale)}
+                        title={formatDateTime(entry.occurredAt, locale)}
                       >
                         {relativeTime(entry.occurredAt, locale)}
                       </TableCell>
