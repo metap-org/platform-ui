@@ -2,6 +2,8 @@ export type TransitionAvailability = {
   action: string;
   available: boolean;
   reason?: string;
+  /** Translation key of `reason`, when the guard declares one (see `workflow/guardMessage`). */
+  reasonKey?: string;
 };
 
 export type RecordCapabilities = {

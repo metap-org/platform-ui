@@ -304,9 +304,11 @@ function MenuIcon() {
 function AccountMenu({
   onLogout,
   accountSecurityPath,
+  localeSwitcher,
 }: {
   onLogout: () => void;
   accountSecurityPath: string | null;
+  localeSwitcher: boolean;
 }) {
   const { t } = useTranslation();
   const navAdapter = useNavigationAdapter();
@@ -342,10 +344,14 @@ function AccountMenu({
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <div className="px-2 py-1.5">
-          <LocaleSwitcher compact />
-        </div>
-        <DropdownMenuSeparator />
+        {localeSwitcher ? (
+          <>
+            <div className="px-2 py-1.5">
+              <LocaleSwitcher compact />
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         {accountSecurityPath ? (
           <DropdownMenuItem onSelect={() => navAdapter.navigate(accountSecurityPath)}>
             {t("shell.accountSecurity")}
@@ -375,6 +381,7 @@ export function AppShellLayout({
   navItems,
   children,
   accountSecurityPath = "/account/security",
+  localeSwitcher = true,
 }: {
   /** The product's mark: a name, or a logo with a name. A string is also its accessible label. */
   brand: ReactNode;
@@ -385,6 +392,9 @@ export function AppShellLayout({
   /** Where the account menu's "Account security" entry goes (mount `AccountSecurityPage` there);
    *  `null` hides the entry. */
   accountSecurityPath?: string | null;
+  /** Show the language switcher in the account menu (default). A product that offers it on its
+   *  own settings screen turns this off and renders `LocaleSwitcher` there. */
+  localeSwitcher?: boolean;
 }) {
   const { t } = useTranslation();
   const { logout } = useAuth();
@@ -498,6 +508,7 @@ export function AppShellLayout({
               <AccountMenu
                 onLogout={() => void handleLogout()}
                 accountSecurityPath={accountSecurityPath}
+                localeSwitcher={localeSwitcher}
               />
             </div>
           </header>

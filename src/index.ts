@@ -77,6 +77,7 @@ export * from "./navigation/ReactRouterNavigationProvider";
 export * from "./shell/AppCommandPalette";
 export * from "./shell/AppShellLayout";
 export * from "./shell/ErrorBoundary";
+export * from "./workflow/guardMessage";
 export * from "./workflow/WorkflowActionBar";
 export * from "./workflow/WorkflowStepper";
 export * from "./workflow/WorkflowVisualizeDialog";
