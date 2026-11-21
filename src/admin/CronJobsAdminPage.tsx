@@ -34,6 +34,7 @@ import {
   type CronJob,
 } from "./adminApi";
 import { AdminOnly } from "../auth/AdminOnly";
+import { CredentialPicker } from "./CredentialPicker";
 import { ConfirmButton } from "./ConfirmButton";
 
 // `email`/`steps` were missing here (found live 2026-09-06,
@@ -439,7 +440,7 @@ function CreateCronJobDialog({
   const [webhookHeaders, setWebhookHeaders] = useState<KeyValueRow[]>([]);
   // JSON sent verbatim as the request body (`WebhookConfig.body: Option<Value>`), no templating.
   const [webhookBody, setWebhookBody] = useState("");
-  const [webhookAuthFromSecret, setWebhookAuthFromSecret] = useState(false);
+  const [webhookCredentialId, setWebhookCredentialId] = useState("");
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
@@ -462,7 +463,7 @@ function CreateCronJobDialog({
     setWebhookMethod(HTTP_METHODS[1] ?? "POST");
     setWebhookHeaders([]);
     setWebhookBody("");
-    setWebhookAuthFromSecret(false);
+    setWebhookCredentialId("");
     setEmailTo("");
     setEmailSubject("");
     setEmailBody("");
@@ -499,7 +500,7 @@ function CreateCronJobDialog({
           method: webhookMethod,
           ...(Object.keys(headers).length > 0 ? { headers } : {}),
           ...(body !== undefined ? { body } : {}),
-          ...(webhookAuthFromSecret ? { authorizationFromSecret: true } : {}),
+          ...(webhookCredentialId ? { credentialId: webhookCredentialId } : {}),
         };
       }
       case "email": {
@@ -733,20 +734,16 @@ function CreateCronJobDialog({
                       rows={3}
                     />
                   </Field>
-                  <div className="flex items-start justify-between gap-4 sm:col-span-2">
-                    <div>
-                      <div className="text-sm font-medium">
-                        {t("admin.cronJobs.targetAuthFromSecret")}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {t("admin.cronJobs.targetAuthFromSecretDescription")}
-                      </p>
-                    </div>
-                    <Toggle
-                      checked={webhookAuthFromSecret}
-                      onCheckedChange={setWebhookAuthFromSecret}
-                      aria-label={t("admin.cronJobs.targetAuthFromSecret")}
+                  <div className="sm:col-span-2">
+                    <CredentialPicker
+                      label={t("admin.cronJobs.targetAuthFromSecret")}
+                      kinds={["authorization", "userpass"]}
+                      value={webhookCredentialId}
+                      onChange={setWebhookCredentialId}
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("admin.cronJobs.targetAuthFromSecretDescription")}
+                    </p>
                   </div>
                 </>
               ) : null}

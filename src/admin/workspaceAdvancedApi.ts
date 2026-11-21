@@ -216,3 +216,96 @@ export async function downloadAuditExport(filter: AuditFilter, format: "csv" | "
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// --- Credentials -------------------------------------------------------------------------------
+
+/** Where a credential's value lives: encrypted in metap's own database, or in the deployment's
+ *  external secret manager (Vault, AWS or GCP Secret Manager). */
+export type CredentialSource = "database" | "external";
+
+/** What a credential is, so a form offers only the ones that fit: an HTTP `Authorization` header
+ *  value, any opaque secret, or a username and password (sent as HTTP Basic by a webhook). */
+export type CredentialKind = "authorization" | "secret" | "userpass";
+
+/** Something that links to a credential (today: a cron job). */
+export type CredentialUse = { kind: string; id: string; name: string };
+
+export type Credential = {
+  id: string;
+  name: string;
+  description: string;
+  kind: CredentialKind;
+  /** Shown for a `userpass` credential; its password is write-only like any value. */
+  username: string;
+  source: CredentialSource;
+  createdAt: string;
+  updatedAt: string;
+  usedBy: CredentialUse[];
+};
+
+export type CredentialsView = {
+  credentials: Credential[];
+  /** The deployment can store credentials encrypted in the database. */
+  databaseAvailable: boolean;
+  /** An external secret manager takes writes; `externalKind` names it (`vault`, `aws`, `gcp`). */
+  externalAvailable: boolean;
+  externalKind: string;
+};
+
+export type CredentialInput = {
+  name: string;
+  description?: string;
+  kind: CredentialKind;
+  /** Required for `userpass` (then `value` is the password), refused for the other kinds. */
+  username?: string;
+  source: CredentialSource;
+  value: string;
+};
+
+/** Changes only what is set. A `value` replaces the stored one; changing `source` needs a `value`
+ *  too (a stored value is never read back). */
+export type CredentialPatch = {
+  name?: string;
+  description?: string;
+  /** `userpass` only; the password stays unless `value` is set. */
+  username?: string;
+  source?: CredentialSource;
+  value?: string;
+};
+
+const CREDENTIALS_KEY = ["workspace", "credentials"];
+
+export function useCredentials() {
+  return useApiQuery<CredentialsView>(CREDENTIALS_KEY, "/admin/credentials");
+}
+
+export function useCredentialActions() {
+  const queryClient = useQueryClient();
+  const settle = (view: CredentialsView) => queryClient.setQueryData(CREDENTIALS_KEY, view);
+  return {
+    async create(input: CredentialInput) {
+      settle(
+        await apiFetch<CredentialsView>("/admin/credentials", {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+      );
+    },
+    async update(id: string, patch: CredentialPatch) {
+      settle(
+        await apiFetch<CredentialsView>(`/admin/credentials/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+        }),
+      );
+    },
+    /** Refused with `record_referenced` while a job uses it (`fieldErrors.usedBy` names them). */
+    async remove(id: string) {
+      settle(
+        await apiFetch<CredentialsView>(`/admin/credentials/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        }),
+      );
+    },
+  };
+}

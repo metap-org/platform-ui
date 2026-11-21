@@ -40,6 +40,7 @@ export * from "./auth/OidcCallbackPage";
 export * from "./auth/AccountSecurityPage";
 export * from "./auth/MfaEnrollment";
 export * from "./auth/securityApi";
+export * from "./admin/CredentialPicker";
 export * from "./admin/WorkspaceAdminPage";
 export * from "./admin/workspaceAdminApi";
 export * from "./admin/workspaceAdvancedApi";
