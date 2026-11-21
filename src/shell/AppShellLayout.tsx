@@ -371,11 +371,15 @@ function AccountMenu({
  * without every consumer app wiring its own provider. */
 export function AppShellLayout({
   brand,
+  brandLabel,
   navItems,
   children,
   accountSecurityPath = "/account/security",
 }: {
-  brand: string;
+  /** The product's mark: a name, or a logo with a name. A string is also its accessible label. */
+  brand: ReactNode;
+  /** Accessible name when `brand` is not a plain string (a logo has none of its own). */
+  brandLabel?: string;
   navItems: ShellNavItem[];
   children: ReactNode;
   /** Where the account menu's "Account security" entry goes (mount `AccountSecurityPage` there);
@@ -404,14 +408,23 @@ export function AppShellLayout({
     });
   }
 
-  const brandLink = (
+  const brandName = brandLabel ?? (typeof brand === "string" ? brand : undefined);
+  // The same mark sits on the navigation rail (whose text color is the rail's own token, since a
+  // theme may make the rail dark) and on the page-colored top bar on small screens.
+  const brandLink = (onRail: boolean) => (
     <navAdapter.Link
       to={navAdapter.toHome()}
-      className="truncate px-1 text-sm font-bold text-foreground no-underline"
+      aria-label={brandName}
+      className={`flex min-w-0 items-center gap-2 truncate px-1 text-sm font-bold no-underline ${
+        onRail ? "text-sidebar-accent-foreground" : "text-foreground"
+      }`}
     >
       {brand}
     </navAdapter.Link>
   );
+  // Buttons that live on the rail take its colors, not the page's.
+  const railButton =
+    "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
   return (
     <ToastProvider>
@@ -427,11 +440,11 @@ export function AppShellLayout({
 
         <Sidebar collapsed={collapsed} className="hidden md:flex">
           <SidebarHeader className={collapsed ? "justify-center" : "justify-between"}>
-            {collapsed ? null : brandLink}
+            {collapsed ? null : brandLink(true)}
             <IconButton
               variant="ghost"
               size="sm"
-              className="h-8 w-8"
+              className={`h-8 w-8 ${railButton}`}
               aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
               onClick={toggleCollapsed}
               icon={<ChevronIcon left={!collapsed} />}
@@ -444,14 +457,19 @@ export function AppShellLayout({
 
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent side="left" className="w-64 max-w-[80vw] gap-0 p-0">
-            <SheetTitle className="sr-only">{brand}</SheetTitle>
+            <SheetTitle className="sr-only">{brandName}</SheetTitle>
             <Sidebar className="w-full border-r-0">
-              <SidebarHeader>{brandLink}</SidebarHeader>
+              <SidebarHeader>{brandLink(true)}</SidebarHeader>
               <SidebarContent>
                 <NavGroups items={navItems} onNavigate={() => setMobileNavOpen(false)} />
               </SidebarContent>
               <SidebarFooter>
-                <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={railButton}
+                  onClick={() => void handleLogout()}
+                >
                   {t("shell.logout")}
                 </Button>
               </SidebarFooter>
@@ -460,7 +478,7 @@ export function AppShellLayout({
         </Sheet>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-3">
+          <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-3">
             <div className="flex min-w-0 items-center gap-2">
               <IconButton
                 variant="ghost"
@@ -471,7 +489,7 @@ export function AppShellLayout({
                 onClick={() => setMobileNavOpen(true)}
                 icon={<MenuIcon />}
               />
-              <div className="md:hidden">{brandLink}</div>
+              <div className="md:hidden">{brandLink(false)}</div>
             </div>
             <div className="flex items-center gap-2">
               <div className="hidden md:block">
