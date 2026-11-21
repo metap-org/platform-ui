@@ -3,7 +3,7 @@ import { Alert, Badge, Button, DateTimePicker, Input, Select, Spinner } from "@m
 import { useTranslation } from "react-i18next";
 import { ApiErrorMessage } from "../api/ApiErrorMessage";
 import { useTenantUsers } from "../auth/useTenantUsers";
-import { relativeTime } from "../lib/dates";
+import { relativeTime, formatDateTime } from "../lib/dates";
 import {
   downloadAuditExport,
   useAuditEntries,
@@ -253,7 +253,7 @@ function AuditRow({
         <span className="text-muted-foreground">{who(entry.actorUserId)}</span>
         <span
           className="ml-auto shrink-0 text-xs text-muted-foreground"
-          title={new Date(entry.occurredAt).toLocaleString()}
+          title={formatDateTime(entry.occurredAt)}
         >
           {entry.seq ? `#${entry.seq} · ` : ""}
           {relativeTime(entry.occurredAt, locale)}

@@ -205,6 +205,7 @@ const EntityRow = memo(
           {label}
         </span>
         <Select
+          lazy
           className="h-7 px-2 text-xs"
           aria-label={t("admin.rolePermissions.rowPreset", { entity: label })}
           options={options}
@@ -299,6 +300,7 @@ const PermissionGroup = memo(
             <span className="text-xs font-normal text-muted-foreground">({members.length})</span>
           </button>
           <Select
+            lazy
             className="h-7 px-2 text-xs"
             aria-label={t("admin.rolePermissions.groupPreset", { group })}
             options={options}

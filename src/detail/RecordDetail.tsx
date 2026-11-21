@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatDateTime } from "../lib/dates";
 import {
   Alert,
   Button,
@@ -73,7 +74,7 @@ function WorkflowHistoryTab({ entityName, recordId }: { entityName: string; reco
               })}
             </span>
             <span className="text-xs text-muted-foreground">
-              {new Date(event.created_at).toLocaleString()}
+              {formatDateTime(event.created_at)}
               {actorEmail ? ` · ${t("detail.historyBy", { actor: actorEmail })}` : ""}
             </span>
           </li>
