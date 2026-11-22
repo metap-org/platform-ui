@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "../shell/useConfirm";
 import {
   Alert,
   Badge,
@@ -259,6 +260,7 @@ function WaveRolloutForm({ gatewayUrl, authTokenUrl }: TenantsAdminPageProps) {
 
 function TenantsTable({ gatewayUrl, authTokenUrl }: TenantsAdminPageProps) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { data: tenants, isLoading, error } = useTenants(gatewayUrl, authTokenUrl);
   const { setTenantStatus, setTenantProduct, deleteTenant } = useTenantActions(
     gatewayUrl,
@@ -298,7 +300,7 @@ function TenantsTable({ gatewayUrl, authTokenUrl }: TenantsAdminPageProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(t("admin.tenants.deleteConfirm"))) {
+    if (!(await confirm(t("admin.tenants.deleteConfirm")))) {
       return;
     }
     setRowError(null);
@@ -421,6 +423,7 @@ function TenantsTable({ gatewayUrl, authTokenUrl }: TenantsAdminPageProps) {
           )}
         </TableBody>
       </Table>
+      {confirmDialog}
     </>
   );
 }

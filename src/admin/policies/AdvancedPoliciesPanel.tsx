@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "../../shell/useConfirm";
 import {
   Alert,
   Badge,
@@ -41,6 +42,7 @@ const NO_FIELD = "";
  */
 export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { data: policies, isLoading, error, refetch } = useAdminPolicies(entity.name);
   const { data: actions } = useKnownActions();
   const { data: users } = useUserRoleAssignments();
@@ -90,7 +92,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(t("common.deleteConfirm"))) return;
+    if (!(await confirm(t("common.deleteConfirm")))) return;
     setRowError(null);
     try {
       await deletePolicy(id);
@@ -246,6 +248,7 @@ export function AdvancedPoliciesPanel({ entity }: { entity: EntitySummary }) {
           </TableBody>
         </Table>
       )}
+      {confirmDialog}
     </div>
   );
 }

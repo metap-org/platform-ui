@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useConfirm } from "../shell/useConfirm";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -193,7 +194,9 @@ export type GeneratedListProps = {
   title?: string;
   /** Extra controls in the toolbar, next to the built-in ones (e.g. an "Add zone" wizard link). */
   actions?: ReactNode;
-  /** Where the row's primary cell links to; turns the first visible column into a link. */
+  /** Where the row's primary cell links to; turns the first visible column into a link. It is also
+   *  where the row's "view" icon goes, so an entity with its own detail page never falls back to
+   *  the generic record screen (and its generic edit form). */
   rowHref?: (record: ApiRecord) => string;
   /** Per-column cell renderers keyed by field name — a derived or styled cell without leaving the
    *  generated list. Return `undefined` to fall back to the default rendering for that row. */
@@ -219,6 +222,7 @@ export function GeneratedList({
   readOnly = false,
 }: GeneratedListProps) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
   const invalidateRecords = useInvalidateRecords();
@@ -419,7 +423,7 @@ export function GeneratedList({
   const requiredFieldNames = new Set(listView.requiredFields ?? []);
 
   async function handleDelete(record: RecordDto) {
-    if (!window.confirm(t("common.deleteConfirm"))) {
+    if (!(await confirm(t("common.deleteConfirm")))) {
       return;
     }
 
@@ -446,7 +450,7 @@ export function GeneratedList({
   }
 
   async function handleBulkDelete() {
-    if (!window.confirm(t("common.bulkDeleteConfirm", { count: selectedIds.size }))) {
+    if (!(await confirm(t("common.bulkDeleteConfirm", { count: selectedIds.size })))) {
       return;
     }
 
@@ -577,186 +581,189 @@ export function GeneratedList({
     canDelete && record.capabilities?.canDelete !== false;
 
   return (
-    <DataList
-      title={title ?? entityLabel(entity.label)}
-      rows={records}
-      getRowId={(record) => record.id}
-      columns={columns}
-      loading={recordsLoading}
-      error={recordsError}
-      search={
-        hasSearch
-          ? {
-              value: searchInput,
-              onChange: (value) => {
-                setSearchInput(value);
-                setPage(1);
-              },
-            }
-          : undefined
-      }
-      filtersActive={Object.keys(activeFilters).length > 0}
-      onRefresh={() => void refetch()}
-      refreshing={isFetching}
-      columnVisibilityKey={hiddenColumnsStorageKey(entityName, listView.name)}
-      sort={sort}
-      onSortChange={(next) => {
-        setPage(1);
-        setSort(next);
-      }}
-      toolbar={
-        <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              {/* `title` states the "loaded rows only" scope up front. */}
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={exportingAllFormat !== null || records.length === 0}
-                loading={exportingAllFormat !== null}
-                title={
-                  exportingAllFormat !== null
-                    ? t("common.exportingAll", { count: exportedSoFar })
-                    : t("common.exportScopeHint")
-                }
-              >
-                {exportingAllFormat !== null
-                  ? t("common.exportingAll", { count: exportedSoFar })
-                  : t("common.export")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{t("common.exportLoadedGroup")}</DropdownMenuLabel>
-              <DropdownMenuItem
-                disabled={exportingAllFormat !== null}
-                onSelect={() => exportLoadedRecords("csv", entityName, listViewFields, records)}
-              >
-                {t("common.exportCsv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={exportingAllFormat !== null}
-                onSelect={() => exportLoadedRecords("json", entityName, listViewFields, records)}
-              >
-                {t("common.exportJson")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel title={t("common.exportAllScopeHint")}>
-                {t("common.exportAllGroup")}
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                disabled={exportingAllFormat !== null}
-                onSelect={() => void handleExportAll("csv")}
-              >
-                {t("common.exportAllCsv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={exportingAllFormat !== null}
-                onSelect={() => void handleExportAll("json")}
-              >
-                {t("common.exportAllJson")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {actions}
-          {canCreate ? (
-            <navAdapter.Link
-              to={newHref ?? navAdapter.toNewRecord(entityName)}
-              className={buttonVariants({ variant: "default" })}
-            >
-              {t("common.new")}
-            </navAdapter.Link>
-          ) : null}
-        </>
-      }
-      banner={
-        deleteError ? (
-          <Alert variant="destructive" className="flex items-start justify-between gap-2">
-            {deleteError instanceof ApiError &&
-            deleteError.code === "record_referenced" &&
-            deleteError.fieldErrors ? (
-              <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />
-            ) : (
-              <span>{deleteError.message}</span>
-            )}
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label="Dismiss"
-              onClick={() => setDeleteError(null)}
-              icon={
-                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
+    <>
+      <DataList
+        title={title ?? entityLabel(entity.label)}
+        rows={records}
+        getRowId={(record) => record.id}
+        columns={columns}
+        loading={recordsLoading}
+        error={recordsError}
+        search={
+          hasSearch
+            ? {
+                value: searchInput,
+                onChange: (value) => {
+                  setSearchInput(value);
+                  setPage(1);
+                },
               }
-            />
-          </Alert>
-        ) : null
-      }
-      selection={{
-        selectedIds,
-        onChange: setSelectedIds,
-        isSelectable: recordDeletable,
-        actions: (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            loading={bulkDeleting}
-            onClick={() => void handleBulkDelete()}
-          >
-            {t("common.bulkDelete", { count: selectedIds.size })}
-          </Button>
-        ),
-      }}
-      rowActions={(record) => {
-        const deleting = pendingDeleteId === record.id;
-        return (
+            : undefined
+        }
+        filtersActive={Object.keys(activeFilters).length > 0}
+        onRefresh={() => void refetch()}
+        refreshing={isFetching}
+        columnVisibilityKey={hiddenColumnsStorageKey(entityName, listView.name)}
+        sort={sort}
+        onSortChange={(next) => {
+          setPage(1);
+          setSort(next);
+        }}
+        toolbar={
           <>
-            {/* A router link styled as a ghost icon button; `!`-important because the classes are
-                concatenated after `buttonVariants` without `cn()`'s conflict resolution. */}
-            <navAdapter.Link
-              to={navAdapter.toRecordDetail(entityName, record.id)}
-              className={`${buttonVariants({ variant: "ghost" })} !h-7 !w-7 !p-0`}
-              aria-label={t("common.view")}
-              title={t("common.view")}
-            >
-              <EyeIcon />
-            </navAdapter.Link>
-            {recordDeletable(record) ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                {/* `title` states the "loaded rows only" scope up front. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingAllFormat !== null || records.length === 0}
+                  loading={exportingAllFormat !== null}
+                  title={
+                    exportingAllFormat !== null
+                      ? t("common.exportingAll", { count: exportedSoFar })
+                      : t("common.exportScopeHint")
+                  }
+                >
+                  {exportingAllFormat !== null
+                    ? t("common.exportingAll", { count: exportedSoFar })
+                    : t("common.export")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{t("common.exportLoadedGroup")}</DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={exportingAllFormat !== null}
+                  onSelect={() => exportLoadedRecords("csv", entityName, listViewFields, records)}
+                >
+                  {t("common.exportCsv")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={exportingAllFormat !== null}
+                  onSelect={() => exportLoadedRecords("json", entityName, listViewFields, records)}
+                >
+                  {t("common.exportJson")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel title={t("common.exportAllScopeHint")}>
+                  {t("common.exportAllGroup")}
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={exportingAllFormat !== null}
+                  onSelect={() => void handleExportAll("csv")}
+                >
+                  {t("common.exportAllCsv")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={exportingAllFormat !== null}
+                  onSelect={() => void handleExportAll("json")}
+                >
+                  {t("common.exportAllJson")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {actions}
+            {canCreate ? (
+              <navAdapter.Link
+                to={newHref ?? navAdapter.toNewRecord(entityName)}
+                className={buttonVariants({ variant: "default" })}
+              >
+                {t("common.new")}
+              </navAdapter.Link>
+            ) : null}
+          </>
+        }
+        banner={
+          deleteError ? (
+            <Alert variant="destructive" className="flex items-start justify-between gap-2">
+              {deleteError instanceof ApiError &&
+              deleteError.code === "record_referenced" &&
+              deleteError.fieldErrors ? (
+                <ReferencedByErrorMessage fieldErrors={deleteError.fieldErrors} />
+              ) : (
+                <span>{deleteError.message}</span>
+              )}
               <IconButton
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 text-destructive hover:text-destructive"
-                aria-label={t("common.delete")}
-                title={t("common.delete")}
-                disabled={pendingDeleteId !== null && !deleting}
-                onClick={() => void handleDelete(record)}
-                icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
+                aria-label="Dismiss"
+                onClick={() => setDeleteError(null)}
+                icon={
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                }
               />
-            ) : null}
-          </>
-        );
-      }}
-      wrapPrimaryCell={
-        rowHref
-          ? (record, cell) => (
-              <navAdapter.Link to={rowHref(record)} className="font-medium hover:underline">
-                {cell}
+            </Alert>
+          ) : null
+        }
+        selection={{
+          selectedIds,
+          onChange: setSelectedIds,
+          isSelectable: recordDeletable,
+          actions: (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              loading={bulkDeleting}
+              onClick={() => void handleBulkDelete()}
+            >
+              {t("common.bulkDelete", { count: selectedIds.size })}
+            </Button>
+          ),
+        }}
+        rowActions={(record) => {
+          const deleting = pendingDeleteId === record.id;
+          return (
+            <>
+              {/* A router link styled as a ghost icon button; `!`-important because the classes are
+                concatenated after `buttonVariants` without `cn()`'s conflict resolution. */}
+              <navAdapter.Link
+                to={rowHref ? rowHref(record) : navAdapter.toRecordDetail(entityName, record.id)}
+                className={`${buttonVariants({ variant: "ghost" })} !h-7 !w-7 !p-0`}
+                aria-label={t("common.view")}
+                title={t("common.view")}
+              >
+                <EyeIcon />
               </navAdapter.Link>
-            )
-          : undefined
-      }
-      paging={{
-        page,
-        pageSize: limit,
-        total,
-        onPageChange: setPage,
-        pageSizeOptions,
-        onPageSizeChange: (size) => {
-          setPageSize(size);
-          setPage(1);
-        },
-      }}
-    />
+              {recordDeletable(record) ? (
+                <IconButton
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  aria-label={t("common.delete")}
+                  title={t("common.delete")}
+                  disabled={pendingDeleteId !== null && !deleting}
+                  onClick={() => void handleDelete(record)}
+                  icon={deleting ? <Spinner size="sm" /> : <TrashIcon />}
+                />
+              ) : null}
+            </>
+          );
+        }}
+        wrapPrimaryCell={
+          rowHref
+            ? (record, cell) => (
+                <navAdapter.Link to={rowHref(record)} className="font-medium hover:underline">
+                  {cell}
+                </navAdapter.Link>
+              )
+            : undefined
+        }
+        paging={{
+          page,
+          pageSize: limit,
+          total,
+          onPageChange: setPage,
+          pageSizeOptions,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(1);
+          },
+        }}
+      />
+      {confirmDialog}
+    </>
   );
 }

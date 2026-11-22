@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useConfirm } from "../shell/useConfirm";
 import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -978,6 +979,7 @@ function LowCodeEntitiesAdminPageContent({
   authTokenUrl?: string;
 }) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { data: entities, isLoading, error, refetch } = useLowCodeEntities();
   const { getDraft, saveDraft, publish, previewPublish, rollback, setEnabled } =
     useLowCodeActions();
@@ -1172,7 +1174,7 @@ function LowCodeEntitiesAdminPageContent({
   }
 
   async function handleRollback(entityName: string, versionNumber: number) {
-    if (!window.confirm(t("admin.lowcode.versions.rollbackConfirm", { version: versionNumber }))) {
+    if (!(await confirm(t("admin.lowcode.versions.rollbackConfirm", { version: versionNumber })))) {
       return;
     }
     setRowError(null);
@@ -1434,6 +1436,7 @@ function LowCodeEntitiesAdminPageContent({
           </Tabs>
         </div>
       ) : null}
+      {confirmDialog}
     </div>
   );
 }
