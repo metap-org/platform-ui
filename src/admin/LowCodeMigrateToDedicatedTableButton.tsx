@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "../shell/useConfirm";
 import { Button } from "@metap/ui";
 import { useTranslation } from "react-i18next";
 import { useLowCodeControlPlaneActions, useLowCodePublished } from "./lowCodeControlPlane";
@@ -12,7 +13,7 @@ import { useLowCodeControlPlaneActions, useLowCodePublished } from "./lowCodeCon
  *  - the entity has never been published (no `tableName` to inspect yet), or
  *  - it's already on its own dedicated table (`tableName !== "records"`).
  *
- * Confirmation is required (same `window.confirm` pattern `LowCodeEntitiesAdminPage.tsx`'s own
+ * Confirmation is required (same confirm pattern (`useConfirm`) `LowCodeEntitiesAdminPage.tsx`'s own
  * rollback action uses) since this kicks off an actual reconciler-driven schema migration.
  */
 export function LowCodeMigrateToDedicatedTableButton({
@@ -25,6 +26,7 @@ export function LowCodeMigrateToDedicatedTableButton({
   authTokenUrl: string;
 }) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { data: published } = useLowCodePublished(name, gatewayUrl, authTokenUrl);
   const { migrateToDedicatedTable } = useLowCodeControlPlaneActions(gatewayUrl, authTokenUrl);
   const [migrating, setMigrating] = useState(false);
@@ -35,7 +37,7 @@ export function LowCodeMigrateToDedicatedTableButton({
   }
 
   async function handleClick() {
-    if (!window.confirm(t("admin.lowcode.migrateToDedicatedTable.confirm", { entity: name }))) {
+    if (!(await confirm(t("admin.lowcode.migrateToDedicatedTable.confirm", { entity: name })))) {
       return;
     }
     setError(null);
@@ -55,6 +57,7 @@ export function LowCodeMigrateToDedicatedTableButton({
         {t("admin.lowcode.migrateToDedicatedTable.action")}
       </Button>
       {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      {confirmDialog}
     </div>
   );
 }

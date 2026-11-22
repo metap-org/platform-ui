@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "../shell/useConfirm";
 import { formatDateTime } from "../lib/dates";
 import {
   Alert,
@@ -95,6 +96,7 @@ export function RecordDetail({
   showRelated?: boolean;
 }) {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirm();
   const { entityLabel, fieldLabel } = useEntityLabels(entityName);
   const navAdapter = useNavigationAdapter();
   const invalidateRecords = useInvalidateRecords();
@@ -109,7 +111,7 @@ export function RecordDetail({
   } = useRecord(entityName, id);
 
   async function handleDelete() {
-    if (!record || !window.confirm(t("common.deleteConfirm"))) {
+    if (!record || !(await confirm(t("common.deleteConfirm")))) {
       return;
     }
 
@@ -333,6 +335,7 @@ export function RecordDetail({
       ) : (
         fieldsAndRelated
       )}
+      {confirmDialog}
     </div>
   );
 }
