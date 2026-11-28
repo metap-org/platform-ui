@@ -1,0 +1,5 @@
+# Patched versions of two transitive dev dependencies (openapi-typescript > @redocly/openapi-core)
+# that its own ranges did not move to. Remove once openapi-typescript resolves them by itself.
+overrides:
+  "brace-expansion@2": "^2.1.7"
+  "js-yaml@4": "^4.3.2"
