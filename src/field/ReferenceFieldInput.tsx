@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Autocomplete } from "@metap/ui";
 import { useRecord, useRecords, type ApiRecord } from "../api/records";
 import type { EntityField } from "../metadata/types";
+import { useEntity } from "../metadata/useEntity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 function labelFor(record: ApiRecord, refDisplayField: string | undefined): string {
@@ -40,8 +41,14 @@ export function ReferenceFieldInput({
   // it wasn't loading anything at all). An empty filter value would now mean "IS NULL" since
   // `metap-query`'s empty-filter-value fix, so this branch omits the filter entirely rather than
   // sending it empty.
+  // The server refuses a filter the target's list view does not declare, so a target that cannot
+  // be filtered by its display field keeps showing its first page.
+  const { data: target } = useEntity(refEntity ?? "", Boolean(refEntity));
+  const canFilter = Boolean(
+    field.refDisplayField && target?.listViews[0]?.filters.includes(field.refDisplayField),
+  );
   const searchFilters =
-    debouncedSearch.length > 0 && field.refDisplayField
+    debouncedSearch.length > 0 && field.refDisplayField && canFilter
       ? { [field.refDisplayField]: debouncedSearch }
       : {};
   const { data: searchResults } = useRecords(

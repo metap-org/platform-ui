@@ -315,8 +315,11 @@ export function GeneratedList({
 
     const textFromUrl: Record<string, string> = {};
     const enumFromUrl: Record<string, string> = {};
+    // Only the list view's own filters: the server refuses any other, so a stray parameter in a
+    // link (a tracking tag, a filter removed since) must not become one.
+    const filterable = new Set(entity.listViews[0]?.filters ?? []);
     for (const [key, value] of searchParams.entries()) {
-      if (RESERVED_URL_PARAMS.has(key)) continue;
+      if (RESERVED_URL_PARAMS.has(key) || !filterable.has(key)) continue;
       const field = entity.fields.find((f) => f.name === key);
       if (field?.kind === "enum") {
         enumFromUrl[key] = value;
